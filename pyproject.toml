@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "django-indexer"
+version = "0.1.0"
+description = "Potlock indexer built using Django & NEAR Data Lake Framework"
+authors = ["Lachlan Glen <54282009+lachlanglen@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^5.0.4"
+psycopg2-binary = "^2.9.9"
+near-lake-framework = "^0.0.7"
+celery = "^5.3.6"
+redis = "^5.0.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
