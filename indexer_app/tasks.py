@@ -1,9 +1,12 @@
-
 import asyncio
 from pathlib import Path
+
 from celery import shared_task
-from near_lake_framework import LakeConfig, streamer
 from django.conf import settings
+from near_lake_framework import LakeConfig, streamer
+
+from indexer_app.handler import handle_streamer_message
+
 
 async def indexer(network: str, from_block: int, to_block: int):
     """
@@ -22,9 +25,10 @@ async def indexer(network: str, from_block: int, to_block: int):
         try:
             # streamer_message is the current block
             streamer_message = await streamer_messages_queue.get()
-            print("streamer_message", streamer_message)
+            handle_streamer_message(streamer_message)
         except Exception as e:
             print("Error in streamer_messages_queue", e)
+
 
 @shared_task
 def listen_to_near_events():
