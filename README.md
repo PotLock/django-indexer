@@ -13,6 +13,7 @@
 - Install postgres
 - Create postgres database `potlock` for user `postgres`
 - Activate poetry shell (`poetry shell`)
+- Install dependencies (`poetry install`)
 - Run migrations (`python manage.py migrate`)
 - Start celery worker with logger (`celery -A indexer worker --loglevel=info`)
 - Start indexer (`python manage.py runindexer`)
