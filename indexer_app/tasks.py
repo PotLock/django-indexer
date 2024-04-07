@@ -17,7 +17,6 @@ async def indexer(network: str, from_block: int, to_block: int):
     lake_config.start_block_height = (
         from_block if from_block else print("Starting to index from latest block")
     )
-    print("settings.AWS_ACCESS_KEY_ID", settings.AWS_ACCESS_KEY_ID)
     lake_config.aws_access_key_id = settings.AWS_ACCESS_KEY_ID
     lake_config.aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
     _, streamer_messages_queue = streamer(lake_config)
