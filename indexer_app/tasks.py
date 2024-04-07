@@ -35,6 +35,7 @@ def listen_to_near_events():
     asyncio.set_event_loop(loop)
 
     try:
+        # Update below with desired network & block height
         loop.run_until_complete(indexer("mainnet", 116_190_760, None))
     finally:
         loop.close()

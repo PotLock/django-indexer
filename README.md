@@ -4,6 +4,7 @@
 
 - Django w/ Poetry
 - Celery for background indexer task
+- NEAR Data Lake Framework for fetching/listening for blocks
 
 ## Steps to run:
 
@@ -15,6 +16,7 @@
 - Activate poetry shell (`poetry shell`)
 - Install dependencies (`poetry install`)
 - Run migrations (`python manage.py migrate`)
+- Update `indexer_app.tasks.listen_to_near_events` with desired network & start block (if desired)
 - Start celery worker with logger (`celery -A indexer worker --loglevel=info`)
 - Start indexer (`python manage.py runindexer`)
 - Kill indexer (`python manage.py killindexer`)
