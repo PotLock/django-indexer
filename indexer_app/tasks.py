@@ -24,18 +24,19 @@ async def indexer(network: str, from_block: int, to_block: int):
         try:
             # streamer_message is the current block
             streamer_message = await streamer_messages_queue.get()
-            handle_streamer_message(streamer_message)
+            await handle_streamer_message(streamer_message)
         except Exception as e:
             print("Error in streamer_messages_queue", e)
 
 
 @shared_task
 def listen_to_near_events():
+    print("tell us you're alive!!!!")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
         # Update below with desired network & block height
-        loop.run_until_complete(indexer("mainnet", 116_190_760, None))
+        loop.run_until_complete(indexer("mainnet", 112_724_128, None))
     finally:
         loop.close()

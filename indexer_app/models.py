@@ -159,6 +159,13 @@ class ListRegistration(models.Model):
         null=False,
         help_text=_("Account that registered on the list."),
     )
+    registered_by = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="list_registrars",
+        null=False,
+        help_text=_("Account that did the registration."), # this correct?
+    )
     status = models.CharField(
         _("registration status"),
         max_length=32,
@@ -292,6 +299,11 @@ class Pot(models.Model):
         related_name="owned_pots",
         null=False,
         help_text=_("Pot owner."),
+    )
+    admins = models.ManyToManyField(
+        Account,
+        related_name="admin_pot",
+        help_text=_("Pot admins."),
     )
     chef = models.ForeignKey(
         Account,
@@ -434,7 +446,7 @@ class Pot(models.Model):
     )
     cooldown_period_ms = models.PositiveIntegerField(
         _("cooldown period in ms"),
-        null=False,
+        null=True,
         help_text=_("Pot cooldown period in ms."),
     )
     all_paid_out = models.BooleanField(
@@ -796,7 +808,7 @@ class Donation(models.Model):
     referrer_fee = models.CharField(
         _("referrer fee"),
         max_length=64,
-        null=False,
+        null=True,
         help_text=_("Referrer fee."),
     )
     referrer_fee_usd = models.DecimalField(
