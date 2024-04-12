@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     "celery",
     "accounts",
     "indexer_app",
+    "lists",
+    "pots",
 ]
 
 MIDDLEWARE = [
