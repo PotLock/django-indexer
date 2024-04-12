@@ -154,14 +154,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case "admin_set_default_project_status":
                             print("registry default status setting incoming:", args_dict)
                             await handle_default_list_status_change(
-                                args_dict, receiver_id)
+                                args_dict, receiver_id, status_obj)
                             break
 
-                        case "admin_set_project_status":
+                        case "update_registration":
                             print("project registration status update incoming:",
                                 args_dict)
                             await handle_project_registration_update(
-                                args_dict, receiver_id)
+                                args_dict, receiver_id, status_obj)
                             break
 
                         case "chef_set_payouts":

@@ -254,20 +254,22 @@ async def handle_new_project(data, receiverId, signerId, receipt, status_obj):
     except Exception as e:
         print(f"Encountered error trying to insert activity: {e}")
 
-async def handle_project_registration_update(data, receiverId):
+async def handle_project_registration_update(data, receiverId, status_obj):
     print("new Project data::", data, receiverId)
+
+    data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
 
     # Prepare data for update
     regUpdate = {
         "status": data["status"],
-        "admin_notes": data["review_notes"],
-        "updated_at": created_at,
+        "admin_notes": data["admin_notes"],
+        "updated_at": datetime.fromtimestamp(data["updated_ms"] / 1000),
     }
 
     try:
         # Perform the update
-        await ListRegistration.objects.filter(registrant_id=data["project_id"]).aupdate(**regUpdate)
-        print("Updated ListRegistration with project_id:", data["project_id"])
+        await ListRegistration.objects.filter(id=data["id"]).aupdate(**regUpdate)
+        print("Updated ListRegistration with id:", data["id"])
     except Exception as e:
         print(f"Encountered error trying to update ListRegistration: {e}")
 
@@ -340,20 +342,34 @@ async def handle_application_status_change(data, receiverId, signerId, receipt, 
 
     print("PotApplicationReview and PotApplication updated successfully.")
 
-async def handle_default_list_status_change(data, receiverId):
+async def handle_default_list_status_change(data, receiverId, status_obj):
     print("update project data::", data, receiverId)
 
-    list_id = data.get("list_id") or receiverId
-    listUpdate = {
-        "default_registration_status": data["status"]
-    }
+    result_data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
 
-    await List.objects.filter(id=list_id).aupdate(**listUpdate)
+    list_id = data.get("registration_id")
+    list_update = {
+        "name": result_data["name"],
+        "owner_id": result_data["owner"],
+        "default_registration_status": result_data["default_registration_status"],
+        "admin_only_registrations": result_data["admin_only_registrations"],
+        "updated_at": result_data["updated_at"],
+    }
+    if result_data.get("description"):
+        list_update["description"] =  result_data["description"]
+    if result_data.get("cover_image_url"):
+        list_update["cover_image_url"] =  result_data["cover_image_url"]
+
+    await List.objects.filter(id=list_id).aupdate(**list_update)
 
     print("List updated successfully.")
 
 async def handle_up_voting(data, receiverId, signerId, receiptId):
     print("upvote list::", data, receiverId)
+
+    acct, _ = await Account.objects.aget_or_create(
+        id=signerId,
+    )
 
     created_at = datetime.now()
 
