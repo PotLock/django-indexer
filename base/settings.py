@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "indexer_app",
     "lists",
     "pots",
+    "tokens",
 ]
 
 MIDDLEWARE = [
