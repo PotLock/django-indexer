@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "celery",
     "accounts",
+    "activities",
     "donations",
     "indexer_app",
     "lists",
