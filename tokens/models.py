@@ -18,6 +18,9 @@ class Token(models.Model):
         help_text=_("Token decimals."),
     )
 
+    def get_most_recent_price(self):
+        return self.historical_prices.order_by("-timestamp").first()
+
 
 class TokenHistoricalPrice(models.Model):
     token = models.ForeignKey(
@@ -32,6 +35,7 @@ class TokenHistoricalPrice(models.Model):
         null=False,
         help_text=_("Price timestamp."),
         db_index=True,
+        default=timezone.now,
     )
     price_usd = models.DecimalField(
         _("price USD"),

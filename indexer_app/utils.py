@@ -1,59 +1,48 @@
 import base64
 import decimal
 import json
-import re
-from datetime import datetime
+from datetime import date, datetime
+from tkinter import E
 
 import requests
+from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
-from indexer_app.models import (
-    Account,
-    Activity,
-    Donation,
-    List,
-    ListRegistration,
-    ListUpvote,
+from accounts.models import Account
+from activities.models import Activity
+from base.utils import format_date, format_to_near
+from donations.models import Donation
+from lists.models import List, ListRegistration, ListUpvote
+from pots.models import (
     Pot,
     PotApplication,
     PotApplicationReview,
     PotFactory,
     PotPayout,
     PotPayoutChallenge,
-    TokenHistoricalData,
 )
+from tokens.models import Token, TokenHistoricalPrice
 
 GECKO_URL = "https://api.coingecko.com/api/v3"
 
 
-def format_date(date):
-    year = date.year
-    month = str(date.month).zfill(2)
-    day = str(date.day).zfill(2)
-    return f"{day}-{month}-{year}"
-
-def format_to_near(yocto_amount):
-    near_amount = int(yocto_amount) / (10 ** 24)
-    return near_amount
-
-async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId, created_at):
+async def handle_new_pot(
+    data: dict,
+    receiverId: str,
+    signerId: str,
+    predecessorId: str,
+    receiptId: str,
+    created_at: datetime,
+):
     print("new pot deployment process... upsert accounts,")
 
     # Upsert accounts
-    owner, _ = await Account.objects.aget_or_create(
-        id=data["owner"]
-    )
-    signer, _ = await Account.objects.aget_or_create(
-        id=signerId
-    )
-    receiver, _ = await Account.objects.aget_or_create(
-        id=receiverId
-    )
+    owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+    signer, _ = await Account.objects.aget_or_create(id=signerId)
+    receiver, _ = await Account.objects.aget_or_create(id=receiverId)
 
     print("upsert chef")
     if data.get("chef"):
-        chef, _ = await Account.objects.aget_or_create(
-            id=data["chef"]
-        )
+        chef, _ = await Account.objects.aget_or_create(id=data["chef"])
 
     # Create Pot object
     print("create pot....")
@@ -69,17 +58,23 @@ async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId, c
         description=data["pot_description"],
         max_approved_applicants=data["max_projects"],
         base_currency="near",
-        application_start=datetime.fromtimestamp(data["application_start_ms"]/1000),
-        application_end=datetime.fromtimestamp(data["application_end_ms"]/1000),
-        matching_round_start=datetime.fromtimestamp(data["public_round_start_ms"]/1000),
-        matching_round_end=datetime.fromtimestamp(data["public_round_end_ms"]/1000),
+        application_start=datetime.fromtimestamp(data["application_start_ms"] / 1000),
+        application_end=datetime.fromtimestamp(data["application_end_ms"] / 1000),
+        matching_round_start=datetime.fromtimestamp(
+            data["public_round_start_ms"] / 1000
+        ),
+        matching_round_end=datetime.fromtimestamp(data["public_round_end_ms"] / 1000),
         registry_provider=data["registry_provider"],
         min_matching_pool_donation_amount=data["min_matching_pool_donation_amount"],
         sybil_wrapper_provider=data["sybil_wrapper_provider"],
         custom_sybil_checks=data.get("custom_sybil_checks"),
         custom_min_threshold_score=data.get("custom_min_threshold_score"),
-        referral_fee_matching_pool_basis_points=data["referral_fee_matching_pool_basis_points"],
-        referral_fee_public_round_basis_points=data["referral_fee_public_round_basis_points"],
+        referral_fee_matching_pool_basis_points=data[
+            "referral_fee_matching_pool_basis_points"
+        ],
+        referral_fee_public_round_basis_points=data[
+            "referral_fee_public_round_basis_points"
+        ],
         chef_fee_basis_points=data["chef_fee_basis_points"],
         total_matching_pool="0",
         matching_pool_balance="0",
@@ -88,15 +83,13 @@ async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId, c
         public_donations_count=0,
         cooldown_period_ms=None,
         all_paid_out=False,
-        protocol_config_provider=data["protocol_config_provider"]
+        protocol_config_provider=data["protocol_config_provider"],
     )
 
     # Add admins to the Pot
     if data.get("admins"):
         for admin_id in data["admins"]:
-            admin, _ = await Account.objects.aget_or_create(
-                id=admin_id
-            )
+            admin, _ = await Account.objects.aget_or_create(id=admin_id)
             potObject.admins.aadd(admin)
 
     # Create activity object
@@ -106,12 +99,13 @@ async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId, c
         timestamp=created_at,
         type="Deploy_Pot",
         action_result=data,
-        tx_hash=receiptId
+        tx_hash=receiptId,
     )
 
-async def handle_new_factory(data, receiverId, created_at):
+
+async def handle_new_pot_factory(data: dict, receiverId: str, created_at: datetime):
     print("upserting accounts...")
-    
+
     # Upsert accounts
     owner, _ = await Account.objects.aget_or_create(
         id=data["owner"],
@@ -130,10 +124,10 @@ async def handle_new_factory(data, receiverId, created_at):
         id=receiver,
         owner=owner,
         deployed_at=created_at,
-        source_metadata= data["source_metadata"],
+        source_metadata=data["source_metadata"],
         protocol_fee_basis_points=data["protocol_fee_basis_points"],
         protocol_fee_recipient=protocol_fee_recipient_account,
-        require_whitelist=data["require_whitelist"]
+        require_whitelist=data["require_whitelist"],
     )
 
     # Add admins to the PotFactory
@@ -147,19 +141,18 @@ async def handle_new_factory(data, receiverId, created_at):
     # Add whitelisted deployers to the PotFactory
     if data.get("whitelisted_deployers"):
         for deployer_id in data["whitelisted_deployers"]:
-            deployer, _ = await Account.objects.aget_or_create(
-                id=deployer_id
-            )
+            deployer, _ = await Account.objects.aget_or_create(id=deployer_id)
             await factory.whitelisted_deployers.aadd(deployer)
 
 
-async def handle_registry(signerId, receiverId, status_obj):
+async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionOutcome):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
-    data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
+    data = json.loads(
+        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+    )
 
     print("creating list.....", data)
 
-    
     listObject = await List.objects.acreate(
         id=data["id"],
         owner_id=data["owner"],
@@ -172,20 +165,13 @@ async def handle_registry(signerId, receiverId, status_obj):
         updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
     )
 
-
     print("upserting involveed accts...")
 
-    await Account.objects.aget_or_create(
-        id=data["owner"]
-    )
+    await Account.objects.aget_or_create(id=data["owner"])
 
-    await Account.objects.aget_or_create(
-        id=signerId
-    )
+    await Account.objects.aget_or_create(id=signerId)
 
-    await Account.objects.aget_or_create(
-        id=receiverId
-    )
+    await Account.objects.aget_or_create(id=receiverId)
 
     if data.get("admins"):
         for admin_id in data["admins"]:
@@ -195,14 +181,22 @@ async def handle_registry(signerId, receiverId, status_obj):
             await listObject.admins.aadd(admin_object)
 
 
-async def handle_new_project(data, receiverId, signerId, receipt, status_obj):
+async def handle_new_list_registration(
+    data: dict,
+    receiverId: str,
+    signerId: str,
+    receipt: Receipt,
+    status_obj: ExecutionOutcome,
+):
     print("new Project data::", data, receiverId)
 
     # Retrieve receipt data
     if receipt is None:
         return
 
-    reg_data = json.loads(base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8"))
+    reg_data = json.loads(
+        base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
+    )
     print("Receipt data:", reg_data)
 
     # Prepare data for insertion
@@ -210,31 +204,34 @@ async def handle_new_project(data, receiverId, signerId, receipt, status_obj):
     insert_data = []
     for dt in reg_data:
         project_list.append({"id": dt["registrant_id"]})
-        insert_data.append({
-            "id": dt["id"],
-            "registrant_id": dt["registrant_id"],
-            "list_id": dt["list_id"],
-            "status": dt["status"],
-            "submitted_at": datetime.fromtimestamp(dt["submitted_ms"]/1000),
-            "updated_at": datetime.fromtimestamp(dt["updated_ms"]/1000),
-            "registered_by_id": dt["registered_by"],
-            "admin_notes": dt.get("admin_notes"),
-            "registrant_notes": dt.get("registrant_notes"),
-            "tx_hash": receipt.receipt_id
-        })
-    
+        insert_data.append(
+            {
+                "id": dt["id"],
+                "registrant_id": dt["registrant_id"],
+                "list_id": dt["list_id"],
+                "status": dt["status"],
+                "submitted_at": datetime.fromtimestamp(dt["submitted_ms"] / 1000),
+                "updated_at": datetime.fromtimestamp(dt["updated_ms"] / 1000),
+                "registered_by_id": dt["registered_by"],
+                "admin_notes": dt.get("admin_notes"),
+                "registrant_notes": dt.get("registrant_notes"),
+                "tx_hash": receipt.receipt_id,
+            }
+        )
 
     try:
-        await Account.objects.abulk_create(objs=[Account(**data) for data in project_list], ignore_conflicts=True)
-        await Account.objects.aget_or_create(
-            id=signerId
+        await Account.objects.abulk_create(
+            objs=[Account(**data) for data in project_list], ignore_conflicts=True
         )
+        await Account.objects.aget_or_create(id=signerId)
         print("Upserted accounts/registrants(signer)")
     except Exception as e:
         print(f"Encountered error trying to get create acct: {e}")
 
     try:
-        await ListRegistration.objects.abulk_create([ListRegistration(**data) for data in insert_data])
+        await ListRegistration.objects.abulk_create(
+            [ListRegistration(**data) for data in insert_data]
+        )
     except Exception as e:
         print(f"Encountered error trying to create list: {e}")
 
@@ -248,15 +245,20 @@ async def handle_new_project(data, receiverId, signerId, receipt, status_obj):
             timestamp=insert_data[0]["submitted_at"],
             type="Register_Batch",
             action_result=reg_data,
-            tx_hash=receipt.receipt_id
+            tx_hash=receipt.receipt_id,
         )
     except Exception as e:
         print(f"Encountered error trying to insert activity: {e}")
 
-async def handle_project_registration_update(data, receiverId, status_obj):
+
+async def handle_list_registration_update(
+    data: dict, receiverId: str, status_obj: ExecutionOutcome
+):
     print("new Project data::", data, receiverId)
 
-    data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
+    data = json.loads(
+        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+    )
 
     # Prepare data for update
     regUpdate = {
@@ -272,14 +274,27 @@ async def handle_project_registration_update(data, receiverId, status_obj):
     except Exception as e:
         print(f"Encountered error trying to update ListRegistration: {e}")
 
-async def handle_pot_application(data, receiverId, signerId, receipt, status_obj, created_at):
+
+async def handle_pot_application(
+    data: dict,
+    receiverId: str,
+    signerId: str,
+    receipt: Receipt,
+    status_obj: ExecutionOutcome,
+    created_at: datetime,
+):
     # receipt = block.receipts().filter(lambda receipt: receipt.receiptId == receiptId)[0]
     result = status_obj.status.get("SuccessValue")
     if not result:
         return
 
     appl_data = json.loads(base64.b64decode(result).decode("utf-8"))
-    print("new pot application data::", data, appl_data["message"], appl_data["submitted_at"])
+    print(
+        "new pot application data::",
+        data,
+        appl_data["message"],
+        appl_data["submitted_at"],
+    )
 
     # Update or create the account
     project, _ = await Account.objects.aget_or_create(
@@ -315,14 +330,25 @@ async def handle_pot_application(data, receiverId, signerId, receipt, status_obj
 
     print("PotApplication and Activity created successfully.")
 
-async def handle_application_status_change(data, receiverId, signerId, receipt, status_obj):
+
+async def handle_pot_application_status_change(
+    data: dict,
+    receiverId: str,
+    signerId: str,
+    receipt: Receipt,
+    status_obj: ExecutionOutcome,
+):
     print("pot application update data::", data, receiverId)
 
     # receipt = next(receipt for receipt in block.receipts() if receipt.receiptId == receiptId)
-    update_data = json.loads(base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8"))
+    update_data = json.loads(
+        base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
+    )
 
     # Retrieve the PotApplication object
-    appl = await PotApplication.objects.filter(applicant_id=data["project_id"]).afirst()
+    appl = await PotApplication.objects.filter(
+        applicant_id=data["project_id"]
+    ).afirst()  # TODO: handle this being None
 
     # Create the PotApplicationReview object
     print("create review......", appl)
@@ -337,14 +363,21 @@ async def handle_application_status_change(data, receiverId, signerId, receipt, 
     )
 
     # Update the PotApplication object
-    await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(**{"status": update_data["status"], "updated_at": updated_at})
+    await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
+        **{"status": update_data["status"], "updated_at": updated_at}
+    )
 
     print("PotApplicationReview and PotApplication updated successfully.")
 
-async def handle_default_list_status_change(data, receiverId, status_obj):
+
+async def handle_default_list_status_change(
+    data: dict, receiverId: str, status_obj: ExecutionOutcome
+):
     print("update project data::", data, receiverId)
 
-    result_data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
+    result_data = json.loads(
+        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+    )
 
     list_id = data.get("registration_id")
     list_update = {
@@ -355,15 +388,18 @@ async def handle_default_list_status_change(data, receiverId, status_obj):
         "updated_at": result_data["updated_at"],
     }
     if result_data.get("description"):
-        list_update["description"] =  result_data["description"]
+        list_update["description"] = result_data["description"]
     if result_data.get("cover_image_url"):
-        list_update["cover_image_url"] =  result_data["cover_image_url"]
+        list_update["cover_image_url"] = result_data["cover_image_url"]
 
     await List.objects.filter(id=list_id).aupdate(**list_update)
 
     print("List updated successfully.")
 
-async def handle_up_voting(data, receiverId, signerId, receiptId):
+
+async def handle_list_upvote(
+    data: dict, receiverId: str, signerId: str, receiptId: str
+):
     print("upvote list::", data, receiverId)
 
     acct, _ = await Account.objects.aget_or_create(
@@ -373,24 +409,24 @@ async def handle_up_voting(data, receiverId, signerId, receiptId):
     created_at = datetime.now()
 
     await ListUpvote.objects.acreate(
-        list_id = data.get("list_id") or receiverId,
-        account_id = signerId,
-        created_at = created_at,
+        list_id=data.get("list_id") or receiverId,
+        account_id=signerId,
+        created_at=created_at,
     )
 
     await Activity.objects.acreate(
-        signer_id = signerId,
-        receiver_id= receiverId,
-        timestamp = created_at,
-        type = "Upvote",
-        action_result = data,
-        tx_hash = receiptId,
+        signer_id=signerId,
+        receiver_id=receiverId,
+        timestamp=created_at,
+        type="Upvote",
+        action_result=data,
+        tx_hash=receiptId,
     )
-
 
     print("Upvote and activity records created successfully.")
 
-async def handle_setting_payout(data, receiverId, receipt):
+
+async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
     print("set payout data::", data, receiverId)
     payouts = data.get("payouts", [])
 
@@ -404,11 +440,13 @@ async def handle_setting_payout(data, receiverId, receipt):
             "tx_hash": receipt.receipt_id,
         }
         insertion_data.append(potPayout)
-    
+
     await PotPayout.objects.abulk_create(insertion_data)
 
 
-async def handle_payout(data, receiverId, receiptId, created_at):
+async def handle_transfer_payout(
+    data: dict, receiverId: str, receiptId: str, created_at: datetime
+):
     data = data["payout"]
     print("fulfill payout data::", data, receiverId)
     payout = {
@@ -420,7 +458,9 @@ async def handle_payout(data, receiverId, receiptId, created_at):
     await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(**payout)
 
 
-async def handle_payout_challenge(data, receiverId, signerId, receiptId):
+async def handle_payout_challenge(
+    data: dict, receiverId: str, signerId: str, receiptId: str
+):
     print("challenging payout..: ", data, receiverId)
     created_at = datetime.now()
     payoutChallenge = {
@@ -433,12 +473,12 @@ async def handle_payout_challenge(data, receiverId, signerId, receiptId):
     await PotPayoutChallenge.objects.acreate(**payoutChallenge)
 
     await Activity.objects.acreate(
-        signer_id = signerId,
-        receiver_id = receiverId,
-        timestamp = created_at,
-        type = "Challenge_Payout",
-        action_result = payoutChallenge,
-        tx_hash = receiptId,
+        signer_id=signerId,
+        receiver_id=receiverId,
+        timestamp=created_at,
+        type="Challenge_Payout",
+        action_result=payoutChallenge,
+        tx_hash=receiptId,
     )
 
 
@@ -447,7 +487,7 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
     list_obj = await List.objects.aget(id=data["list_id"])
 
     for acct in data["admins"]:
-        list_obj.admins.remove({"admins_id": acct}) # ??
+        list_obj.admins.remove({"admins_id": acct})  # ??
 
     activity = {
         "signer_id": signerId,
@@ -459,79 +499,115 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
 
     await Activity.objects.acreate(**activity)
 
-async def handle_new_donations(data, receiverId, signerId, actionName, receipt_obj, status_obj, log_data, created_at):
+
+async def handle_new_donations(
+    data: dict,
+    receiverId: str,
+    signerId: str,
+    actionName: str,
+    receipt_obj: Receipt,
+    status_obj: ExecutionOutcome,
+    log_data: list,
+    created_at: datetime,
+):
     print("new donation data:", data, receiverId)
 
     if actionName == "direct":
         print("calling donate contract...")
         # Handle direct donation
 
-        if not log_data: return
-        
+        if not log_data:
+            return
+
         if len(log_data) > 1:
-            log_data = [x for x in log_data if x['donation']['recipient_id'] == data['recipient_id']]
-        
+            log_data = [
+                x
+                for x in log_data
+                if x["donation"]["recipient_id"] == data["recipient_id"]
+            ]
+
         print("event after possible filtering:", log_data)
 
         event_data = log_data[0]
-        donation_data = event_data['donation']
-        net_amount =  int(donation_data['total_amount']) - int(donation_data['protocol_fee'])
+        donation_data = event_data["donation"]
+        net_amount = int(donation_data["total_amount"]) - int(
+            donation_data["protocol_fee"]
+        )
         print("Donation data:", donation_data, net_amount)
         # insert donate contract which is the receiver id(because of activitry relationship mainly)
         donate_contract, _ = await Account.objects.aget_or_create(id=receiverId)
 
     else:
         # Handle non-direct donation
-        donation_data = json.loads(base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8"))
-        net_amount = int(donation_data['net_amount'])
+        donation_data = json.loads(
+            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+        )
+        net_amount = int(donation_data["net_amount"])
         print("donation data decoded...", donation_data)
 
-    donated_at = datetime.fromtimestamp((donation_data.get('donated_at') or donation_data.get('donated_at_ms')) / 1000)
+    donated_at = datetime.fromtimestamp(
+        (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
+    )
 
-    print("upserting accounts involved", donation_data['donor_id'], donation_data.get('recipient_id'))
-    
+    print(
+        "upserting accounts involved",
+        donation_data["donor_id"],
+        donation_data.get("recipient_id"),
+    )
+
     # Upsert donor account
-    donor, _ = await Account.objects.aget_or_create(id=donation_data['donor_id'])
+    donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
 
-    if donation_data.get('recipient_id'):
-        recipient, _ = await Account.objects.aget_or_create(id=donation_data['recipient_id'])
+    if donation_data.get("recipient_id"):
+        recipient, _ = await Account.objects.aget_or_create(
+            id=donation_data["recipient_id"]
+        )
     else:
-        recipient, _ = await Account.objects.aget_or_create(id=donation_data['project_id'])
+        recipient, _ = await Account.objects.aget_or_create(
+            id=donation_data["project_id"]
+        )
 
-    if donation_data.get('referrer_id'):
-        referrer, _ = await Account.objects.aget_or_create(id=donation_data['referrer_id'])
+    if donation_data.get("referrer_id"):
+        referrer, _ = await Account.objects.aget_or_create(
+            id=donation_data["referrer_id"]
+        )
 
     print("get set", donor, recipient)
 
     # Upsert token account
-    token, _ = await Account.objects.aget_or_create(id=(donation_data.get('ft_id') or'near'))
+    token_acct, _ = await Account.objects.aget_or_create(
+        id=(donation_data.get("ft_id") or "near")
+    )
 
+    # Upsert token
+    try:
+        token = await Token.objects.get(id=token_acct.id)
+    except Token.DoesNotExist:
+        # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
+        token = await Token.objects.create(id=token_acct.id, decimals=12)
 
-    
     # Fetch historical token data
     try:
         print("fetching historical price...")
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
         response = requests.get(endpoint)
         price_data = response.json()
-        unit_price = price_data.get('market_data', {}).get('current_price', {}).get('usd')
-        hist_data = {
-            'token_id': donation_data.get('ft_id', 'near'),
-            'last_updated': created_at,
-            'historical_price': unit_price,
-        }
-        print("price data to insert", hist_data)
-        # Replace with appropriate Django model insertion
-        await TokenHistoricalData.objects.aupdate_or_create(token_id=hist_data['token_id'], defaults={'last_updated': hist_data['last_updated'], 'historical_price_usd': hist_data['historical_price']})
+        unit_price = (
+            price_data.get("market_data", {}).get("current_price", {}).get("usd")
+        )
+        await TokenHistoricalPrice.objects.acreate(
+            token=token_acct,
+            price_usd=unit_price,
+        )
     except Exception as e:
         print("api rate limit?", e)
-        # Replace with appropriate Django model selection
-        historical_price = await TokenHistoricalData.objects.aget(token_id=donation_data.get('ft_id', 'near')).first()
-        print("fetched old price:", historical_price.historical_price)
-        unit_price = historical_price.historical_price
+        # TODO: NB: below method has not been tested
+        historical_price = await token.get_most_recent_price()
+        print("fetched old price:", historical_price.price_usd)
+        unit_price = historical_price.price_usd
 
-    total_amount = donation_data['total_amount']
-    net_amount = net_amount - (donation_data.get('referrer_fee') or 0)
+    total_amount = donation_data["total_amount"]
+    net_amount = net_amount - (donation_data.get("referrer_fee") or 0)
 
     # Calculate USD amounts
     totalnearAmount = format_to_near(total_amount)
@@ -541,20 +617,20 @@ async def handle_new_donations(data, receiverId, signerId, actionName, receipt_o
 
     print("inserting donations...", total_amount_usd)
     donation = await Donation.objects.acreate(
-        id=donation_data['id'],
+        id=donation_data["id"],
         donor=donor,
         total_amount=total_amount,
         total_amount_usd=total_amount_usd,
         net_amount_usd=net_amount_usd,
         net_amount=net_amount,
-        ft=token,
-        message=donation_data.get('message'),
+        ft=token_acct,
+        message=donation_data.get("message"),
         donated_at=donated_at,
-        matching_pool=donation_data.get('matching_pool', False),
+        matching_pool=donation_data.get("matching_pool", False),
         recipient=recipient,
-        protocol_fee=donation_data['protocol_fee'],
-        referrer=referrer if donation_data.get('referrer_id') else None,
-        referrer_fee=donation_data.get('referrer_fee'),
+        protocol_fee=donation_data["protocol_fee"],
+        referrer=referrer if donation_data.get("referrer_id") else None,
+        referrer_fee=donation_data.get("referrer_fee"),
         tx_hash=receipt_obj.receipt_id,
     )
 
@@ -563,25 +639,37 @@ async def handle_new_donations(data, receiverId, signerId, actionName, receipt_o
         pot = await Pot.objects.aget(id=receiverId)
         Donation.objects.filter(id=donation.id).aupdate(**{"pot": pot})
         potUpdate = {
-            'total_public_donations': (pot.total_public_donations or 0) + total_amount,
+            "total_public_donations": (pot.total_public_donations or 0) + total_amount,
         }
-        if donation_data.get('matching_pool'):
-            potUpdate['total_matching_pool'] = (pot.total_matching_pool or 0) + total_amount
-            potUpdate['matching_pool_donations_count'] = (pot.matching_pool_donations_count or 0) + 1
+        if donation_data.get("matching_pool"):
+            potUpdate["total_matching_pool"] = (
+                pot.total_matching_pool or 0
+            ) + total_amount
+            potUpdate["matching_pool_donations_count"] = (
+                pot.matching_pool_donations_count or 0
+            ) + 1
             # accountUpdate = {}
         else:
-            potUpdate['public_donations_count'] = (pot.public_donations_count or 0) + 1
+            potUpdate["public_donations_count"] = (pot.public_donations_count or 0) + 1
         await Pot.objects.filter(id=pot.id).aupdate(**potUpdate)
 
     # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
-    print(f"update totl donated for {donor.id}, {donor.total_donated_usd + decimal.Decimal(total_amount_usd)}")
-    await Account.objects.filter(id=donor.id).aupdate(**{"total_donated_usd" : donor.total_donated_usd + decimal.Decimal(total_amount_usd)})
+    print(
+        f"update totl donated for {donor.id}, {donor.total_donated_usd + decimal.Decimal(total_amount_usd)}"
+    )
+    await Account.objects.filter(id=donor.id).aupdate(
+        **{
+            "total_donated_usd": donor.total_donated_usd
+            + decimal.Decimal(total_amount_usd)
+        }
+    )
     if recipient:
         acct = await Account.objects.aget(id=recipient.id)
         print(f"selected {acct} to perform donor count update")
         acctUpdate = {
-            'donors_count': acct.donors_count + 1,
-            'total_donations_received_usd': acct.total_donations_received_usd + decimal.Decimal(net_amount_usd)
+            "donors_count": acct.donors_count + 1,
+            "total_donations_received_usd": acct.total_donations_received_usd
+            + decimal.Decimal(net_amount_usd),
         }
         await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
 
@@ -590,11 +678,15 @@ async def handle_new_donations(data, receiverId, signerId, actionName, receipt_o
         signer_id=signerId,
         receiver_id=receiverId,
         timestamp=donation.donated_at,
-        type="Donate_Direct" if actionName == "direct" else ("Donate_Pot_Matching_Pool" if donation.matching_pool else "Donate_Pot_Public"),
+        type=(
+            "Donate_Direct"
+            if actionName == "direct"
+            else (
+                "Donate_Pot_Matching_Pool"
+                if donation.matching_pool
+                else "Donate_Pot_Public"
+            )
+        ),
         action_result=donation_data,
         tx_hash=receipt_obj.receipt_id,
     )
-
-def match_version_pattern(receiver):
-    pattern = r'^v\d+\.potfactory\.potlock\.near$'
-    return bool(re.match(pattern, receiver))
