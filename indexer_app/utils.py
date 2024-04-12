@@ -24,7 +24,6 @@ from indexer_app.models import (
 
 GECKO_URL = "https://api.coingecko.com/api/v3"
 
-created_at = datetime.now()
 
 def format_date(date):
     year = date.year
@@ -36,7 +35,7 @@ def format_to_near(yocto_amount):
     near_amount = int(yocto_amount) / (10 ** 24)
     return near_amount
 
-async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId):
+async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId, created_at):
     print("new pot deployment process... upsert accounts,")
 
     # Upsert accounts
@@ -110,7 +109,7 @@ async def handle_new_pot(data, receiverId, signerId, predecessorId, receiptId):
         tx_hash=receiptId
     )
 
-async def handle_new_factory(data, receiverId):
+async def handle_new_factory(data, receiverId, created_at):
     print("upserting accounts...")
     
     # Upsert accounts
@@ -273,7 +272,7 @@ async def handle_project_registration_update(data, receiverId, status_obj):
     except Exception as e:
         print(f"Encountered error trying to update ListRegistration: {e}")
 
-async def handle_pot_application(data, receiverId, signerId, receipt, status_obj):
+async def handle_pot_application(data, receiverId, signerId, receipt, status_obj, created_at):
     # receipt = block.receipts().filter(lambda receipt: receipt.receiptId == receiptId)[0]
     result = status_obj.status.get("SuccessValue")
     if not result:
@@ -409,7 +408,7 @@ async def handle_setting_payout(data, receiverId, receipt):
     await PotPayout.objects.abulk_create(insertion_data)
 
 
-async def handle_payout(data, receiverId, receiptId):
+async def handle_payout(data, receiverId, receiptId, created_at):
     data = data["payout"]
     print("fulfill payout data::", data, receiverId)
     payout = {
@@ -460,7 +459,7 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
 
     await Activity.objects.acreate(**activity)
 
-async def handle_new_donations(data, receiverId, signerId, actionName, receipt_obj, status_obj, log_data):
+async def handle_new_donations(data, receiverId, signerId, actionName, receipt_obj, status_obj, log_data, created_at):
     print("new donation data:", data, receiverId)
 
     if actionName == "direct":
