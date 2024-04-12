@@ -1,3 +1,31 @@
+- [Potlock Indexer (Django / Poetry / Celery / NEAR Lake Framework)](#potlock-indexer-django--poetry--celery--near-lake-framework)
+  - [Stack:](#stack)
+  - [Steps to run:](#steps-to-run)
+    - [Env vars example](#env-vars-example)
+  - [API Basics](#api-basics)
+    - [Base URL](#base-url)
+    - [Authorization](#authorization)
+    - [Error Responses](#error-responses)
+    - [Pagination](#pagination)
+  - [API Endpoints](#api-endpoints)
+    - [`Account` endpoints](#account-endpoints)
+      - [Get all accounts: `GET /accounts` (paginated)](#get-all-accounts-get-accounts-paginated)
+      - [Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#get-account-by-id-address-get-accountsaccount_id)
+      - [Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
+    - [`List` endpoints](#list-endpoints)
+      - [Get all lists: `GET /lists` (paginated)](#get-all-lists-get-lists-paginated)
+      - [Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#get-registrations-for-list-get-listslist_idregistrations-paginated)
+    - [`Donors` endpoints](#donors-endpoints)
+      - [Get all donors: `GET /donors` (paginated)](#get-all-donors-get-donors-paginated)
+    - [`Pots` endpoints](#pots-endpoints)
+      - [Get all pots: `GET /pots` (paginated)](#get-all-pots-get-pots-paginated)
+      - [Get applications for pot: `GET /pots/{POT_ID}/applications`](#get-applications-for-pot-get-potspot_idapplications)
+      - [Get donations for pot: `GET /pots/{POT_ID}/donations`](#get-donations-for-pot-get-potspot_iddonations)
+      - [Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`](#get-sponsors-for-pot-get-potspot_idsponsors)
+      - [Get payouts for pot: `GET /pots/{POT_ID}/payouts`](#get-payouts-for-pot-get-potspot_idpayouts)
+    - [`Stats` endpoints](#stats-endpoints)
+      - [Get stats: `GET /stats`](#get-stats-get-stats)
+
 # Potlock Indexer (Django / Poetry / Celery / NEAR Lake Framework)
 
 ## Stack:
@@ -34,3 +62,93 @@ export PL_CELERY_BROKER_URL=redis://localhost:6379/0
 export PL_AWS_ACCESS_KEY_ID=
 export PL_AWS_SECRET_ACCESS_KEY=
 ```
+
+## API Basics
+
+#### Base URL
+
+`/api/v1/`
+
+#### Authorization
+
+This is a public, read-only API and as such does not currently implement authentication or authorization.
+
+Rate limits of (FILL THIS IN) are enforced to ensure service for all users.
+
+#### Error Responses
+
+An error response (status code not within range 200-299) will always contain an object body with a `message` string property containing more information about the error.
+
+Possible Error Codes:
+
+- **`400` (Bad Request)**
+  - Error in client request
+- **`404` (Not found)**
+  - Requested resource could not be located
+- **`500` (Internal Error)**
+  - Check `message` string for more information
+
+#### Pagination
+
+Pagination available using `limit` and `offset` query params on endpoints that specify `paginated`. Default `limit` is 30.
+
+Endpoints that support pagination will return a success response containing the following:
+
+- `count` (int) - total number of items available
+- `next` (str | null) - pre-populated endpoint link to the next page of results
+- `previous` (str | null) - pre-populated endpoint link to the previous page of results
+- `results` (any[]) - array of results
+
+## API Endpoints
+
+_NB: These endpoints are what is required to integrate with BOS app & replace current RPC calls, but more endpoints can easily be added as needed._
+
+### `Account` endpoints
+
+#### Get all accounts: `GET /accounts` (paginated)
+
+#### Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
+
+#### Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
+
+Can specify `status=live` query param to retrieve only pots that are currently active (live matching round)
+
+### `List` endpoints
+
+#### Get all lists: `GET /lists` (paginated)
+
+#### Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
+
+Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
+
+### `Donors` endpoints
+
+#### Get all donors: `GET /donors` (paginated)
+
+Options to order by amount donated if desired using `order_by` query param, e.g. `order_by=amount_donated_asc` (ascending, aka order least to most) or `order_by=amount_donated_desc` (descending, aka order most to least)
+
+### `Pots` endpoints
+
+_NB: `POT_ID` == on-chain Pot address_
+
+#### Get all pots: `GET /pots` (paginated)
+
+#### Get applications for pot: `GET /pots/{POT_ID}/applications`
+
+#### Get donations for pot: `GET /pots/{POT_ID}/donations`
+
+#### Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`
+
+#### Get payouts for pot: `GET /pots/{POT_ID}/payouts`
+
+### `Stats` endpoints
+
+#### Get stats: `GET /stats`
+
+Returns:
+
+- `total_donations_usd`
+- `total_payouts_usd`
+- `total_donations_count`
+- `total_donors_count`
+- `total_recipients_count`
