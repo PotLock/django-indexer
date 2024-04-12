@@ -17,19 +17,6 @@ class Token(models.Model):
         null=False,
         help_text=_("Token decimals."),
     )
-    created_at = models.DateTimeField(
-        _("created at"),
-        null=False,
-        help_text=_("Creation date."),
-        db_index=True,
-        default=timezone.now,
-    )
-    updated_at = models.DateTimeField(
-        _("last updated"),
-        null=False,
-        help_text=_("Last updated date."),
-        db_index=True,
-    )
 
 
 class TokenHistoricalPrice(models.Model):
