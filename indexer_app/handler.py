@@ -83,7 +83,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     continue
                 receipt = receipt_execution_outcome.receipt
                 status_obj = receipt_execution_outcome.execution_outcome.outcome
-                created_at = datetime.fromtimestamp(block_timestamp / 1000000)
+                created_at = datetime.fromtimestamp(block_timestamp / 1000000000)
+
                 try:
                     function_call = action["FunctionCall"]
                     method_name = function_call["method_name"]
