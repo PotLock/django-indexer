@@ -1,47 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-## ACCOUNTS
-
-
-class Account(models.Model):
-    id = models.CharField(
-        _("address"),
-        primary_key=True,
-        max_length=64,
-        db_index=True,
-        validators=[],
-        help_text=_("On-chain account address."),
-    )
-    total_donations_in_usd = models.DecimalField(
-        _("total donations received in USD"),
-        max_digits=20,
-        decimal_places=2,
-        default=0,
-        help_text=_("Total donations received in USD."),
-    )
-    total_donations_out_usd = models.DecimalField(
-        _("total donations sent in USD"),
-        max_digits=20,
-        decimal_places=2,
-        default=0,
-        help_text=_("Total donated in USD."),
-    )
-    total_matching_pool_allocations_usd = models.DecimalField(
-        _("total matching pool allocations in USD"),
-        max_digits=20,
-        decimal_places=2,
-        default=0,
-        help_text=_("Total matching pool allocations in USD."),
-    )
-    donors_count = models.PositiveIntegerField(
-        _("donors count"),
-        default=0,
-        help_text=_("Number of donors."),
-    )
-
-    # add Meta, properties & methods as necessary
-
+from accounts.models import Account
 
 ## LISTS
 
@@ -160,7 +120,7 @@ class ListRegistration(models.Model):
     registrant = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
-        related_name="registered_lists",
+        related_name="list_registrations",
         null=False,
         help_text=_("Account that registered on the list."),
     )
@@ -169,7 +129,7 @@ class ListRegistration(models.Model):
         on_delete=models.CASCADE,
         related_name="list_registrars",
         null=False,
-        help_text=_("Account that did the registration."), # this correct?
+        help_text=_("Account that did the registration."),
     )
     status = models.CharField(
         _("registration status"),
@@ -309,7 +269,7 @@ class Pot(models.Model):
     )
     admins = models.ManyToManyField(
         Account,
-        related_name="admin_pot",
+        related_name="admin_pots",
         help_text=_("Pot admins."),
     )
     chef = models.ForeignKey(
