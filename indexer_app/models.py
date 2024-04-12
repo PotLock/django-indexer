@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+## ACCOUNTS
+
 
 class Account(models.Model):
     id = models.CharField(
@@ -11,15 +13,15 @@ class Account(models.Model):
         validators=[],
         help_text=_("On-chain account address."),
     )
-    total_donations_received_usd = models.DecimalField(
+    total_donations_in_usd = models.DecimalField(
         _("total donations received in USD"),
         max_digits=20,
         decimal_places=2,
         default=0,
         help_text=_("Total donations received in USD."),
     )
-    total_donated_usd = models.DecimalField(
-        _("total donated in USD"),
+    total_donations_out_usd = models.DecimalField(
+        _("total donations sent in USD"),
         max_digits=20,
         decimal_places=2,
         default=0,
@@ -41,6 +43,9 @@ class Account(models.Model):
     # add Meta, properties & methods as necessary
 
 
+## LISTS
+
+
 class ListRegistrationStatus(models.TextChoices):
     PENDING = "Pending", "Pending"
     APPROVED = "Approved", "Approved"
@@ -50,7 +55,7 @@ class ListRegistrationStatus(models.TextChoices):
 
 
 class List(models.Model):
-    id = models.AutoField(
+    id = models.PositiveIntegerField(
         _("list id"),
         primary_key=True,
         help_text=_("List id."),
@@ -165,6 +170,7 @@ class ListRegistration(models.Model):
         null=False,
         choices=ListRegistrationStatus.choices,
         help_text=_("Registration status."),
+        db_index=True,
     )
     submitted_at = models.DateTimeField(
         _("submitted at"),
@@ -198,6 +204,7 @@ class ListRegistration(models.Model):
         indexes = [models.Index(fields=["id", "status"], name="idx_list_id_status")]
 
 
+## POTS
 class PotFactory(models.Model):
     id = models.OneToOneField(
         Account,
@@ -574,6 +581,14 @@ class PotPayout(models.Model):
         primary_key=True,
         help_text=_("Payout id."),
     )
+    pot = models.ForeignKey(
+        Pot,
+        on_delete=models.CASCADE,
+        related_name="payouts",
+        null=False,
+        help_text=_("Pot that this payout is for."),
+        db_index=True,
+    )
     recipient = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
@@ -694,6 +709,9 @@ class PotPayoutChallengeAdminResponse(models.Model):
     )
 
 
+## DONATIONS
+
+
 class Donation(models.Model):
     id = models.AutoField(
         _("donation id"),
@@ -714,6 +732,7 @@ class Donation(models.Model):
         null=False,
         help_text=_("Total amount."),
     )
+    # TODO: consider adding formatted total_amount (would need to fetch decimals for FTs)
     total_amount_usd = models.DecimalField(
         _("total amount in USD"),
         max_digits=20,
@@ -753,6 +772,7 @@ class Donation(models.Model):
         _("matching pool"),
         null=False,
         help_text=_("Matching pool."),
+        db_index=True,
     )
     message = models.TextField(
         _("message"),
@@ -834,6 +854,9 @@ class Donation(models.Model):
     )
 
 
+## ACTIVITIES
+
+
 class ActivityType(models.TextChoices):
     DONATE_DIRECT = "Donate_Direct", "Donate Direct"
     DONATE_POT_PUBLIC = "Donate_Pot_Public", "Donate Pot Public"
@@ -895,13 +918,18 @@ class Activity(models.Model):
     )
 
 
-class TokenHistoricalData(models.Model):
+class TokenData(models.Model):
     token_id = models.CharField(
         _("token id"),
         primary_key=True,
         max_length=64,
         db_index=True,
         help_text=_("Token id."),
+    )
+    decimals = models.PositiveIntegerField(
+        _("decimals"),
+        null=False,
+        help_text=_("Token decimals."),
     )
     last_updated = models.DateTimeField(
         _("last updated"),
