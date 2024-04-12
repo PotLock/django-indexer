@@ -18,5 +18,6 @@
   },
   "[toml]": {
     "editor.defaultFormatter": "bodil.prettier-toml"
-  }
+  },
+  "python.analysis.autoImportCompletions": true
 }
