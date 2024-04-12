@@ -71,7 +71,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "indexer.urls"
+ROOT_URLCONF = "base.urls"
 
 TEMPLATES = [
     {
@@ -89,7 +89,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "indexer.wsgi.application"
+WSGI_APPLICATION = "base.wsgi.application"
 
 
 ###############################################################################
