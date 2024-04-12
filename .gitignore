@@ -105,6 +105,8 @@ poetry.lock
 venv/
 ENV/
 
+.bashrc
+
 # Spyder project settings
 .spyderproject
 .spyproject
