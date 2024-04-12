@@ -1,3 +1,4 @@
+from django import db
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -24,6 +25,7 @@ class Account(models.Model):
         decimal_places=2,
         default=0,
         help_text=_("Total donated in USD."),
+        db_index=True,
     )
     total_matching_pool_allocations_usd = models.DecimalField(
         _("total matching pool allocations in USD"),
