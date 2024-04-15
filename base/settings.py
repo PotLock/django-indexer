@@ -62,6 +62,14 @@ INSTALLED_APPS = [
     "tokens",
 ]
 
+DEFAULT_PAGE_SIZE = 30
+
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": DEFAULT_PAGE_SIZE,
+}
+
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
