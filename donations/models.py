@@ -1,3 +1,4 @@
+from django import db
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -32,6 +33,7 @@ class Donation(models.Model):
         decimal_places=2,
         null=True,
         help_text=_("Total amount in USD."),
+        db_index=True,
     )
     net_amount = models.CharField(
         _("net amount"),

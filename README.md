@@ -9,9 +9,10 @@
     - [Pagination](#pagination)
   - [API Endpoints](#api-endpoints)
     - [`Account` endpoints](#account-endpoints)
-      - [Get all accounts: `GET /accounts` (paginated)](#get-all-accounts-get-accounts-paginated)
-      - [Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#get-account-by-id-address-get-accountsaccount_id)
-      - [Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
+      - [✅ Get all accounts: `GET /accounts` (paginated)](#-get-all-accounts-get-accounts-paginated)
+      - [✅ Get all donors: `GET /donors` (paginated)](#-get-all-donors-get-donors-paginated)
+      - [✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#-get-account-by-id-address-get-accountsaccount_id)
+      - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
     - [`List` endpoints](#list-endpoints)
       - [Get all lists: `GET /lists` (paginated)](#get-all-lists-get-lists-paginated)
       - [Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#get-registrations-for-list-get-listslist_idregistrations-paginated)
@@ -105,11 +106,19 @@ _NB: These endpoints are what is required to integrate with BOS app & replace cu
 
 ### `Account` endpoints
 
-#### Get all accounts: `GET /accounts` (paginated)
+#### ✅ Get all accounts: `GET /accounts` (paginated)
 
-#### Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
+#### ✅ Get all donors: `GET /donors` (paginated)
 
-#### Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
+Returns all accounts that have sent at least one donation.
+
+Optional query params:
+
+- `sort` (currently only allowed value is `most_donated_usd`, which returns results in the order of most to least donated in USD) e.g. `?sort=most_donated_usd`
+
+#### ✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
+
+#### ✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
 
 Can specify `status=live` query param to retrieve only pots that are currently active (live matching round)
 
