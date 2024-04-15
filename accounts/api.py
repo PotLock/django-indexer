@@ -22,3 +22,15 @@ class DonorsAPI(APIView, LimitOffsetPagination):
         results = self.paginate_queryset(donor_accounts, request, view=self)
         serializer = AccountSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+class AccountsAPI(APIView, LimitOffsetPagination):
+    def dispatch(self, request, *args, **kwargs):
+        return super(AccountsAPI, self).dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        # Return all accounts
+        accounts = Account.objects.all()
+        results = self.paginate_queryset(accounts, request, view=self)
+        serializer = AccountSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
