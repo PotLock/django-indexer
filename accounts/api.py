@@ -41,13 +41,19 @@ class AccountsAPI(APIView, LimitOffsetPagination):
         action = kwargs.get("action", None)
         if account_id:
             # Request pertaining to a specific account_id
+            try:
+                account = Account.objects.get(id=account_id)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Account with ID {account_id} not found."}, status=404
+                )
             if action:
                 # Handle action if present; only valid option currently is "active_pots"
                 if action == "active_pots":
                     # Return active pots for account_id
                     now = timezone.now()
                     applications = PotApplication.objects.filter(
-                        applicant_id=account_id, status=PotApplicationStatus.APPROVED
+                        applicant=account, status=PotApplicationStatus.APPROVED
                     )
                     pot_ids = applications.values_list("pot_id", flat=True)
                     pots = Pot.objects.filter(id__in=pot_ids)
@@ -58,14 +64,11 @@ class AccountsAPI(APIView, LimitOffsetPagination):
                     results = self.paginate_queryset(pots, request, view=self)
                     serializer = PotSerializer(results, many=True)
                     return self.get_paginated_response(serializer.data)
-                return Response({"message": f"Unknown action {action}."}, status=404)
+                return Response({"message": f"Invalid action {action}."}, status=400)
             # If no action, return account by account_id
-            try:
-                account = Account.objects.get(id=account_id)
+            else:
                 serializer = AccountSerializer(account)
                 return Response(serializer.data)
-            except Account.DoesNotExist:
-                return Response({"message": "Account not found."}, status=404)
         else:
             # No account_id specified; return all accounts
             accounts = Account.objects.all()
