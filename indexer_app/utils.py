@@ -2,7 +2,6 @@ import base64
 import decimal
 import json
 from datetime import date, datetime
-from tkinter import E
 
 import requests
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
