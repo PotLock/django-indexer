@@ -11,7 +11,7 @@ django = "^5.0.4"
 psycopg2-binary = "^2.9.9"
 near-lake-framework = "^0.0.7"
 celery = "^5.3.6"
-redis = "^5.0.3"
+redis = {extras = ["hiredis"], version = "^5.0.3"}
 requests = "^2.31.0"
 djangorestframework = "^3.15.1"
 

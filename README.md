@@ -46,7 +46,7 @@
 - Install dependencies (`poetry install`)
 - Run migrations (`python manage.py migrate`)
 - Update `indexer_app.tasks.listen_to_near_events` with desired network & start block (if desired)
-- Start celery worker with logger (`celery -A indexer worker --loglevel=info`)
+- Start celery worker with logger (`celery -A base worker --loglevel=info`)
 - Start indexer (`python manage.py runindexer`)
 - Kill indexer (`python manage.py killindexer`)
   - If for some reason this doesn't kill any active celery tasks, run `ps auxww | grep 'celery' | grep -v grep` and kill resulting PIDs
