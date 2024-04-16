@@ -118,9 +118,12 @@ REDIS_CACHE_URL = f"{REDIS_BASE_URL}/{REDIS_CACHE_DB_ID}"
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_CACHE_URL,
         "TIMEOUT": 300,  # 5 minutes
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
     }
 }
 
@@ -138,7 +141,7 @@ CACHALOT_UNCACHABLE_TABLES = frozenset(("django_migrations",))
 ###############################################################################
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": POSTGRES_DB,
         "USER": POSTGRES_USER,
         "PASSWORD": POSTGRES_PASS,
@@ -146,7 +149,7 @@ DATABASES = {
         "PORT": POSTGRES_PORT,
     },
     "default_readonly": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": POSTGRES_DB,
         "USER": POSTGRES_READONLY_USER,
         "PASSWORD": POSTGRES_READONLY_PASS,
@@ -154,6 +157,8 @@ DATABASES = {
         "PORT": POSTGRES_PORT,
     },
 }
+
+CACHALOT_DATABASES = {"default"}
 
 
 # Password validation

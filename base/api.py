@@ -37,7 +37,7 @@ class StatsAPI(APIView):
             Account.objects.filter(donations__isnull=False).distinct().count()
         )
         total_recipients_count = (
-            Account.objects.filter(received_donations__is_null=False).distinct().count()
+            Account.objects.filter(received_donations__isnull=False).distinct().count()
         )
 
         return Response(
