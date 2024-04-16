@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import datetime
 
+from django.core.cache import cache
 from near_lake_framework import near_primitives
 
 from indexer_app.utils import (
@@ -26,6 +27,9 @@ from pots.utils import match_pot_factory_version_pattern
 async def handle_streamer_message(streamer_message: near_primitives.StreamerMessage):
     block_timestamp = streamer_message.block.header.timestamp
     block_height = streamer_message.block.header.height
+    await cache.aset(
+        "block_height", block_height
+    )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
     print(f"Block Height: {block_height}, Block Timestamp: {block_timestamp}")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
@@ -294,3 +298,5 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     print(
                         f"Error during parsing method call from JSON string to dict\n{e}"
                     )
+                    # with open("indexer_error.txt", "a") as file:
+                    #     file.write(f"{e}\n")

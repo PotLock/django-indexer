@@ -4,12 +4,15 @@ import json
 from datetime import date, datetime
 
 import requests
+from django.conf import settings
+from django.core.cache import cache
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
 from accounts.models import Account
 from activities.models import Activity
 from base.utils import format_date, format_to_near
 from donations.models import Donation
+from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
 from pots.models import (
     Pot,
@@ -580,12 +583,13 @@ async def handle_new_donations(
 
     # Upsert token
     try:
-        token = await Token.objects.get(id=token_acct.id)
+        token = await Token.objects.aget(id=token_acct)
     except Token.DoesNotExist:
         # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-        token = await Token.objects.create(id=token_acct.id, decimals=12)
+        token = await Token.objects.acreate(id=token_acct, decimals=12)
 
     # Fetch historical token data
+    # late_p = await token.get_most_recent_price()
     try:
         print("fetching historical price...")
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
@@ -595,18 +599,22 @@ async def handle_new_donations(
             price_data.get("market_data", {}).get("current_price", {}).get("usd")
         )
         await TokenHistoricalPrice.objects.acreate(
-            token=token_acct,
+            token=token,
             price_usd=unit_price,
         )
     except Exception as e:
         print("api rate limit?", e)
         # TODO: NB: below method has not been tested
-        historical_price = await token.get_most_recent_price()
-        print("fetched old price:", historical_price.price_usd)
-        unit_price = historical_price.price_usd
+        # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
+        historical = await TokenHistoricalPrice.objects.aget(
+            token=token,
+            price_usd=unit_price,
+        )
+        # print("fetched old price:", historical_price.price_usd)
+        unit_price = historical.price_usd
 
     total_amount = donation_data["total_amount"]
-    net_amount = net_amount - (donation_data.get("referrer_fee") or 0)
+    net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
 
     # Calculate USD amounts
     totalnearAmount = format_to_near(total_amount)
@@ -636,7 +644,7 @@ async def handle_new_donations(
     if actionName != "direct":
         print("selecting pot to make public donation update")
         pot = await Pot.objects.aget(id=receiverId)
-        Donation.objects.filter(id=donation.id).aupdate(**{"pot": pot})
+        await Donation.objects.filter(id=donation.id).aupdate(**{"pot": pot})
         potUpdate = {
             "total_public_donations": (pot.total_public_donations or 0) + total_amount,
         }
@@ -654,11 +662,11 @@ async def handle_new_donations(
 
     # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
     print(
-        f"update totl donated for {donor.id}, {donor.total_donated_usd + decimal.Decimal(total_amount_usd)}"
+        f"update totl donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
     )
     await Account.objects.filter(id=donor.id).aupdate(
         **{
-            "total_donated_usd": donor.total_donated_usd
+            "total_donations_out_usd": donor.total_donations_out_usd
             + decimal.Decimal(total_amount_usd)
         }
     )
@@ -667,7 +675,7 @@ async def handle_new_donations(
         print(f"selected {acct} to perform donor count update")
         acctUpdate = {
             "donors_count": acct.donors_count + 1,
-            "total_donations_received_usd": acct.total_donations_received_usd
+            "total_donations_in_usd": acct.total_donations_in_usd
             + decimal.Decimal(net_amount_usd),
         }
         await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
@@ -689,3 +697,17 @@ async def handle_new_donations(
         action_result=donation_data,
         tx_hash=receipt_obj.receipt_id,
     )
+
+
+async def cache_block_height(key: str, height: int, block_count: int) -> int:
+    await cache.aset(key, height)
+    # the cache os the default go to for the restart block, the db is a backup if the redis server crashes.
+    if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
+        print("saving daylight,", height)
+        await BlockHeight.objects.aupdate_or_create(id=1, defaults={"block_height": height, "updated_at": datetime.now()}) # better than ovverriding model's save method to get a singleton? we need only one entry
+    return height
+
+def get_block_height(key: str) -> int:
+    g =  cache.get(key) or BlockHeight.objects.filter({"id": 1}).first().block_height
+    return g or 104_922_190
+

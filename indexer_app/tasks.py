@@ -7,6 +7,8 @@ from near_lake_framework import LakeConfig, streamer
 
 from indexer_app.handler import handle_streamer_message
 
+from .utils import cache_block_height, get_block_height
+
 
 async def indexer(network: str, from_block: int, to_block: int):
     """
@@ -20,10 +22,14 @@ async def indexer(network: str, from_block: int, to_block: int):
     lake_config.aws_access_key_id = settings.AWS_ACCESS_KEY_ID
     lake_config.aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
     _, streamer_messages_queue = streamer(lake_config)
+    block_count = 0
+    
     while True:
         try:
             # streamer_message is the current block
             streamer_message = await streamer_messages_queue.get()
+            block_count += 1
+            await cache_block_height("current_block_height", streamer_message.block.header.height, block_count) # current block height
             await handle_streamer_message(streamer_message)
         except Exception as e:
             print("Error in streamer_messages_queue", e)
@@ -37,6 +43,8 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        loop.run_until_complete(indexer("mainnet", 112_724_128, None))
+        start_block = get_block_height('current_block_height')
+        print("what;s the start block, pray tell?", start_block-1)
+        loop.run_until_complete(indexer("mainnet", start_block-1, None))
     finally:
         loop.close()
