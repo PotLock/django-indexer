@@ -40,6 +40,7 @@ POSTGRES_READONLY_PASS = os.environ.get("PL_POSTGRES_READONLY_PASS", None)
 POSTGRES_READONLY_USER = os.environ.get("PL_POSTGRES_READONLY_USER", None)
 POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
 
+BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
 # Application definition
 
@@ -91,6 +92,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "base.wsgi.application"
+
+# CACHE
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CELERY_BROKER_URL,
+        "TIMEOUT": None
+    }
+}
 
 
 ###############################################################################
