@@ -27,7 +27,9 @@ from pots.utils import match_pot_factory_version_pattern
 async def handle_streamer_message(streamer_message: near_primitives.StreamerMessage):
     block_timestamp = streamer_message.block.header.timestamp
     block_height = streamer_message.block.header.height
-    await cache.aset("block_height", block_height)
+    await cache.aset(
+        "block_height", block_height
+    )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
     print(f"Block Height: {block_height}, Block Timestamp: {block_timestamp}")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
