@@ -1,6 +1,7 @@
 from django.urls import path
 
 from accounts.api import AccountsAPI, DonorsAPI
+from base.api import StatsAPI
 from lists.api import ListsAPI
 
 urlpatterns = [
@@ -24,4 +25,6 @@ urlpatterns = [
         ListsAPI.as_view(),
         name="lists_api_by_id_with_action",
     ),
+    # stats
+    path("v1/stats", StatsAPI.as_view(), name="stats_api"),
 ]
