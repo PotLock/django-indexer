@@ -25,7 +25,7 @@
       - [✅ Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`](#-get-sponsors-for-pot-get-potspot_idsponsors)
       - [✅ Get payouts for pot: `GET /pots/{POT_ID}/payouts`](#-get-payouts-for-pot-get-potspot_idpayouts)
     - [`Stats` endpoints](#stats-endpoints)
-      - [Get stats: `GET /stats`](#get-stats-get-stats)
+      - [✅ Get stats: `GET /stats`](#-get-stats-get-stats)
 
 # Potlock Indexer (Django / Poetry / Celery / NEAR Lake Framework)
 
@@ -150,7 +150,7 @@ _NB: `POT_ID` == on-chain Pot address_
 
 ### `Stats` endpoints
 
-#### Get stats: `GET /stats`
+#### ✅ Get stats: `GET /stats`
 
 Returns:
 
