@@ -31,7 +31,8 @@ ALLOWED_HOSTS = []
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
-CELERY_BROKER_URL = os.environ.get("PL_CELERY_BROKER_URL")
+REDIS_HOST = os.environ.get("PL_REDIS_HOST")
+REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
 POSTGRES_HOST = os.environ.get("PL_POSTGRES_HOST", None)
 POSTGRES_PASS = os.environ.get("PL_POSTGRES_PASS", None)
@@ -93,13 +94,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "base.wsgi.application"
 
-# CACHE
+# REDIS / CACHE CONFIGS
+
+REDIS_BASE_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
+CELERY_DB_ID = 0
+CELERY_BROKER_URL = f"{REDIS_BASE_URL}/{CELERY_DB_ID}"
+
+REDIS_CACHE_DB_ID = 1
+REDIS_CACHE_URL = f"{REDIS_BASE_URL}/{REDIS_CACHE_DB_ID}"
 
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": CELERY_BROKER_URL,
-        "TIMEOUT": None
+        "LOCATION": REDIS_CACHE_URL,
+        "TIMEOUT": 300,  # 5 minutes
     }
 }
 
