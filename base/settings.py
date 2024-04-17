@@ -130,7 +130,7 @@ CACHES = {
 ###############################################################################
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": POSTGRES_DB,
         "USER": POSTGRES_USER,
         "PASSWORD": POSTGRES_PASS,
@@ -138,7 +138,7 @@ DATABASES = {
         "PORT": POSTGRES_PORT,
     },
     "default_readonly": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": POSTGRES_DB,
         "USER": POSTGRES_READONLY_USER,
         "PASSWORD": POSTGRES_READONLY_PASS,
