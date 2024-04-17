@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+from distutils.util import strtobool
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -21,16 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 ALLOWED_HOSTS = []
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
+DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
 POSTGRES_HOST = os.environ.get("PL_POSTGRES_HOST", None)
