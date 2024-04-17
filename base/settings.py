@@ -31,8 +31,7 @@ ALLOWED_HOSTS = []
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
-REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
-REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
+ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
 POSTGRES_HOST = os.environ.get("PL_POSTGRES_HOST", None)
 POSTGRES_PASS = os.environ.get("PL_POSTGRES_PASS", None)
@@ -40,6 +39,8 @@ POSTGRES_PORT = os.environ.get("PL_POSTGRES_PORT", None)
 POSTGRES_READONLY_PASS = os.environ.get("PL_POSTGRES_READONLY_PASS", None)
 POSTGRES_READONLY_USER = os.environ.get("PL_POSTGRES_READONLY_USER", None)
 POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
+REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
+REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
@@ -96,15 +97,18 @@ WSGI_APPLICATION = "base.wsgi.application"
 
 # REDIS / CACHE CONFIGS
 
-REDIS_BASE_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}" # (rediss = SSL connection)
+REDIS_SCHEMA = (
+    "redis://" if ENVIRONMENT == "local" else "rediss://"
+)  # rediss denotes SSL connection
+REDIS_BASE_URL = f"{REDIS_SCHEMA}{REDIS_HOST}:{REDIS_PORT}"
 
-CELERY_BROKER_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}/0"
-CELERY_RESULT_BACKEND = f"rediss://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0"
+CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/0"
 CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'fanout_prefix': True,
-    'fanout_patterns': True,
-    'visibility_timeout': 3600,  # Adjust as necessary
-    'key_prefix': 'celery_tasks'
+    "fanout_prefix": True,
+    "fanout_patterns": True,
+    "visibility_timeout": 3600,  # Adjust as necessary
+    "key_prefix": "celery_tasks",
 }
 
 CACHES = {
@@ -114,7 +118,7 @@ CACHES = {
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SSL": True,
-            "KEY_PREFIX": "django_cache"
+            "KEY_PREFIX": "django_cache",
         },
     }
 }
