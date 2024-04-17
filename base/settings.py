@@ -96,19 +96,26 @@ WSGI_APPLICATION = "base.wsgi.application"
 
 # REDIS / CACHE CONFIGS
 
-REDIS_BASE_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+REDIS_BASE_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}" # (rediss = SSL connection)
 
-CELERY_DB_ID = 0
-CELERY_BROKER_URL = f"{REDIS_BASE_URL}/{CELERY_DB_ID}"
-
-REDIS_CACHE_DB_ID = 1
-REDIS_CACHE_URL = f"{REDIS_BASE_URL}/{REDIS_CACHE_DB_ID}"
+CELERY_BROKER_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_RESULT_BACKEND = f"rediss://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'fanout_prefix': True,
+    'fanout_patterns': True,
+    'visibility_timeout': 3600,  # Adjust as necessary
+    'key_prefix': 'celery_tasks'
+}
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": REDIS_CACHE_URL,
-        "TIMEOUT": 300,  # 5 minutes
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"{REDIS_BASE_URL}/0",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SSL": True,
+            "KEY_PREFIX": "django_cache"
+        },
     }
 }
 
