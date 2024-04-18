@@ -26,7 +26,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "ec2-54-89-249-195.compute-1.amazonaws.com",
+    "54.89.249.195"
+]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
@@ -112,8 +115,8 @@ CELERY_BROKER_URL = f"{REDIS_SCHEMA}{CELERY_BROKER_HOST}:{REDIS_PORT}/0{SSL_QUER
 
 CELERY_RESULT_BACKEND = f"{REDIS_SCHEMA}{CELERY_RESULT_HOST}/0{SSL_QUERY}"
 
-print("Broker URL:", CELERY_BROKER_URL)
-print("Result Backend:", CELERY_RESULT_BACKEND)
+# print("Broker URL:", CELERY_BROKER_URL)
+# print("Result Backend:", CELERY_RESULT_BACKEND)
 
 # hash_tag = "task_group_1"
 
@@ -209,8 +212,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
-
-STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
+print("static root: ", STATIC_ROOT)
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "assets")]
+STATIC_URL = "/static/"
+STATICFILES_LOCATION = "static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
