@@ -199,8 +199,6 @@ async def handle_new_list_registration(
     reg_data = json.loads(
         base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
     )
-    print("Receipt data:", reg_data)
-
     # Prepare data for insertion
     project_list = []
     insert_data = []
@@ -232,12 +230,10 @@ async def handle_new_list_registration(
 
     try:
         await ListRegistration.objects.abulk_create(
-            [ListRegistration(**data) for data in insert_data]
+            [ListRegistration(**data) for data in insert_data], ignore_conflicts=True
         )
     except Exception as e:
         print(f"Encountered error trying to create list: {e}")
-
-    print("Upserted List List:", reg_data)
 
     # Insert activity
     try:
@@ -272,7 +268,6 @@ async def handle_list_registration_update(
     try:
         # Perform the update
         await ListRegistration.objects.filter(id=data["id"]).aupdate(**regUpdate)
-        print("Updated ListRegistration with id:", data["id"])
     except Exception as e:
         print(f"Encountered error trying to update ListRegistration: {e}")
 
@@ -502,6 +497,170 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
     await Activity.objects.acreate(**activity)
 
 
+# TODO: Need to abstract some actions.
+async def handle_batch_donations(
+        receiverId: str,
+        signerId: str,
+        actionName: str,
+        receipt_obj: Receipt,
+        log_data: list,
+
+):
+    print("BAtch Transaction for donation...")
+    for event_data in log_data:
+        donation_data = event_data["donation"]
+        net_amount = int(donation_data["total_amount"]) - int(
+            donation_data["protocol_fee"]
+        )
+        print("Donation data:", donation_data, net_amount)
+        # insert donate contract which is the receiver id(because of activitry relationship mainly)
+        donate_contract, _ = await Account.objects.aget_or_create(id=receiverId)
+        donated_at = datetime.fromtimestamp(
+        (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
+        )
+
+        print(
+            "upserting accounts involved",
+            donation_data["donor_id"],
+            donation_data.get("recipient_id"),
+        )
+
+        # Upsert donor account
+        donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
+
+        
+        recipient = None
+        if donation_data.get("recipient_id"):
+            recipient, _ = await Account.objects.aget_or_create(
+                id=donation_data["recipient_id"]
+            )
+        else:
+            if not donation_data.get("matching_pool"):
+                recipient, _ = await Account.objects.aget_or_create(
+                    id=donation_data["project_id"]
+                )
+
+        if donation_data.get("referrer_id"):
+            referrer, _ = await Account.objects.aget_or_create(
+                id=donation_data["referrer_id"]
+            )
+
+
+        # Upsert token account
+        token_acct, _ = await Account.objects.aget_or_create(
+            id=(donation_data.get("ft_id") or "near")
+        )
+
+        # Upsert token
+        try:
+            token = await Token.objects.aget(id=token_acct)
+        except Token.DoesNotExist:
+            # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
+            token = await Token.objects.acreate(id=token_acct, decimals=12)
+
+        # Fetch historical token data
+        # late_p = await token.get_most_recent_price()
+        try:
+            print("fetching historical price...")
+            endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
+            response = requests.get(endpoint)
+            price_data = response.json()
+            unit_price = (
+                price_data.get("market_data", {}).get("current_price", {}).get("usd")
+            )
+            print(f"the usd price is what, {unit_price}")
+            await TokenHistoricalPrice.objects.acreate(
+                token=token,
+                price_usd=unit_price,
+            )
+        except Exception as e:
+            print("api rate limit?", e)
+            # TODO: NB: below method has not been tested
+            # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
+            historical = await TokenHistoricalPrice.objects.aget(
+                token=token,
+                price_usd=unit_price,
+            )
+            # print("fetched old price:", historical_price.price_usd)
+            unit_price = historical.price_usd
+
+        total_amount = donation_data["total_amount"]
+        net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
+
+        # Calculate USD amounts
+        totalnearAmount = format_to_near(total_amount)
+        netnearAmount = format_to_near(net_amount)
+        total_amount_usd = unit_price * totalnearAmount
+        net_amount_usd = unit_price * netnearAmount
+
+        print("inserting donations...", total_amount_usd)
+        donation = await Donation.objects.acreate(
+            on_chain_id=donation_data["id"],
+            donor=donor,
+            total_amount=total_amount,
+            total_amount_usd=total_amount_usd,
+            net_amount_usd=net_amount_usd,
+            net_amount=net_amount,
+            ft=token_acct,
+            message=donation_data.get("message"),
+            donated_at=donated_at,
+            matching_pool=donation_data.get("matching_pool", False),
+            recipient=recipient,
+            protocol_fee=donation_data["protocol_fee"],
+            referrer=referrer if donation_data.get("referrer_id") else None,
+            referrer_fee=donation_data.get("referrer_fee"),
+            tx_hash=receipt_obj.receipt_id,
+        )
+
+        if actionName != "direct":
+            print("selecting pot to make public donation update")
+            pot = await Pot.objects.aget(id=receiverId)
+            await Donation.objects.filter(id=donation.id).aupdate(**{"pot": pot})
+            potUpdate = {
+                "total_public_donations": int(pot.total_public_donations or 0) + int(total_amount),
+            }
+            if donation_data.get("matching_pool"):
+                potUpdate["total_matching_pool"] = (
+                    pot.total_matching_pool or 0
+                ) + total_amount
+                potUpdate["matching_pool_donations_count"] = (
+                    pot.matching_pool_donations_count or 0
+                ) + 1
+                # accountUpdate = {}
+            else:
+                potUpdate["public_donations_count"] = (pot.public_donations_count or 0) + 1
+            await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
+
+        # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
+        print(
+            f"update totl donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
+        )
+        await Account.objects.filter(id=donor.id).aupdate(
+            **{
+                "total_donations_out_usd": donor.total_donations_out_usd
+                + decimal.Decimal(total_amount_usd)
+            }
+        )
+        if recipient:
+            acct = await Account.objects.aget(id=recipient.id)
+            print(f"selected {acct} to perform donor count update")
+            acctUpdate = {
+                "donors_count": acct.donors_count + 1,
+                "total_donations_in_usd": acct.total_donations_in_usd
+                + decimal.Decimal(net_amount_usd),
+            }
+            await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
+
+        # Insert activity record
+        await Activity.objects.acreate(
+            signer_id=signerId,
+            receiver_id=receiverId,
+            timestamp=donation.donated_at,
+            type="Donate_Direct",
+            action_result=donation_data,
+            tx_hash=receipt_obj.receipt_id,
+        )
+
 async def handle_new_donations(
     data: dict,
     receiverId: str,
@@ -513,8 +672,10 @@ async def handle_new_donations(
     created_at: datetime,
 ):
     print("new donation data:", data, receiverId)
+    
 
-    if actionName == "direct":
+
+    if (actionName == "direct") and receiverId == "donate.potlock.near" : # early pot donations followed similarly to direct donations i.e they returned result instead of events.
         print("calling donate contract...")
         # Handle direct donation
 
@@ -522,11 +683,12 @@ async def handle_new_donations(
             return
 
         if len(log_data) > 1:
-            log_data = [
-                x
-                for x in log_data
-                if x["donation"]["recipient_id"] == data["recipient_id"]
-            ]
+            # log_data = [
+            #     x
+            #     for x in log_data
+            #     if x["donation"]["recipient_id"] == data["recipient_id"]
+            # ]
+            return await handle_batch_donations(receiverId, signerId, actionName, receipt_obj, log_data)
 
         print("event after possible filtering:", log_data)
 
@@ -540,12 +702,14 @@ async def handle_new_donations(
         donate_contract, _ = await Account.objects.aget_or_create(id=receiverId)
 
     else:
+        result = status_obj.status.get("SuccessValue")
+        if not result:
+            return
         # Handle non-direct donation
         donation_data = json.loads(
-            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+            base64.b64decode(result).decode("utf-8")
         )
         net_amount = int(donation_data["net_amount"])
-        print("donation data decoded...", donation_data)
 
     donated_at = datetime.fromtimestamp(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
@@ -559,12 +723,13 @@ async def handle_new_donations(
 
     # Upsert donor account
     donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
+    recipient = None
 
     if donation_data.get("recipient_id"):
         recipient, _ = await Account.objects.aget_or_create(
             id=donation_data["recipient_id"]
         )
-    else:
+    if donation_data.get("project_id"):
         recipient, _ = await Account.objects.aget_or_create(
             id=donation_data["project_id"]
         )
@@ -574,7 +739,6 @@ async def handle_new_donations(
             id=donation_data["referrer_id"]
         )
 
-    print("get set", donor, recipient)
 
     # Upsert token account
     token_acct, _ = await Account.objects.aget_or_create(
@@ -598,7 +762,7 @@ async def handle_new_donations(
         unit_price = (
             price_data.get("market_data", {}).get("current_price", {}).get("usd")
         )
-        await TokenHistoricalPrice.objects.acreate(
+        await TokenHistoricalPrice.objects.acreate( # need to change token model to use token as id
             token=token,
             price_usd=unit_price,
         )
@@ -607,8 +771,7 @@ async def handle_new_donations(
         # TODO: NB: below method has not been tested
         # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
         historical = await TokenHistoricalPrice.objects.aget(
-            token=token,
-            price_usd=unit_price,
+            token=token
         )
         # print("fetched old price:", historical_price.price_usd)
         unit_price = historical.price_usd
@@ -623,42 +786,63 @@ async def handle_new_donations(
     net_amount_usd = unit_price * netnearAmount
 
     print("inserting donations...", total_amount_usd)
-    donation = await Donation.objects.acreate(
-        id=donation_data["id"],
-        donor=donor,
-        total_amount=total_amount,
-        total_amount_usd=total_amount_usd,
-        net_amount_usd=net_amount_usd,
-        net_amount=net_amount,
-        ft=token_acct,
-        message=donation_data.get("message"),
-        donated_at=donated_at,
-        matching_pool=donation_data.get("matching_pool", False),
-        recipient=recipient,
-        protocol_fee=donation_data["protocol_fee"],
-        referrer=referrer if donation_data.get("referrer_id") else None,
-        referrer_fee=donation_data.get("referrer_fee"),
-        tx_hash=receipt_obj.receipt_id,
-    )
+    if actionName == "direct": # 
+        donation = await Donation.objects.acreate(
+            on_chain_id=donation_data["id"],
+            donor=donor,
+            total_amount=total_amount,
+            total_amount_usd=total_amount_usd,
+            net_amount_usd=net_amount_usd,
+            net_amount=net_amount,
+            ft=token_acct,
+            message=donation_data.get("message"),
+            donated_at=donated_at,
+            matching_pool=donation_data.get("matching_pool", False),
+            recipient=recipient,
+            protocol_fee=donation_data["protocol_fee"],
+            referrer=referrer if donation_data.get("referrer_id") else None,
+            referrer_fee=donation_data.get("referrer_fee"),
+            tx_hash=receipt_obj.receipt_id,
+        )
 
     if actionName != "direct":
         print("selecting pot to make public donation update")
         pot = await Pot.objects.aget(id=receiverId)
-        await Donation.objects.filter(id=donation.id).aupdate(**{"pot": pot})
+        donation = await Donation.objects.acreate(
+            on_chain_id=donation_data["id"],
+            donor=donor,
+            pot = pot,
+            total_amount=total_amount,
+            total_amount_usd=total_amount_usd,
+            net_amount_usd=net_amount_usd,
+            net_amount=net_amount,
+            ft=token_acct,
+            message=donation_data.get("message"),
+            donated_at=donated_at,
+            matching_pool=donation_data.get("matching_pool", False),
+            recipient=recipient,
+            protocol_fee=donation_data["protocol_fee"],
+            referrer=referrer if donation_data.get("referrer_id") else None,
+            referrer_fee=donation_data.get("referrer_fee"),
+            tx_hash=receipt_obj.receipt_id,
+        )
         potUpdate = {
-            "total_public_donations": (pot.total_public_donations or 0) + total_amount,
+            "total_public_donations": str(int(pot.total_public_donations or 0) + int(total_amount)),
+            "total_public_donations_usd": int(pot.total_public_donations_usd or 0.0) + total_amount_usd,
         }
         if donation_data.get("matching_pool"):
-            potUpdate["total_matching_pool"] = (
-                pot.total_matching_pool or 0
-            ) + total_amount
-            potUpdate["matching_pool_donations_count"] = (
-                pot.matching_pool_donations_count or 0
-            ) + 1
+            potUpdate["total_matching_pool"] = str(int(pot.total_matching_pool or 0) + int(total_amount))
+            potUpdate["total_matching_pool"] = (pot.total_matching_pool_usd or 0.0) + total_amount_usd
+            potUpdate["matching_pool_donations_count"] = (pot.matching_pool_donations_count or 0) + 1
+
+            if recipient:
+                await Account.objects.filter(id=recipient.id).aupdate(**{"total_matching_pool_allocations_usd": recipient.total_matching_pool_allocations_usd + total_amount_usd })
+            
             # accountUpdate = {}
         else:
             potUpdate["public_donations_count"] = (pot.public_donations_count or 0) + 1
-        await Pot.objects.filter(id=pot.id).aupdate(**potUpdate)
+        
+        await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
 
     # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
     print(
@@ -708,6 +892,9 @@ async def cache_block_height(key: str, height: int, block_count: int) -> int:
     return height
 
 def get_block_height(key: str) -> int:
-    g =  cache.get(key) or BlockHeight.objects.filter({"id": 1}).first().block_height
-    return g or 104_922_190
+    try:
+        g =  cache.get(key) or (BlockHeight.objects.filter(id=1).first().block_height)
+        return g or 104_922_190
+    except AttributeError: # on first start.
+        return 104_922_190
 
