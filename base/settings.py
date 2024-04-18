@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+import ssl
 from distutils.util import strtobool
 from pathlib import Path
 
@@ -30,6 +31,8 @@ ALLOWED_HOSTS = []
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
+CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
+CELERY_RESULT_HOST = os.environ.get("PL_CELERY_RESULT_HOST")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
@@ -102,14 +105,38 @@ REDIS_SCHEMA = (
 )  # rediss denotes SSL connection
 REDIS_BASE_URL = f"{REDIS_SCHEMA}{REDIS_HOST}:{REDIS_PORT}"
 
-CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0"
-CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/0"
+# Append SSL parameters as query parameters in the URL
+SSL_QUERY = "?ssl_cert_reqs=CERT_NONE" # TODO: UPDATE ACCORDING TO ENV (prod should require cert)
+
+CELERY_BROKER_URL = f"{REDIS_SCHEMA}{CELERY_BROKER_HOST}:{REDIS_PORT}/0{SSL_QUERY}"
+
+CELERY_RESULT_BACKEND = f"{REDIS_SCHEMA}{CELERY_RESULT_HOST}/0{SSL_QUERY}"
+
+print("Broker URL:", CELERY_BROKER_URL)
+print("Result Backend:", CELERY_RESULT_BACKEND)
+
+# hash_tag = "task_group_1"
+
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     "fanout_prefix": True,
     "fanout_patterns": True,
     "visibility_timeout": 3600,  # Adjust as necessary
-    "key_prefix": "celery_tasks",
+    # "key_prefix": f"celery_tasks:{{{hash_tag}}}", # Add hash tag to ensure that all keys involved in the same operation are located in the same redis cluster hash slot
+    # "key_prefix": f"celery_tasks:{{{hash_tag}}}"
+    "ssl": True,
+    # "ssl_cert_reqs": "CERT_NONE",  # No client certificate required
 }
+
+# # Add SSL configurations directly into the broker and result backend options
+# CELERY_BROKER_TRANSPORT_OPTIONS['redis_backend_use_ssl'] = {
+#     'ssl_cert_reqs': "CERT_NONE"
+# }
+
+# # Ensure the backend uses SSL
+# CELERY_RESULT_BACKEND_OPTIONS = {
+#     "ssl_cert_reqs": "CERT_NONE",
+#     "ssl": True,
+# }
 
 CACHES = {
     "default": {
@@ -119,6 +146,7 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SSL": True,
             "KEY_PREFIX": "django_cache",
+            # "ssl_cert_reqs": "CERT_NONE",
         },
     }
 }

@@ -708,6 +708,9 @@ async def cache_block_height(key: str, height: int, block_count: int) -> int:
     return height
 
 def get_block_height(key: str) -> int:
-    g =  cache.get(key) or BlockHeight.objects.filter({"id": 1}).first().block_height
-    return g or 104_922_190
+    block_height = cache.get(key)
+    if not block_height:
+        record = BlockHeight.objects.filter(id=1).first()
+        block_height = 104_922_190 if not record else record.block_height
+    return block_height
 
