@@ -14,6 +14,7 @@ import os
 import ssl
 from distutils.util import strtobool
 from pathlib import Path
+import sentry_sdk
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,6 +48,7 @@ POSTGRES_READONLY_USER = os.environ.get("PL_POSTGRES_READONLY_USER", None)
 POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
 REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
+SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
@@ -177,6 +179,39 @@ DATABASES = {
         "PORT": POSTGRES_PORT,
     },
 }
+
+# LOGGING
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'ERROR', # TODO: take from env
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/django-indexer/error.log',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+}
+
+sentry_sdk.init(
+    environment=ENVIRONMENT,
+    dsn=SENTRY_DSN,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    traces_sample_rate=1.0,
+    # Set profiles_sample_rate to 1.0 to profile 100%
+    # of sampled transactions.
+    # We recommend adjusting this value in production.
+    profiles_sample_rate=1.0,
+)
 
 
 # Password validation
