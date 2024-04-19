@@ -22,10 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 ALLOWED_HOSTS = []
 
@@ -34,6 +32,8 @@ AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
 CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "True"))
 CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
+DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
+ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
 POSTGRES_HOST = os.environ.get("PL_POSTGRES_HOST", None)
 POSTGRES_PASS = os.environ.get("PL_POSTGRES_PASS", None)
@@ -108,21 +108,29 @@ WSGI_APPLICATION = "base.wsgi.application"
 
 # REDIS / CACHE CONFIGS
 
-REDIS_BASE_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+REDIS_SCHEMA = (
+    "redis://" if ENVIRONMENT == "local" else "rediss://"
+)  # rediss denotes SSL connection
+REDIS_BASE_URL = f"{REDIS_SCHEMA}{REDIS_HOST}:{REDIS_PORT}"
 
-CELERY_DB_ID = 0
-CELERY_BROKER_URL = f"{REDIS_BASE_URL}/{CELERY_DB_ID}"
-
-REDIS_CACHE_DB_ID = 1
-REDIS_CACHE_URL = f"{REDIS_BASE_URL}/{REDIS_CACHE_DB_ID}"
+CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0"
+CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/0"
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "fanout_prefix": True,
+    "fanout_patterns": True,
+    "visibility_timeout": 3600,  # Adjust as necessary
+    "key_prefix": "celery_tasks",
+}
 
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_CACHE_URL,
+        "LOCATION": f"{REDIS_BASE_URL}/0",
         "TIMEOUT": 300,  # 5 minutes
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SSL": True,
+            "KEY_PREFIX": "django_cache",
         },
     }
 }
