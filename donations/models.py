@@ -12,6 +12,11 @@ class Donation(models.Model):
         primary_key=True,
         help_text=_("Donation id."),
     )
+    on_chain_id = models.IntegerField(
+        _("contract donation id"),
+        null=False,
+        help_text=_("Donation id in contract"),
+    )
     donor = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
@@ -147,3 +152,10 @@ class Donation(models.Model):
         null=False,
         help_text=_("Transaction hash."),
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "pot"], name="unique_pot_on_chain_id"
+            )
+        ]

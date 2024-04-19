@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
+from accounts.serializers import AccountSerializer
 from donations.models import Donation
 from donations.serializers import DonationSerializer
 
@@ -19,7 +20,7 @@ class PotsAPI(APIView, LimitOffsetPagination):
     def dispatch(self, request, *args, **kwargs):
         return super(PotsAPI, self).dispatch(request, *args, **kwargs)
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
+    # @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id", None)
         action = kwargs.get("action", None)
@@ -54,7 +55,7 @@ class PotsAPI(APIView, LimitOffsetPagination):
                     )
                     sponsors = Account.objects.filter(id__in=sponsor_ids)
                     results = self.paginate_queryset(sponsors, request, view=self)
-                    serializer = DonationSerializer(results, many=True)
+                    serializer = AccountSerializer(results, many=True)
                     return self.get_paginated_response(serializer.data)
                 elif action == "payouts":
                     # Return payouts for pot_id
