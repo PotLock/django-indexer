@@ -20,7 +20,7 @@ class PotsAPI(APIView, LimitOffsetPagination):
     def dispatch(self, request, *args, **kwargs):
         return super(PotsAPI, self).dispatch(request, *args, **kwargs)
 
-    # @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id", None)
         action = kwargs.get("action", None)
