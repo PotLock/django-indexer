@@ -188,6 +188,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 receipt,
                                 status_obj,
                                 log_data,
+                                created_at,
                             )
                             break
 
@@ -205,6 +206,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 receipt,
                                 status_obj,
                                 log_data,
+                                created_at,
                             )
                             break
 

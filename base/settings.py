@@ -30,6 +30,8 @@ ALLOWED_HOSTS = []
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
+CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "True"))
+CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
@@ -54,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "cachalot",
     "celery",
     "api",
     "accounts",
@@ -64,6 +67,14 @@ INSTALLED_APPS = [
     "pots",
     "tokens",
 ]
+
+DEFAULT_PAGE_SIZE = 30
+
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": DEFAULT_PAGE_SIZE,
+}
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -115,6 +126,7 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": f"{REDIS_BASE_URL}/0",
+        "TIMEOUT": 300,  # 5 minutes
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SSL": True,
@@ -122,6 +134,13 @@ CACHES = {
         },
     }
 }
+
+if CACHALOT_TIMEOUT:
+    CACHALOT_TIMEOUT = int(CACHALOT_TIMEOUT)
+else:
+    CACHALOT_TIMEOUT = 60 * 5  # 5 minutes
+
+CACHALOT_UNCACHABLE_TABLES = frozenset(("django_migrations",))
 
 
 ###############################################################################
@@ -146,6 +165,8 @@ DATABASES = {
         "PORT": POSTGRES_PORT,
     },
 }
+
+CACHALOT_DATABASES = {"default"}
 
 
 # Password validation
