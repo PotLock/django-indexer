@@ -1,3 +1,4 @@
+from django import db
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -10,6 +11,11 @@ class Donation(models.Model):
         _("donation id"),
         primary_key=True,
         help_text=_("Donation id."),
+    )
+    on_chain_id = models.IntegerField(
+        _("contract donation id"),
+        null=False,
+        help_text=_("Donation id in contract"),
     )
     donor = models.ForeignKey(
         Account,
@@ -32,6 +38,7 @@ class Donation(models.Model):
         decimal_places=2,
         null=True,
         help_text=_("Total amount in USD."),
+        db_index=True,
     )
     net_amount = models.CharField(
         _("net amount"),
@@ -145,3 +152,10 @@ class Donation(models.Model):
         null=False,
         help_text=_("Transaction hash."),
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "pot"], name="unique_pot_on_chain_id"
+            )
+        ]

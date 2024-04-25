@@ -37,6 +37,8 @@ AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
 # CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
 CELERY_CACHE_HOST = os.environ.get("PL_CELERY_CACHE_HOST")
+CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "True"))
+CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 LOG_LEVEL = os.getenv("PL_LOG_LEVEL", "INFO").upper()
@@ -63,6 +65,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "cachalot",
     "celery",
     "api",
     "accounts",
@@ -73,6 +76,14 @@ INSTALLED_APPS = [
     "pots",
     "tokens",
 ]
+
+DEFAULT_PAGE_SIZE = 30
+
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": DEFAULT_PAGE_SIZE,
+}
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -151,6 +162,7 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": f"{REDIS_BASE_URL}/0",
+        "TIMEOUT": 300,  # 5 minutes
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SSL": True,
@@ -159,6 +171,13 @@ CACHES = {
         },
     }
 }
+
+if CACHALOT_TIMEOUT:
+    CACHALOT_TIMEOUT = int(CACHALOT_TIMEOUT)
+else:
+    CACHALOT_TIMEOUT = 60 * 5  # 5 minutes
+
+CACHALOT_UNCACHABLE_TABLES = frozenset(("django_migrations",))
 
 
 ###############################################################################
@@ -184,41 +203,10 @@ DATABASES = {
     },
 }
 
+CACHALOT_DATABASES = {"default"}
+
+
 # LOGGING
-
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'formatters': {
-#         'standard': {
-#             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-#         },
-#     },
-#     'handlers': {
-#         'cloudwatch': {
-#             'level': 'DEBUG',
-#             'class': 'watchtower.CloudWatchLogHandler',
-#             'boto3_session': None,  # Uses default boto3 session; configure AWS in your environment
-#             'log_group': 'DjangoAppLogs',
-#             'stream_name': 'django-logs',
-#             'formatter': 'standard'
-#         }
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['cloudwatch'],
-#             'level': 'DEBUG',
-#             'propagate': True,
-#         },
-#         # Ensure that Celery log entries go to CloudWatch as well
-#         'celery': {
-#             'handlers': ['cloudwatch'],
-#             'level': 'DEBUG',
-#             'propagate': True,
-#         },
-#     },
-# }
-
 
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 print("LOG_LEVEL: ", LOG_LEVEL)

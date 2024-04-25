@@ -3,28 +3,29 @@
   - [Steps to run:](#steps-to-run)
     - [Env vars example](#env-vars-example)
   - [API Basics](#api-basics)
-    - [Base URL](#base-url)
-    - [Authorization](#authorization)
-    - [Error Responses](#error-responses)
-    - [Pagination](#pagination)
+      - [Base URL](#base-url)
+      - [Authorization](#authorization)
+      - [Error Responses](#error-responses)
+      - [Pagination](#pagination)
   - [API Endpoints](#api-endpoints)
     - [`Account` endpoints](#account-endpoints)
-      - [Get all accounts: `GET /accounts` (paginated)](#get-all-accounts-get-accounts-paginated)
-      - [Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#get-account-by-id-address-get-accountsaccount_id)
-      - [Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
+      - [✅ Get all accounts: `GET /accounts` (paginated)](#-get-all-accounts-get-accounts-paginated)
+      - [✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#-get-account-by-id-address-get-accountsaccount_id)
+      - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
     - [`List` endpoints](#list-endpoints)
-      - [Get all lists: `GET /lists` (paginated)](#get-all-lists-get-lists-paginated)
-      - [Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#get-registrations-for-list-get-listslist_idregistrations-paginated)
+      - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
+      - [✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)](#-get-list-by-id-get-listslist_id-paginated)
+      - [✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#-get-registrations-for-list-get-listslist_idregistrations-paginated)
     - [`Donors` endpoints](#donors-endpoints)
-      - [Get all donors: `GET /donors` (paginated)](#get-all-donors-get-donors-paginated)
+      - [✅ Get all donors: `GET /donors` (paginated)](#-get-all-donors-get-donors-paginated)
     - [`Pots` endpoints](#pots-endpoints)
-      - [Get all pots: `GET /pots` (paginated)](#get-all-pots-get-pots-paginated)
-      - [Get applications for pot: `GET /pots/{POT_ID}/applications`](#get-applications-for-pot-get-potspot_idapplications)
-      - [Get donations for pot: `GET /pots/{POT_ID}/donations`](#get-donations-for-pot-get-potspot_iddonations)
-      - [Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`](#get-sponsors-for-pot-get-potspot_idsponsors)
-      - [Get payouts for pot: `GET /pots/{POT_ID}/payouts`](#get-payouts-for-pot-get-potspot_idpayouts)
+      - [✅ Get all pots: `GET /pots` (paginated)](#-get-all-pots-get-pots-paginated)
+      - [✅ Get applications for pot: `GET /pots/{POT_ID}/applications`](#-get-applications-for-pot-get-potspot_idapplications)
+      - [✅ Get donations for pot: `GET /pots/{POT_ID}/donations`](#-get-donations-for-pot-get-potspot_iddonations)
+      - [✅ Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`](#-get-sponsors-for-pot-get-potspot_idsponsors)
+      - [✅ Get payouts for pot: `GET /pots/{POT_ID}/payouts`](#-get-payouts-for-pot-get-potspot_idpayouts)
     - [`Stats` endpoints](#stats-endpoints)
-      - [Get stats: `GET /stats`](#get-stats-get-stats)
+      - [✅ Get stats: `GET /stats`](#-get-stats-get-stats)
 
 # Potlock Indexer (Django / Poetry / Celery / NEAR Lake Framework)
 
@@ -108,45 +109,51 @@ _NB: These endpoints are what is required to integrate with BOS app & replace cu
 
 ### `Account` endpoints
 
-#### Get all accounts: `GET /accounts` (paginated)
+#### ✅ Get all accounts: `GET /accounts` (paginated)
 
-#### Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
+#### ✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
 
-#### Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
+#### ✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
 
 Can specify `status=live` query param to retrieve only pots that are currently active (live matching round)
 
 ### `List` endpoints
 
-#### Get all lists: `GET /lists` (paginated)
+#### ✅ Get all lists: `GET /lists` (paginated)
 
-#### Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
+#### ✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)
+
+#### ✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
 
 Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
 
 ### `Donors` endpoints
 
-#### Get all donors: `GET /donors` (paginated)
+#### ✅ Get all donors: `GET /donors` (paginated)
 
-Options to order by amount donated if desired using `order_by` query param, e.g. `order_by=amount_donated_asc` (ascending, aka order least to most) or `order_by=amount_donated_desc` (descending, aka order most to least)
+Returns all accounts that have sent at least one donation.
+
+Optional query params:
+
+- `sort` (currently only allowed value is `most_donated_usd`, which returns results in the order of most to least donated in USD) e.g. `?sort=most_donated_usd`
 
 ### `Pots` endpoints
 
 _NB: `POT_ID` == on-chain Pot address_
 
-#### Get all pots: `GET /pots` (paginated)
+#### ✅ Get all pots: `GET /pots` (paginated)
 
-#### Get applications for pot: `GET /pots/{POT_ID}/applications`
+#### ✅ Get applications for pot: `GET /pots/{POT_ID}/applications`
 
-#### Get donations for pot: `GET /pots/{POT_ID}/donations`
+#### ✅ Get donations for pot: `GET /pots/{POT_ID}/donations`
 
-#### Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`
+#### ✅ Get sponsors for pot: `GET /pots/{POT_ID}/sponsors`
 
-#### Get payouts for pot: `GET /pots/{POT_ID}/payouts`
+#### ✅ Get payouts for pot: `GET /pots/{POT_ID}/payouts`
 
 ### `Stats` endpoints
 
-#### Get stats: `GET /stats`
+#### ✅ Get stats: `GET /stats`
 
 Returns:
 
