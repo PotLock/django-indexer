@@ -17,6 +17,7 @@ djangorestframework = "^3.15.1"
 django-redis = "^5.4.0"
 gunicorn = "^22.0.0"
 sentry-sdk = {extras = ["django"], version = "^1.45.0"}
+watchtower = "^3.1.0"
 
 
 [tool.poetry.group.dev.dependencies]

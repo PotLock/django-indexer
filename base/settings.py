@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import boto3
+import logging
 import os
 import ssl
 from distutils.util import strtobool
@@ -28,17 +30,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
 ALLOWED_HOSTS = [
-    "ec2-54-89-249-195.compute-1.amazonaws.com",
-    "54.89.249.195"
+    "ec2-52-23-183-168.compute-1.amazonaws.com"
 ]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
-CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
-CELERY_RESULT_HOST = os.environ.get("PL_CELERY_RESULT_HOST")
+# CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
+CELERY_CACHE_HOST = os.environ.get("PL_CELERY_CACHE_HOST")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
+LOG_LEVEL = os.getenv('PL_LOG_LEVEL', 'INFO').upper()
 POSTGRES_DB = os.environ.get("PL_POSTGRES_DB")
 POSTGRES_HOST = os.environ.get("PL_POSTGRES_HOST", None)
 POSTGRES_PASS = os.environ.get("PL_POSTGRES_PASS", None)
@@ -113,9 +115,12 @@ REDIS_BASE_URL = f"{REDIS_SCHEMA}{REDIS_HOST}:{REDIS_PORT}"
 # Append SSL parameters as query parameters in the URL
 SSL_QUERY = "?ssl_cert_reqs=CERT_NONE" # TODO: UPDATE ACCORDING TO ENV (prod should require cert)
 
-CELERY_BROKER_URL = f"{REDIS_SCHEMA}{CELERY_BROKER_HOST}:{REDIS_PORT}/0{SSL_QUERY}"
+CELERY_CACHE_URL = f"{REDIS_SCHEMA}{CELERY_CACHE_HOST}:{REDIS_PORT}"
+CELERY_BROKER_URL = f"{CELERY_CACHE_URL}/0{SSL_QUERY}"
+print("CELERY BROKER URL: ", CELERY_BROKER_URL)
 
-CELERY_RESULT_BACKEND = f"{REDIS_SCHEMA}{CELERY_RESULT_HOST}/0{SSL_QUERY}"
+CELERY_RESULT_BACKEND = f"{CELERY_CACHE_URL}/1{SSL_QUERY}"
+print("CELERY RESULT BACKEND: ", CELERY_RESULT_BACKEND)
 
 # print("Broker URL:", CELERY_BROKER_URL)
 # print("Result Backend:", CELERY_RESULT_BACKEND)
@@ -182,23 +187,86 @@ DATABASES = {
 
 # LOGGING
 
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'standard': {
+#             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+#         },
+#     },
+#     'handlers': {
+#         'cloudwatch': {
+#             'level': 'DEBUG',
+#             'class': 'watchtower.CloudWatchLogHandler',
+#             'boto3_session': None,  # Uses default boto3 session; configure AWS in your environment
+#             'log_group': 'DjangoAppLogs',
+#             'stream_name': 'django-logs',
+#             'formatter': 'standard'
+#         }
+#     },
+#     'loggers': {
+#         'django': {
+#             'handlers': ['cloudwatch'],
+#             'level': 'DEBUG',
+#             'propagate': True,
+#         },
+#         # Ensure that Celery log entries go to CloudWatch as well
+#         'celery': {
+#             'handlers': ['cloudwatch'],
+#             'level': 'DEBUG',
+#             'propagate': True,
+#         },
+#     },
+# }
+
+AWS_REGION_NAME = "us-east-1"
+
+boto3_logs_client = boto3.client("logs", region_name=AWS_REGION_NAME)
+
+log_level = getattr(logging, LOG_LEVEL, logging.INFO)
+print("LOG_LEVEL: ", LOG_LEVEL)
+# print("log_level: ", log_level)
+
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'root': {
+        'level': log_level,
+        # Adding the watchtower handler here causes all loggers in the project that
+        # have propagate=True (the default) to send messages to watchtower. If you
+        # wish to send only from specific loggers instead, remove "watchtower" here
+        # and configure individual loggers below.
+        'handlers': ['watchtower', 'console'],
+    },
     'handlers': {
-        'file': {
-            'level': 'ERROR', # TODO: take from env
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/django-indexer/error.log',
+        'console': {
+            'class': 'logging.StreamHandler',
         },
+        'watchtower': {
+            'class': 'watchtower.CloudWatchLogHandler',
+            'boto3_client': boto3_logs_client,
+            'log_group_name': 'django-indexer',
+            # Decrease the verbosity level here to send only those logs to watchtower,
+            # but still see more verbose logs in the console. See the watchtower
+            # documentation for other parameters that can be set here.
+            'level': log_level
+        }
     },
     'loggers': {
+        # In the debug server (`manage.py runserver`), several Django system loggers cause
+        # deadlocks when using threading in the logging handler, and are not supported by
+        # watchtower. This limitation does not apply when running on production WSGI servers
+        # (gunicorn, uwsgi, etc.), so we recommend that you set `propagate=True` below in your
+        # production-specific Django settings file to receive Django system logs in CloudWatch.
         'django': {
-            'handlers': ['file'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    },
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False
+        }
+        # Add any other logger-specific configuration here.
+    }
 }
 
 sentry_sdk.init(
