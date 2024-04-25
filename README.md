@@ -51,6 +51,9 @@
 - Kill indexer (`python manage.py killindexer`)
   - If for some reason this doesn't kill any active celery tasks, run `ps auxww | grep 'celery' | grep -v grep` and kill resulting PIDs
 
+Extra commands that might come in useful:
+- Purge celery queue (`celery -A base purge`)
+
 ### Env vars example
 
 ```

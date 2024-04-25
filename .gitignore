@@ -130,3 +130,7 @@ dmypy.json
 
 # JupyterLab
 .jupyterlab-debug.log
+
+# static
+
+/static/
