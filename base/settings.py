@@ -37,8 +37,8 @@ AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
 # CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
 CELERY_CACHE_HOST = os.environ.get("PL_CELERY_CACHE_HOST")
-CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "False"))
-CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
+# CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "False"))
+# CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 LOG_LEVEL = os.getenv("PL_LOG_LEVEL", "INFO").upper()
@@ -65,7 +65,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "cachalot",
+    # "cachalot",
     "celery",
     "api",
     "accounts",
@@ -127,10 +127,10 @@ SSL_QUERY = "?ssl_cert_reqs=CERT_NONE"  # TODO: UPDATE ACCORDING TO ENV (prod sh
 
 CELERY_CACHE_URL = f"{REDIS_SCHEMA}{CELERY_CACHE_HOST}:{REDIS_PORT}"
 CELERY_BROKER_URL = f"{CELERY_CACHE_URL}/0{SSL_QUERY}"
-print("CELERY BROKER URL: ", CELERY_BROKER_URL)
+# print("CELERY BROKER URL: ", CELERY_BROKER_URL)
 
 CELERY_RESULT_BACKEND = f"{CELERY_CACHE_URL}/1{SSL_QUERY}"
-print("CELERY RESULT BACKEND: ", CELERY_RESULT_BACKEND)
+# print("CELERY RESULT BACKEND: ", CELERY_RESULT_BACKEND)
 
 # print("Broker URL:", CELERY_BROKER_URL)
 # print("Result Backend:", CELERY_RESULT_BACKEND)
@@ -172,12 +172,12 @@ CACHES = {
     }
 }
 
-if CACHALOT_TIMEOUT:
-    CACHALOT_TIMEOUT = int(CACHALOT_TIMEOUT)
-else:
-    CACHALOT_TIMEOUT = 60 * 5  # 5 minutes
+# if CACHALOT_TIMEOUT:
+#     CACHALOT_TIMEOUT = int(CACHALOT_TIMEOUT)
+# else:
+#     CACHALOT_TIMEOUT = 60 * 5  # 5 minutes
 
-CACHALOT_UNCACHABLE_TABLES = frozenset(("django_migrations",))
+# CACHALOT_UNCACHABLE_TABLES = frozenset(("django_migrations",))
 
 
 ###############################################################################
@@ -208,64 +208,118 @@ CACHALOT_DATABASES = {"default"}
 
 # LOGGING
 
+# Setting the log level from an environment variable
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
-print("LOG_LEVEL: ", LOG_LEVEL)
-# print("log_level: ", log_level)
+# print("LOG_LEVEL: ", LOG_LEVEL)
 
-if ENVIRONMENT != "local":
-    AWS_REGION_NAME = "us-east-1"
-    boto3_logs_client = boto3.client("logs", region_name=AWS_REGION_NAME)
-
-
+# Setting up the logging configuration
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "root": {
-        "level": log_level,
-        # Adding the watchtower handler here causes all loggers in the project that
-        # have propagate=True (the default) to send messages to watchtower. If you
-        # wish to send only from specific loggers instead, remove "watchtower" here
-        # and configure individual loggers below.
-        # "handlers": ["watchtower", "console"],
-        "handlers": ["console"],
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        },
     },
     "handlers": {
         "console": {
+            "level": log_level,
             "class": "logging.StreamHandler",
+            "formatter": "standard"
         },
-        # "watchtower": {
-        #     "class": "watchtower.CloudWatchLogHandler",
-        #     "boto3_client": boto3_logs_client,
-        #     "log_group_name": "django-indexer",
-        #     # Decrease the verbosity level here to send only those logs to watchtower,
-        #     # but still see more verbose logs in the console. See the watchtower
-        #     # documentation for other parameters that can be set here.
-        #     "level": log_level,
-        # },
     },
     "loggers": {
-        # In the debug server (`manage.py runserver`), several Django system loggers cause
-        # deadlocks when using threading in the logging handler, and are not supported by
-        # watchtower. This limitation does not apply when running on production WSGI servers
-        # (gunicorn, uwsgi, etc.), so we recommend that you set `propagate=True` below in your
-        # production-specific Django settings file to receive Django system logs in CloudWatch.
-        "django": {"level": log_level, "handlers": ["console"], "propagate": False}
-        # Add any other logger-specific configuration here.
-    },
+        "django": {
+            "handlers": ["console"],
+            "level": log_level,
+            "propagate": False,
+        },
+        "indexer": {
+            "handlers": ["console"],
+            "level": log_level,
+            "propagate": False,
+        },
+        "": {  # root logger
+            "handlers": ["console"],
+            "level": log_level
+        }
+    }
 }
 
+# Adding Watchtower logging handler for non-local environments
 if ENVIRONMENT != "local":
+    AWS_REGION_NAME = "us-east-1"
+    boto3_logs_client = boto3.client("logs", region_name=AWS_REGION_NAME)
     LOGGING["handlers"]["watchtower"] = {
         "class": "watchtower.CloudWatchLogHandler",
         "boto3_client": boto3_logs_client,
         "log_group_name": "django-indexer",
-        # Decrease the verbosity level here to send only those logs to watchtower,
-        # but still see more verbose logs in the console. See the watchtower
-        # documentation for other parameters that can be set here.
+        "formatter": "standard",
         "level": log_level,
     }
+    LOGGING["loggers"][""]["handlers"].append("watchtower")
+    LOGGING["loggers"]["django"]["handlers"].append("watchtower")
+    LOGGING["loggers"]["indexer"]["handlers"].append("watchtower")
 
-    LOGGING["root"]["handlers"].append("watchtower")
+# log_level = getattr(logging, LOG_LEVEL, logging.INFO)
+# print("LOG_LEVEL: ", LOG_LEVEL)
+# # print("log_level: ", log_level)
+
+# if ENVIRONMENT != "local":
+#     AWS_REGION_NAME = "us-east-1"
+#     boto3_logs_client = boto3.client("logs", region_name=AWS_REGION_NAME)
+
+
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "root": {
+#         "level": log_level,
+#         # Adding the watchtower handler here causes all loggers in the project that
+#         # have propagate=True (the default) to send messages to watchtower. If you
+#         # wish to send only from specific loggers instead, remove "watchtower" here
+#         # and configure individual loggers below.
+#         # "handlers": ["watchtower", "console"],
+#         "handlers": ["console"],
+#     },
+#     "handlers": {
+#         "console": {
+#             "class": "logging.StreamHandler",
+#         },
+#         # "watchtower": {
+#         #     "class": "watchtower.CloudWatchLogHandler",
+#         #     "boto3_client": boto3_logs_client,
+#         #     "log_group_name": "django-indexer",
+#         #     # Decrease the verbosity level here to send only those logs to watchtower,
+#         #     # but still see more verbose logs in the console. See the watchtower
+#         #     # documentation for other parameters that can be set here.
+#         #     "level": log_level,
+#         # },
+#     },
+#     "loggers": {
+#         # In the debug server (`manage.py runserver`), several Django system loggers cause
+#         # deadlocks when using threading in the logging handler, and are not supported by
+#         # watchtower. This limitation does not apply when running on production WSGI servers
+#         # (gunicorn, uwsgi, etc.), so we recommend that you set `propagate=True` below in your
+#         # production-specific Django settings file to receive Django system logs in CloudWatch.
+#         "django": {"level": log_level, "handlers": ["console"], "propagate": False}
+#         # Add any other logger-specific configuration here.
+#     },
+# }
+
+# if ENVIRONMENT != "local":
+#     LOGGING["handlers"]["watchtower"] = {
+#         "class": "watchtower.CloudWatchLogHandler",
+#         "boto3_client": boto3_logs_client,
+#         "log_group_name": "django-indexer",
+#         # Decrease the verbosity level here to send only those logs to watchtower,
+#         # but still see more verbose logs in the console. See the watchtower
+#         # documentation for other parameters that can be set here.
+#         "level": log_level,
+#     }
+
+#     LOGGING["root"]["handlers"].append("watchtower")
 
 sentry_sdk.init(
     environment=ENVIRONMENT,
@@ -314,7 +368,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
-print("static root: ", STATIC_ROOT)
+# print("static root: ", STATIC_ROOT)
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "assets")]
 STATIC_URL = "/static/"
 STATICFILES_LOCATION = "static"

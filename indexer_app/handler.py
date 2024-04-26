@@ -5,7 +5,8 @@ from datetime import datetime
 from django.core.cache import cache
 from near_lake_framework import near_primitives
 
-from indexer_app.utils import (
+from .logging import logger
+from .utils import (
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
@@ -30,7 +31,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     await cache.aset(
         "block_height", block_height
     )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
-    print(f"Block Height: {block_height}, Block Timestamp: {block_timestamp}")
+    logger.info(f"Block Height: {block_height}, Block Timestamp: {block_timestamp}")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
     #         file.write(f"{streamer_message}")
@@ -59,7 +60,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
                 except json.JSONDecodeError:
-                    print(
+                    logging.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
                     )
                     continue
@@ -103,22 +104,22 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         args_dict = json.loads(decoded_text)
                     except UnicodeDecodeError:
                         # Handle case where the byte sequence cannot be decoded to UTF-8
-                        print(f"Cannot decode args to UTF-8 text: {decoded_bytes}")
+                        logger.warning(f"Cannot decode args to UTF-8 text: {decoded_bytes}")
                         args_dict = {}
                     except json.JSONDecodeError:
                         # Handle case where the text cannot be parsed as JSON
-                        print(f"Decoded text is not valid JSON: {decoded_text}")
+                        logger.warning(f"Decoded text is not valid JSON: {decoded_text}")
                         args_dict = {}
 
                     match method_name:
                         case "new":
                             if match_pot_factory_version_pattern(receipt.receiver_id):
-                                print("matched for factory pattern", args_dict)
+                                logger.info(f"matched for factory pattern: {args_dict}")
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, created_at
                                 )
                             else:
-                                print("new pot deployment", args_dict, action)
+                                logger.info(f"new pot deployment: {args_dict}, {action}")
                                 await handle_new_pot(
                                     args_dict,
                                     receiver_id,
@@ -130,7 +131,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "assert_can_apply_callback":
-                            print("application case:", args_dict, action, receipt)
+                            logger.info(f"application case: {args_dict}, {action}, {receipt}")
                             await handle_pot_application(
                                 args_dict,
                                 receiver_id,
@@ -142,7 +143,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "apply":
-                            print("application case 2:", args_dict, action, receipt)
+                            logger.info(f"application case 2: {args_dict}, {action}, {receipt}")
                             await handle_pot_application(
                                 args_dict,
                                 receiver_id,
@@ -154,13 +155,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "donate":  # TODO: donate that produces result
-                            print(
-                                "switching bazooka to knifee works!! donate his blood",
-                                args_dict,
-                                receipt,
-                                action,
-                                log_data,
-                            )
+                            logger.info(f"switching bazooka to knifee works!! donate his blood: {args_dict}, {receipt}, {action}, {log_data}")
                             await handle_new_donations(
                                 args_dict,
                                 receiver_id,
@@ -174,12 +169,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "handle_protocol_fee_callback":
-                            print(
-                                "donations to pool incoming:",
-                                args_dict,
-                                receipt,
-                                receipt_execution_outcome,
-                            )
+                            logger.info(f"donations to pool incoming: {args_dict}, {receipt}, {receipt_execution_outcome}")
                             await handle_new_donations(
                                 args_dict,
                                 receiver_id,
@@ -193,11 +183,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "transfer_funds_callback":
-                            print(
-                                "new version donations to pool incoming:",
-                                args_dict,
-                                action,
-                            )
+                            logger.info(f"new version donations to pool incoming: {args_dict}, {action}")
                             await handle_new_donations(
                                 args_dict,
                                 receiver_id,
@@ -213,7 +199,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case (
                             "register_batch"
                         ):  # TODO: listen for create_registration event instead of method call
-                            print("registrations incoming:", args_dict, action)
+                            logger.info(f"registrations incoming: {args_dict}, {action}")
                             if receiver_id != "lists.potlock.near":
                                 break
                             await handle_new_list_registration(
@@ -222,15 +208,15 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "chef_set_application_status":
-                            print("application status change incoming:", args_dict)
+                            logger.info(f"application status change incoming: {args_dict}")
                             await handle_pot_application_status_change(
                                 args_dict, receiver_id, signer_id, receipt, status_obj
                             )
                             break
 
                         case "admin_set_default_project_status":
-                            print(
-                                "registry default status setting incoming:", args_dict
+                            logger.info(
+                                f"registry default status setting incoming: {args_dict}"
                             )
                             await handle_default_list_status_change(
                                 args_dict, receiver_id, status_obj
@@ -240,9 +226,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case (
                             "update_registration"
                         ):  # TODO: listen for update_registration event instead of method call
-                            print(
-                                "project registration status update incoming:",
-                                args_dict,
+                            logger.info(
+                                f"project registration status update incoming: {args_dict}",
                             )
                             await handle_list_registration_update(
                                 args_dict, receiver_id, status_obj
@@ -250,19 +235,19 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
                         # TODO: handle delete_registration event
                         case "chef_set_payouts":
-                            print("setting payout....:", args_dict)
+                            logger.info(f"setting payout....: {args_dict}")
                             await handle_set_payouts(args_dict, receiver_id, receipt)
                             break
 
                         case "challenge_payouts":
-                            print("challenge payout:", args_dict)
+                            logger.info(f"challenge payout: {args_dict}")
                             await handle_payout_challenge(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id
                             )
                             break
 
                         case "transfer_payout_callback":
-                            print("fulfilling payouts.....", args_dict)
+                            logger.info(f"fulfilling payouts..... {args_dict}")
                             await handle_transfer_payout(
                                 args_dict, receiver_id, receipt.receipt_id, created_at
                             )
@@ -271,7 +256,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case (
                             "owner_remove_admins"
                         ):  # TODO: use update_admins event instead of method call to handle all cases
-                            print("attempting to remove admins....:", args_dict)
+                            logger.info(f"attempting to remove admins....: {args_dict}")
                             if receiver_id != "lists.potlock.near":
                                 break
                             await handle_list_admin_removal(
@@ -280,14 +265,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             break
 
                         case "create_list":
-                            print("creating list...", args_dict, action)
+                            logger.info(f"creating list... {args_dict}, {action}")
                             if receiver_id != "lists.potlock.near":
                                 break
                             await handle_new_list(signer_id, receiver_id, status_obj)
                             break
 
                         case "upvote":
-                            print("up voting...", args_dict)
+                            logger.info(f"up voting... {args_dict}")
                             if receiver_id != "lists.potlock.near":
                                 break
                             await handle_list_upvote(
@@ -297,7 +282,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         # TODO: handle remove upvote
 
                 except Exception as e:
-                    print(
+                    logger.warning(
                         f"Error during parsing method call from JSON string to dict\n{e}"
                     )
                     # with open("indexer_error.txt", "a") as file:

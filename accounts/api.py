@@ -7,6 +7,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from base.logging import logger
 from donations.models import Donation
 from pots.models import Pot, PotApplication, PotApplicationStatus
 from pots.serializers import PotSerializer
@@ -39,7 +40,7 @@ class AccountsAPI(APIView, LimitOffsetPagination):
     def dispatch(self, request, *args, **kwargs):
         return super(AccountsAPI, self).dispatch(request, *args, **kwargs)
 
-    # @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id", None)
         action = kwargs.get("action", None)
