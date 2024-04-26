@@ -22,6 +22,7 @@ from .utils import (
     handle_set_payouts,
     handle_transfer_payout,
 )
+from base.utils import convert_ns_to_utc
 from pots.utils import match_pot_factory_version_pattern
 
 
@@ -31,7 +32,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     await cache.aset(
         "block_height", block_height
     )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
-    logger.info(f"Block Height: {block_height}, Block Timestamp: {block_timestamp}")
+    formatted_date = convert_ns_to_utc(block_timestamp)
+    logger.info(f"Block Height: {block_height}, Block Timestamp: {block_timestamp} ({formatted_date})")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
     #         file.write(f"{streamer_message}")

@@ -35,8 +35,6 @@ ALLOWED_HOSTS = ["ec2-52-23-183-168.compute-1.amazonaws.com", "127.0.0.1"]
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
-# CELERY_BROKER_HOST = os.environ.get("PL_CELERY_BROKER_HOST")
-CELERY_CACHE_HOST = os.environ.get("PL_CELERY_CACHE_HOST")
 # CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "False"))
 # CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
@@ -121,21 +119,15 @@ REDIS_SCHEMA = (
     "redis://" if ENVIRONMENT == "local" else "rediss://"
 )  # rediss denotes SSL connection
 REDIS_BASE_URL = f"{REDIS_SCHEMA}{REDIS_HOST}:{REDIS_PORT}"
+DJANGO_CACHE_URL = f"{REDIS_BASE_URL}/2"
 
 # Append SSL parameters as query parameters in the URL
 SSL_QUERY = "?ssl_cert_reqs=CERT_NONE"  # TODO: UPDATE ACCORDING TO ENV (prod should require cert)
 
-CELERY_CACHE_URL = f"{REDIS_SCHEMA}{CELERY_CACHE_HOST}:{REDIS_PORT}"
-CELERY_BROKER_URL = f"{CELERY_CACHE_URL}/0{SSL_QUERY}"
-# print("CELERY BROKER URL: ", CELERY_BROKER_URL)
+CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0{SSL_QUERY}"
 
-CELERY_RESULT_BACKEND = f"{CELERY_CACHE_URL}/1{SSL_QUERY}"
-# print("CELERY RESULT BACKEND: ", CELERY_RESULT_BACKEND)
+CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/1{SSL_QUERY}"
 
-# print("Broker URL:", CELERY_BROKER_URL)
-# print("Result Backend:", CELERY_RESULT_BACKEND)
-
-# hash_tag = "task_group_1"
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     "fanout_prefix": True,
@@ -147,21 +139,10 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     # "ssl_cert_reqs": "CERT_NONE",  # No client certificate required
 }
 
-# # Add SSL configurations directly into the broker and result backend options
-# CELERY_BROKER_TRANSPORT_OPTIONS['redis_backend_use_ssl'] = {
-#     'ssl_cert_reqs': "CERT_NONE"
-# }
-
-# # Ensure the backend uses SSL
-# CELERY_RESULT_BACKEND_OPTIONS = {
-#     "ssl_cert_reqs": "CERT_NONE",
-#     "ssl": True,
-# }
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"{REDIS_BASE_URL}/0",
+        "LOCATION": DJANGO_CACHE_URL,
         "TIMEOUT": 300,  # 5 minutes
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
