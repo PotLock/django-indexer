@@ -22,8 +22,8 @@ jobs:
 
       - name: Print environment variables
         run: |
-          echo "EC2_SSH_HOST=${{ env.EC2_SSH_HOST }}"
-          echo "EC2_USER=${{ env.EC2_USER }}"
+          echo "EC2_SSH_HOST=${{ vars.EC2_SSH_HOST }}"
+          echo "EC2_USER=${{ vars.EC2_USER }}"
 
       - name: Push new code to EC2
         run: |
