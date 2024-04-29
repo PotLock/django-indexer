@@ -20,21 +20,16 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
-      - name: Print environment variables
-        run: |
-          echo "EC2_SSH_HOST=${{ vars.EC2_SSH_HOST }}"
-          echo "EC2_USER=${{ vars.EC2_USER }}"
-
       - name: Push new code to EC2
         run: |
-          rsync -avz --exclude '.git*' --exclude 'node_modules' ./ ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }}:/home/ec2-user/django-indexer
+          rsync -avz --exclude '.git*' --exclude 'node_modules' ./ ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }}:/home/ec2-user/django-indexer
           echo "Code has been pushed to the EC2 instance."
 
       - name: Check for pending migrations
         id: check_migrations
         run: |
           echo "Checking for pending migrations..."
-          pending_migrations=$(ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py showmigrations --plan | grep '\[ \]'")
+          pending_migrations=$(ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py showmigrations --plan | grep '\[ \]'")
           echo "::set-output name=pending::${pending_migrations}"
           if [ -z "$pending_migrations" ]; then
             echo "No migrations found."
@@ -45,27 +40,27 @@ jobs:
         if: steps.check_migrations.outputs.pending
         run: |
           echo "Stopping services..."
-          ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "sudo systemctl stop gunicorn.service indexer.service"
+          ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "sudo systemctl stop gunicorn.service indexer.service"
 
       - name: Run migrations
         if: steps.check_migrations.outputs.pending
         run: |
           echo "Running migrations..."
-          ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py migrate"
+          ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py migrate"
 
       - name: Run collectstatic
         run: |
           echo "Running collectstatic..."
-          ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py collectstatic --noinput"
+          ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "cd /home/ec2-user/django-indexer && source env/bin/activate && python manage.py collectstatic --noinput"
 
       - name: Restart services if migrations were run
         if: steps.check_migrations.outputs.pending
         run: |
           echo "Restarting services after migrations..."
-          ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "sudo systemctl restart gunicorn.service indexer.service"
+          ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "sudo systemctl restart gunicorn.service indexer.service"
 
       - name: Restart services if no migrations
         if: steps.check_migrations.outputs.pending == ''
         run: |
           echo "Restarting services without migration..."
-          ssh -o "StrictHostKeyChecking=no" ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }} "sudo systemctl restart gunicorn.service"
+          ssh -o "StrictHostKeyChecking=no" ${{ vars.EC2_USER }}@${{ vars.EC2_SSH_HOST }} "sudo systemctl restart gunicorn.service"
