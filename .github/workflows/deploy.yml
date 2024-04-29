@@ -20,6 +20,11 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
+      - name: Print environment variables
+        run: |
+          echo "EC2_SSH_HOST=${{ env.EC2_SSH_HOST }}"
+          echo "EC2_USER=${{ env.EC2_USER }}"
+
       - name: Push new code to EC2
         run: |
           rsync -avz --exclude '.git*' --exclude 'node_modules' ./ ${{ env.EC2_USER }}@${{ env.EC2_SSH_HOST }}:/home/ec2-user/django-indexer
