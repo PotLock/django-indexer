@@ -15,7 +15,7 @@ source "/home/ec2-user/.cache/pypoetry/virtualenvs/django-indexer-Y-SQFfhb-py3.1
 
 # Check if there are pending migrations
 if python manage.py showmigrations | grep '\[ \]'; then
-    echo 'Migrations found, stopping services...' >> "$LOG_FILE"
+    echo 'Migrations found; stopping services...' >> "$LOG_FILE"
     sudo systemctl stop gunicorn.service celery.service
 
     echo 'Applying migrations...' >> "$LOG_FILE"
@@ -28,5 +28,9 @@ else
     python manage.py collectstatic --noinput >> "$LOG_FILE"
     sudo systemctl restart gunicorn.service celery.service
 fi
+
+# Set correct permissions for all files in the project directory
+chown -R ec2-user:ec2-user /home/ec2-user/django-indexer/
+chmod -R 775 /home/ec2-user/django-indexer/
 
 echo 'after_install.sh completed' >> "$LOG_FILE"
