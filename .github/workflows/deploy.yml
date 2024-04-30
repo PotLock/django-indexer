@@ -1,4 +1,3 @@
-# This is a basic workflow to help you get started with Actions
 name: Deploy to EC2 on Push
 
 on:
@@ -34,7 +33,7 @@ jobs:
         id: deploy
         run: |
           aws deploy create-deployment \
-          --application-name django-indexer \ 
+          --application-name django-indexer \
           --deployment-group-name django-indexer-dev \
           --deployment-config-name CodeDeployDefault.AllAtOnce \
           --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
