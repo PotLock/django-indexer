@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
-ALLOWED_HOSTS = ["ec2-52-23-183-168.compute-1.amazonaws.com", "127.0.0.1"]
+ALLOWED_HOSTS = ["ec2-100-27-57-47.compute-1.amazonaws.com", "127.0.0.1"]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
@@ -190,7 +190,7 @@ CACHALOT_DATABASES = {"default"}
 # LOGGING
 
 # Setting the log level from an environment variable
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 # print("LOG_LEVEL: ", LOG_LEVEL)
 
@@ -199,15 +199,13 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        },
+        "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
     "handlers": {
         "console": {
             "level": log_level,
             "class": "logging.StreamHandler",
-            "formatter": "standard"
+            "formatter": "standard",
         },
     },
     "loggers": {
@@ -221,11 +219,8 @@ LOGGING = {
             "level": log_level,
             "propagate": False,
         },
-        "": {  # root logger
-            "handlers": ["console"],
-            "level": log_level
-        }
-    }
+        "": {"handlers": ["console"], "level": log_level},  # root logger
+    },
 }
 
 # Adding Watchtower logging handler for non-local environments
