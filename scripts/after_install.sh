@@ -40,8 +40,8 @@ echo "$(date) - Changed ownership to ec2-user for all project files" >> "$LOG_FI
 sudo chmod -R 775 /home/ec2-user/django-indexer/
 echo "$(date) - Set permissions to 775 for all project files" >> "$LOG_FILE"
 
-# Log the results of permissions change
-echo "Permissions after update:" >> "$LOG_FILE"
-ls -lah /home/ec2-user/django-indexer/ >> "$LOG_FILE"
+# # Log the results of permissions change
+# echo "Permissions after update:" >> "$LOG_FILE"
+# ls -lah /home/ec2-user/django-indexer/ >> "$LOG_FILE"
 
 echo 'after_install.sh completed' >> "$LOG_FILE"
