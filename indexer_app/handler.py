@@ -11,15 +11,18 @@ from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import logger
 from .utils import (  # handle_batch_donations,
+    handle_add_stamp,
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
+    handle_nadabot_registry,
     handle_new_donation,
     handle_new_list,
     handle_new_list_registration,
     handle_new_pot,
     handle_new_pot_factory,
+    handle_new_provider,
     handle_payout_challenge,
     handle_payout_challenge_response,
     handle_pot_application,
@@ -27,6 +30,7 @@ from .utils import (  # handle_batch_donations,
     handle_set_payouts,
     handle_social_profile_update,
     handle_transfer_payout,
+    handle_update_default_human_threshold,
     handle_pot_config_update
 )
 
@@ -74,6 +78,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     event_name = parsed_log.get("event")
                     if event_name == "update_pot_config":
                         await handle_pot_config_update(parsed_log.get("data")[0], receiver_id)
+                    print("parsa parsa...", parsed_log)
+                    event_name = parsed_log.get("event")
+                    if event_name == "add_or_update_provider":
+                        await handle_new_provider(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
+                    elif event_name == "add_stamp":
+                        await handle_add_stamp(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
+                    elif event_name == "update_default_human_threshold":
+                        await handle_update_default_human_threshold(parsed_log.get("data")[0], receipt.receiver_id)
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -146,6 +158,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, created_at
                                 )
+                            elif receiver_id.endswith(".nadabot.near"): # does not properly capture registries?
+                                await handle_nadabot_registry(args_dict, receiver_id, created_at)
                             elif match_pot_subaccount_pattern(receipt.receiver_id):
                                 logger.info(
                                     f"new pot deployment: {args_dict}, {action}"
@@ -353,6 +367,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
                         # TODO: handle remove upvote
+
                 except Exception as e:
                     logger.error(f"Error in indexer handler:\n{e}")
                     # with open("indexer_error.txt", "a") as file:
