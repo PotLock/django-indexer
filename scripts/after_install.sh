@@ -32,10 +32,16 @@ else
     sudo systemctl restart gunicorn.service celery.service
 fi
 
-# Set correct permissions for all files in the project directory
-chown -R ec2-user:ec2-user /home/ec2-user/django-indexer/
-chmod -R 775 /home/ec2-user/django-indexer/
+# Set correct ownership recursively for all files and directories in the project directory
+sudo chown -R ec2-user:ec2-user /home/ec2-user/django-indexer/
+echo "$(date) - Changed ownership to ec2-user for all project files" >> "$LOG_FILE"
 
-echo "Set permissions for all files in the project directory" >> "$LOG_FILE"
+# Set read, write, and execute permissions for the owner and group, and read and execute for others
+sudo chmod -R 775 /home/ec2-user/django-indexer/
+echo "$(date) - Set permissions to 775 for all project files" >> "$LOG_FILE"
+
+# Log the results of permissions change
+echo "Permissions after update:" >> "$LOG_FILE"
+ls -lah /home/ec2-user/django-indexer/ >> "$LOG_FILE"
 
 echo 'after_install.sh completed' >> "$LOG_FILE"
