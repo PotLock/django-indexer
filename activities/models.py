@@ -63,3 +63,6 @@ class Activity(models.Model):
         choices=ActivityType.choices,
         help_text=_("Activity type."),
     )
+
+    class Meta:
+        verbose_name_plural = "Activities"

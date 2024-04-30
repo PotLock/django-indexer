@@ -7,6 +7,7 @@ from near_lake_framework import LakeConfig, streamer
 
 from indexer_app.handler import handle_streamer_message
 
+from .logging import logger
 from .utils import cache_block_height, get_block_height
 
 
@@ -15,9 +16,10 @@ async def indexer(network: str, from_block: int, to_block: int):
     Runs the lake indexer framework
     """
     # Initialize lake indexer
+    logger.info(f"from block: {from_block}")
     lake_config = LakeConfig.mainnet() if network == "mainnet" else LakeConfig.testnet()
     lake_config.start_block_height = (
-        from_block if from_block else print("Starting to index from latest block")
+        from_block if from_block else logger.info("Starting to index from latest block")
     )
     lake_config.aws_access_key_id = settings.AWS_ACCESS_KEY_ID
     lake_config.aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
@@ -32,19 +34,28 @@ async def indexer(network: str, from_block: int, to_block: int):
             await cache_block_height("current_block_height", streamer_message.block.header.height, block_count) # current block height
             await handle_streamer_message(streamer_message)
         except Exception as e:
-            print("Error in streamer_messages_queue", e)
+            logger.error(f"Error in streamer_messages_queue: {e}")
 
 
 @shared_task
 def listen_to_near_events():
-    print("tell us you're alive!!!!")
+    logger.info("Listening to near events...")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
         # Update below with desired network & block height
         start_block = get_block_height('current_block_height')
-        print("what;s the start block, pray tell?", start_block-1)
-        loop.run_until_complete(indexer("mainnet", 115743373, None))
+        # start_block = 104_963_982
+        logger.info(f"what's the start block, pray tell? {start_block-1}")
+        loop.run_until_complete(indexer("mainnet", start_block-1, None))
     finally:
         loop.close()
+
+
+from celery.signals import task_revoked
+
+
+@task_revoked.connect
+def on_task_revoked(request, terminated, signum, expired, **kwargs):
+    logger.info(f"Task {request.id} revoked; terminated={terminated}, signum={signum}, expired={expired}")

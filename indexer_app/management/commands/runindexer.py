@@ -6,5 +6,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Invoke Celery task
-        listen_to_near_events.delay()
-        self.stdout.write(self.style.SUCCESS('Successfully invoked the Near Data Lake indexer task'))
+        try:
+            listen_to_near_events.delay()
+            self.stdout.write(self.style.SUCCESS('Successfully invoked the Near Data Lake indexer task'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'Failed to invoke task: {str(e)}'))

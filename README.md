@@ -51,17 +51,26 @@
 - Kill indexer (`python manage.py killindexer`)
   - If for some reason this doesn't kill any active celery tasks, run `ps auxww | grep 'celery' | grep -v grep` and kill resulting PIDs
 
+Extra commands that might come in useful:
+- Purge celery queue (`celery -A base purge`)
+
 ### Env vars example
 
 ```
+export PL_AWS_ACCESS_KEY_ID=
+export PL_AWS_SECRET_ACCESS_KEY=
+export PL_CACHALOT_ENABLED=False
+export PL_DEBUG=True
+export PL_ENVIRONMENT=local
+export PL_LOG_LEVEL=debug
 export PL_POSTGRES_DB=potlock
 export PL_POSTGRES_HOST=127.0.0.1
 export PL_POSTGRES_PASS=
 export PL_POSTGRES_PORT=5432
 export PL_POSTGRES_USER=$USER
-export PL_CELERY_BROKER_URL=redis://localhost:6379/0
-export PL_AWS_ACCESS_KEY_ID=
-export PL_AWS_SECRET_ACCESS_KEY=
+export PL_REDIS_HOST=
+export PL_REDIS_PORT=6379
+export PL_SENTRY_DSN=
 ```
 
 ## API Basics
