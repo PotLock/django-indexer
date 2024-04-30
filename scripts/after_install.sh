@@ -40,6 +40,12 @@ echo "$(date) - Changed ownership to ec2-user for all project files" >> "$LOG_FI
 sudo chmod -R 775 /home/ec2-user/django-indexer/
 echo "$(date) - Set permissions to 775 for all project files" >> "$LOG_FILE"
 
+# Set the group of the Django project and static files to nginx
+sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer
+
+# Set the group of the socket directory to nginx
+sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer/run
+
 # # Log the results of permissions change
 # echo "Permissions after update:" >> "$LOG_FILE"
 # ls -lah /home/ec2-user/django-indexer/ >> "$LOG_FILE"
