@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "lists",
     "pots",
     "tokens",
+    "nadabot",
 ]
 
 DEFAULT_PAGE_SIZE = 30

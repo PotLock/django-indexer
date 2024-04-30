@@ -14,6 +14,7 @@ from base.utils import format_date, format_to_near
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
+from nadabot.models import NadabotRegistry, Provider, Stamp
 from pots.models import (
     Pot,
     PotApplication,
@@ -25,6 +26,30 @@ from pots.models import (
 from tokens.models import Token, TokenHistoricalPrice
 
 GECKO_URL = "https://api.coingecko.com/api/v3"
+
+
+async def handle_nadabot_registry(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    print("nadabot registry init...", data)
+
+    registry, _ = await Account.objects.aget_or_create(id=receiverId)
+    owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+    nadabot_registry = await NadabotRegistry.objects.acreate(
+        id=registry,
+        owner=owner,
+        created_at=created_at,
+        updated_at=created_at,
+        source_metadata=data.get('source_metadata')
+    )
+
+    if data.get("admins"):
+        for admin_id in data["admins"]:
+            admin, _ = await Account.objects.aget_or_create(id=admin_id)
+            await nadabot_registry.admins.aadd(admin)
+
 
 
 async def handle_new_pot(
@@ -92,7 +117,7 @@ async def handle_new_pot(
     if data.get("admins"):
         for admin_id in data["admins"]:
             admin, _ = await Account.objects.aget_or_create(id=admin_id)
-            potObject.admins.aadd(admin)
+            await potObject.admins.aadd(admin)
 
     # Create activity object
     await Activity.objects.acreate(
@@ -881,6 +906,86 @@ async def handle_new_donations(
         action_result=donation_data,
         tx_hash=receipt_obj.receipt_id,
     )
+
+async def handle_update_default_human_threshold(
+        data: dict,
+        receiverId: str
+):
+    print("update landing...", data)
+
+    reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
+        **{"default_human_threshold": data["default_human_threshold"]}
+    )
+
+    print("updated threshold..")
+
+
+async def handle_new_provider(
+    data: dict,
+    receiverId: str,
+    signerId: str
+):
+    print("new provider data:", data, receiverId)
+    data = data["provider"]
+    
+    print(
+        "upserting accounts involved",
+        data["submitted_by"]
+    )
+
+    # Upsert donor account
+    submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
+
+    provider_id = data["id"]
+    
+    if provider_id == 13:
+        provider_id = await cache.aget("last_id", 1)
+        await cache.aset("last_id", provider_id+1)
+    
+    provider = await Provider.objects.acreate(
+        id=provider_id,
+        contract_id=data["contract_id"],
+        method_name=data["method_name"],
+        provider_name=data["provider_name"],
+        description=data.get("description"),
+        status=data["status"],
+        admin_notes=data.get("admin_notes"),
+        default_weight=data["default_weight"],
+        gas=data.get("gas"),
+        tags=data.get("tags"),
+        icon_url=data.get("icon_url"),
+        external_url=data.get("external_url"),
+        submitted_by=data["submitted_by"],
+        submitted_at_ms = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
+        stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
+        account_id_arg_name = data["account_id_arg_name"],
+        custom_args = data.get("custom_args"),
+        registry_id=receiverId
+    )
+
+
+async def handle_add_stamp(
+    data: dict,
+    receiverId: str,
+    signerId: str
+):
+    print("new stamp data:", data, receiverId)
+    data = data["stamp"]
+    
+    print(
+        "upserting accounts involved",
+        data["user_id"]
+    )
+
+    # Upsert donor account
+    user, _ = await Account.objects.aget_or_create(id=data["user_id"])
+
+    stamp = await Stamp.objects.acreate(
+        user=user,
+        provider_id=data["provider_id"],
+        verification_date = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+    )
+
 
 
 async def cache_block_height(key: str, height: int, block_count: int) -> int:

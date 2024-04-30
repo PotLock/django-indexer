@@ -6,22 +6,28 @@ from django.core.cache import cache
 from near_lake_framework import near_primitives
 
 from indexer_app.utils import (
+    handle_add_stamp,
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
+    handle_nadabot_registry,
     handle_new_donations,
     handle_new_list,
     handle_new_list_registration,
     handle_new_pot,
     handle_new_pot_factory,
+    handle_new_provider,
     handle_payout_challenge,
     handle_pot_application,
     handle_pot_application_status_change,
     handle_set_payouts,
     handle_transfer_payout,
+    handle_update_default_human_threshold,
 )
 from pots.utils import match_pot_factory_version_pattern
+
+contracts_tuple = ("potlock.near", "nadabot.near")
 
 
 async def handle_streamer_message(streamer_message: near_primitives.StreamerMessage):
@@ -39,7 +45,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
         for receipt_execution_outcome in shard.receipt_execution_outcomes:
             # we only want to proceed if it's a potlock tx and it succeeded.... (unreadable if statement?)
             if not receipt_execution_outcome.receipt.receiver_id.endswith(
-                "potlock.near"
+                contracts_tuple
             ) or (
                 "SuccessReceiptId"
                 not in receipt_execution_outcome.execution_outcome.outcome.status
@@ -50,6 +56,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             # 1. HANDLE LOGS
 
             log_data = []
+            receipt = receipt_execution_outcome.receipt
 
             for log_index, log in enumerate(
                 receipt_execution_outcome.execution_outcome.outcome.logs, start=1
@@ -58,6 +65,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     continue
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
+                    print("parsa parsa...", parsed_log)
+                    event_name = parsed_log.get("event")
+                    if event_name == "add_or_update_provider":
+                        await handle_new_provider(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
+                    elif event_name == "add_stamp":
+                        await handle_add_stamp(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
+                    elif event_name == "update_default_human_threshold":
+                        await handle_update_default_human_threshold(parsed_log.get("data")[0], receipt.receiver_id)
                 except json.JSONDecodeError:
                     print(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -85,7 +100,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             ):
                 if "FunctionCall" not in action:
                     continue
-                receipt = receipt_execution_outcome.receipt
                 status_obj = receipt_execution_outcome.execution_outcome.outcome
                 created_at = datetime.fromtimestamp(block_timestamp / 1000000000)
 
@@ -117,6 +131,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, created_at
                                 )
+                            elif receiver_id.endswith(".nadabot.near"): # does not properly capture registries?
+                                await handle_nadabot_registry(args_dict, receiver_id, created_at)
                             else:
                                 print("new pot deployment", args_dict, action)
                                 await handle_new_pot(
