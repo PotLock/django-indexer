@@ -4,6 +4,9 @@ LOG_FILE="/home/ec2-user/django-indexer/logs/deploy.log"
 
 echo 'Running after_install.sh' >> "$LOG_FILE"
 
+# Log the current date and time in a human-readable format
+echo "Script execution started at: $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+
 # Define the project directory
 PROJECT_DIR="/home/ec2-user/django-indexer"
 
