@@ -36,4 +36,6 @@ fi
 chown -R ec2-user:ec2-user /home/ec2-user/django-indexer/
 chmod -R 775 /home/ec2-user/django-indexer/
 
+echo "Set permissions for all files in the project directory" >> "$LOG_FILE"
+
 echo 'after_install.sh completed' >> "$LOG_FILE"
