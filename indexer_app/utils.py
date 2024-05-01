@@ -667,6 +667,12 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         logger.error(f"Failed to remove list admin, Error: {e}")
 
 
+async def handle_nadabot_admin_add(data, receiverId):
+    logger.info(f"adding admin...: {data}, {receiverId}")
+    obj = await NadabotRegistry.objects.aget(id=receiverId)
+
+    for acct in data["account_ids"]:
+        await obj.admins.aadd({"admins_id": acct})  # ??
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
