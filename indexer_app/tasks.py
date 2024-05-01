@@ -43,7 +43,7 @@ async def indexer(network: str, from_block: int, to_block: int):
 
 @shared_task
 def listen_to_near_events():
-    logger.info("Listening to near events...")
+    logger.info("Listening to NEAR events...")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
