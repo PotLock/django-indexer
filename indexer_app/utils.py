@@ -6,11 +6,11 @@ from datetime import date, datetime
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
 from accounts.models import Account
 from activities.models import Activity
-from base.logging import logger
 from base.utils import format_date, format_to_near
 from donations.models import Donation
 from indexer_app.models import BlockHeight
@@ -25,6 +25,8 @@ from pots.models import (
     PotPayoutChallenge,
 )
 from tokens.models import Token, TokenHistoricalPrice
+
+from .logging import logger
 
 GECKO_URL = "https://api.coingecko.com/api/v3"
 
@@ -999,7 +1001,7 @@ async def cache_block_height(key: str, height: int, block_count: int) -> int:
     if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
         logger.info(f"saving daylight, {height}")
         await BlockHeight.objects.aupdate_or_create(
-            id=1, defaults={"block_height": height, "updated_at": datetime.now()}
+            id=1, defaults={"block_height": height, "updated_at": timezone.now()}
         )  # better than ovverriding model's save method to get a singleton? we need only one entry
     return height
 
