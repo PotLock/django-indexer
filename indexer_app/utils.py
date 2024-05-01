@@ -505,7 +505,7 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
     list_obj = await List.objects.aget(id=data["list_id"])
 
     for acct in data["admins"]:
-        list_obj.admins.remove({"admins_id": acct})  # ??
+        await list_obj.admins.aremove({"admins_id": acct})  # ??
 
     activity = {
         "signer_id": signerId,
@@ -516,6 +516,14 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
     }
 
     await Activity.objects.acreate(**activity)
+
+
+async def handle_nadabot_admin_add(data, receiverId):
+    logger.info(f"adding admin...: {data}, {receiverId}")
+    obj = await NadabotRegistry.objects.aget(id=receiverId)
+
+    for acct in data["account_ids"]:
+        await obj.admins.aadd({"admins_id": acct})  # ??
 
 
 # TODO: Need to abstract some actions.

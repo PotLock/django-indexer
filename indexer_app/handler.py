@@ -15,6 +15,7 @@ from .utils import (
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
+    handle_nadabot_admin_add,
     handle_nadabot_registry,
     handle_new_donations,
     handle_new_list,
@@ -297,6 +298,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             await handle_list_upvote(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id
                             )
+                            break
+                        case "owner_add_admins":
+                            logger.info(f"adding admins.. {args_dict}")
+                            await handle_nadabot_admin_add(args_dict, receiver_id)
                             break
                         # TODO: handle remove upvote
 
