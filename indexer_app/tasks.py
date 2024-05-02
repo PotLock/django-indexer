@@ -53,7 +53,7 @@ def listen_to_near_events():
         # start_block = get_block_height('current_block_height')
         start_block = 105_923_501  # manually setting for debugging TODO: remove this
         logger.info(f"what's the start block, pray tell? {start_block-1}")
-        loop.run_until_complete(indexer("mainnet", 111_949_088, None))
+        loop.run_until_complete(indexer("mainnet", start_block - 1, None))
     finally:
         loop.close()
 
