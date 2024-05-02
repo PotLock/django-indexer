@@ -525,7 +525,8 @@ async def handle_nadabot_admin_add(data, receiverId):
     obj = await NadabotRegistry.objects.aget(id=receiverId)
 
     for acct in data["account_ids"]:
-        await obj.admins.aadd({"admins_id": acct})  # ??
+        admin, _ = await Account.objects.aget_or_create(id=acct)
+        await obj.admins.aadd(acct)  # ??
 
 
 # TODO: Need to abstract some actions.
