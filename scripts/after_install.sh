@@ -61,6 +61,6 @@ else
     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
     sudo systemctl restart gunicorn celery
-f
+fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"
