@@ -593,7 +593,7 @@ async def handle_new_donations(
     # late_p = await token.get_most_recent_price()
     try:
         logger.info("fetching historical price...")
-        logger.info("donated at: {donated_at}")
+        logger.info(f"donated at: {donated_at}")
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
         logger.info(f"endpoint: {endpoint}")
         response = requests.get(endpoint)
