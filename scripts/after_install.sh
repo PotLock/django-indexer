@@ -38,18 +38,40 @@ echo "Checking for pending migrations..." >> "$LOG_FILE"
 PENDING_MIGRATIONS=$(python manage.py showmigrations | grep '\[ \]' 2>&1)  # Redirect stderr to stdout
 echo "Migration check output: $PENDING_MIGRATIONS" >> "$LOG_FILE"
 
-if [[ ! -z "$PENDING_MIGRATIONS" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Migrations found; stopping services..." >> "$LOG_FILE"
+# Log the full output of showmigrations
+echo "Checking for pending migrations..." >> "$LOG_FILE"
+python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full output to diagnose
+
+# Now, let's use a more direct check for unapplied migrations
+PENDING_MIGRATIONS=$(python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
+
+if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
+    echo "Migrations found; stopping services..." >> "$LOG_FILE"
     sudo systemctl stop gunicorn celery
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Applying migrations..." >> "$LOG_FILE"
-    python manage.py migrate >> "$LOG_FILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting services..." >> "$LOG_FILE"
+
+    echo 'Applying migrations...' >> "$LOG_FILE"
+    python manage.py migrate >> "$LOG_FILE" 2>&1
+
+    echo 'Starting services...' >> "$LOG_FILE"
     sudo systemctl start gunicorn celery
 else
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - No migrations found. Running collectstatic and restarting services..." >> "$LOG_FILE"
-    python manage.py collectstatic --noinput >> "$LOG_FILE"
+    echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+    python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
     sudo systemctl restart gunicorn celery
 fi
+# # not working version
+# if [[ ! -z "$PENDING_MIGRATIONS" ]]; then
+#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Migrations found; stopping services..." >> "$LOG_FILE"
+#     sudo systemctl stop gunicorn celery
+#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Applying migrations..." >> "$LOG_FILE"
+#     python manage.py migrate >> "$LOG_FILE"
+#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting services..." >> "$LOG_FILE"
+#     sudo systemctl start gunicorn celery
+# else
+#     echo "$(date '+%Y-%m-%d %H:%M:%S') - No migrations found. Running collectstatic and restarting services..." >> "$LOG_FILE"
+#     python manage.py collectstatic --noinput >> "$LOG_FILE"
+#     sudo systemctl restart gunicorn celery
+# fi
 
 # # Check if there are pending migrations
 # if python manage.py showmigrations | grep '\[ \]'; then
