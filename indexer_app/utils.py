@@ -595,10 +595,11 @@ async def handle_new_donations(
         logger.info("fetching historical price...")
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
         response = requests.get(endpoint)
+        logger.debug(f"response: {response}")
         price_data = response.json()
     except Exception as e:
         logger.warning(f"Failed to fetch price data: {e}")
-        # logger.debug(f"price data: {price_data}")
+    logger.debug(f"price data: {price_data}")
     unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
     logger.debug(f"unit price: {unit_price}")
     if unit_price:
