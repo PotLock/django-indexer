@@ -7,9 +7,10 @@ from .models import Donation
 
 @admin.register(Donation)
 class DonationAdmin(admin.ModelAdmin):
-    list_display = [
-        field.name for field in Donation._meta.get_fields() if field.name != "id"
-    ]
+    # list_display = [
+    #     field.name for field in Donation._meta.get_fields() if field.name != "id"
+    # ]
+    list_display = ["__all__"]
     list_display.extend(
         [
             "donor_address",
