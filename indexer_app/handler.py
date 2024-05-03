@@ -5,8 +5,12 @@ from datetime import datetime
 from django.core.cache import cache
 from near_lake_framework import near_primitives
 
+from base.utils import convert_ns_to_utc
+from pots.utils import match_pot_factory_version_pattern
+
 from .logging import logger
 from .utils import (
+    handle_batch_donations,
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
@@ -22,8 +26,6 @@ from .utils import (
     handle_set_payouts,
     handle_transfer_payout,
 )
-from base.utils import convert_ns_to_utc
-from pots.utils import match_pot_factory_version_pattern
 
 
 async def handle_streamer_message(streamer_message: near_primitives.StreamerMessage):
@@ -62,7 +64,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
                 except json.JSONDecodeError:
-                    logging.warning(
+                    logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
                     )
                     continue
@@ -158,16 +160,24 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
                         case "donate":  # TODO: donate that produces result
                             logger.info(f"switching bazooka to knifee works!! donate his blood: {args_dict}, {receipt}, {action}, {log_data}")
-                            await handle_new_donations(
-                                args_dict,
-                                receiver_id,
-                                signer_id,
-                                "direct",
-                                receipt,
-                                status_obj,
-                                log_data,
-                                created_at,
-                            )
+                            if len(log_data) > 1:
+                                await handle_batch_donations(
+                                    receiver_id,
+                                    signer_id,
+                                    "direct",
+                                    receipt,
+                                    log_data
+                                )
+                            else:
+                                await handle_new_donations(
+                                    args_dict,
+                                    receiver_id,
+                                    signer_id,
+                                    "direct",
+                                    receipt,
+                                    status_obj,
+                                    log_data,
+                                )
                             break
 
                         case "handle_protocol_fee_callback":
@@ -180,7 +190,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 receipt,
                                 status_obj,
                                 log_data,
-                                created_at,
                             )
                             break
 
@@ -194,7 +203,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 receipt,
                                 status_obj,
                                 log_data,
-                                created_at,
                             )
                             break
 

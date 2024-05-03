@@ -12,6 +12,11 @@ class BlockHeight(models.Model):
         _("blockheight value"),
         help_text=_("the last blockheight saved to db."),
     )
+    block_timestamp = models.DateTimeField(
+        _("block timestamp"),
+        help_text=_("date equivalent of the block height."),
+        null=True,
+    )
     updated_at = models.DateTimeField(
         _("updated at"),
         help_text=_("block height last update at."),
