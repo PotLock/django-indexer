@@ -593,17 +593,17 @@ async def handle_new_donations(
     # late_p = await token.get_most_recent_price()
     try:
         logger.info("fetching historical price...")
-        logger.info(f"donated at: {donated_at}")
+        logger.debug(f"donated at: {donated_at}")
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
-        logger.info(f"endpoint: {endpoint}")
+        logger.debug(f"endpoint: {endpoint}")
         response = requests.get(endpoint)
-        logger.info(f"response: {response}")
+        logger.debug(f"response: {response}")
         price_data = response.json()
     except Exception as e:
         logger.warning(f"Failed to fetch price data: {e}")
-    logger.info(f"price data: {price_data}")
+    logger.debug(f"price data: {price_data}")
     unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
-    logger.info(f"unit price: {unit_price}")
+    logger.debug(f"unit price: {unit_price}")
     if unit_price:
         try:
             await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
