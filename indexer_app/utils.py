@@ -598,6 +598,8 @@ async def handle_new_donations(
         logger.info(f"endpoint: {endpoint}")
         response = requests.get(endpoint)
         logger.info(f"response: {response}")
+        if response.status_code == 429:
+            logger.warning("Coingecko rate limit exceeded")
         price_data = response.json()
     except Exception as e:
         logger.warning(f"Failed to fetch price data: {e}")
@@ -621,13 +623,13 @@ async def handle_new_donations(
     total_amount = donation_data["total_amount"]
     net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
 
-    # Calculate USD amounts
-    totalnearAmount = format_to_near(total_amount)
-    netnearAmount = format_to_near(net_amount)
-    total_amount_usd = unit_price * totalnearAmount
-    net_amount_usd = unit_price * netnearAmount
+    # Calculate and format amounts
+    total_near_amount = format_to_near(total_amount)
+    net_near_amount = format_to_near(net_amount)
+    total_amount_usd = None if not unit_price else unit_price * total_near_amount
+    net_amount_usd = None if not unit_price else unit_price * net_near_amount
 
-    logger.info(f"inserting donations... by {actionName},  {total_amount_usd}")
+    logger.info(f"inserting donations... by {actionName}")
     default_data = {
         "donor": donor,
         "total_amount": total_amount,
@@ -644,6 +646,7 @@ async def handle_new_donations(
         "referrer_fee": donation_data.get("referrer_fee"),
         "tx_hash": receipt_obj.receipt_id,
     }
+    logger.info(f"default donation data: {default_data}")
     created = False
     if actionName == "direct":
         donation, created = await Donation.objects.aupdate_or_create(
