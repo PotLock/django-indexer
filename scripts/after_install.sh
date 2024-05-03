@@ -7,6 +7,9 @@ echo "=========================================" >> "$LOG_FILE"
 echo "Running after_install.sh at $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 echo "=========================================" >> "$LOG_FILE"
 
+# Load env vars
+source /home/ec2-user/.bashrc
+
 # Set correct ownership recursively for project directory
 sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer/
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Corrected ownership to ec2-user:nginx" >> "$LOG_FILE"
