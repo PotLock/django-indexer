@@ -33,20 +33,38 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Installing dependencies with Poetry" >> "$L
 poetry install >> "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Dependencies installed" >> "$LOG_FILE"
 
-# Check if there are pending migrations
-if python manage.py showmigrations | grep '\[ \]'; then
-    echo 'Migrations found; stopping services...' >> "$LOG_FILE"
+# Check if there are pending migrations and log the output
+echo "Checking for pending migrations..." >> "$LOG_FILE"
+PENDING_MIGRATIONS=$(python manage.py showmigrations | grep '\[ \]' 2>&1)  # Redirect stderr to stdout
+echo "Migration check output: $PENDING_MIGRATIONS" >> "$LOG_FILE"
+
+if [[ ! -z "$PENDING_MIGRATIONS" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Migrations found; stopping services..." >> "$LOG_FILE"
     sudo systemctl stop gunicorn celery
-
-    echo 'Applying migrations...' >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Applying migrations..." >> "$LOG_FILE"
     python manage.py migrate >> "$LOG_FILE"
-
-    echo 'Starting services...' >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting services..." >> "$LOG_FILE"
     sudo systemctl start gunicorn celery
 else
-    echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - No migrations found. Running collectstatic and restarting services..." >> "$LOG_FILE"
     python manage.py collectstatic --noinput >> "$LOG_FILE"
     sudo systemctl restart gunicorn celery
 fi
+
+# # Check if there are pending migrations
+# if python manage.py showmigrations | grep '\[ \]'; then
+#     echo 'Migrations found; stopping services...' >> "$LOG_FILE"
+#     sudo systemctl stop gunicorn celery
+
+#     echo 'Applying migrations...' >> "$LOG_FILE"
+#     python manage.py migrate >> "$LOG_FILE"
+
+#     echo 'Starting services...' >> "$LOG_FILE"
+#     sudo systemctl start gunicorn celery
+# else
+#     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+#     python manage.py collectstatic --noinput >> "$LOG_FILE"
+#     sudo systemctl restart gunicorn celery
+# fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"
