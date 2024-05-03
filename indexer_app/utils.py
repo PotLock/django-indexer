@@ -505,7 +505,15 @@ async def handle_batch_donations(
 ):
     logger.info("BAtch Transaction for donation...")
     for event_data in log_data:
-        await handle_new_donations(event_data["donation"], receiverId, signerId, actionName, receipt_obj, status_obj=None, log_data=[event_data])
+        await handle_new_donations(
+            event_data["donation"],
+            receiverId,
+            signerId,
+            actionName,
+            receipt_obj,
+            status_obj=None,
+            log_data=[event_data],
+        )
 
 
 async def handle_new_donations(
@@ -588,20 +596,24 @@ async def handle_new_donations(
         endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
         response = requests.get(endpoint)
         price_data = response.json()
-        unit_price = (
-            price_data.get("market_data", {}).get("current_price", {}).get("usd")
-        )
-        await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
-            token=token,
-            price_usd=unit_price,
-        )
     except Exception as e:
-        logger.warning(f"api rate limit? {e}")
-        # TODO: NB: below method has not been tested
-        # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
-        historical = await TokenHistoricalPrice.objects.aget(token=token)
-        # print("fetched old price:", historical_price.price_usd)
-        unit_price = historical.price_usd
+        logger.warning(f"Failed to fetch price data: {e}")
+        # logger.debug(f"price data: {price_data}")
+    unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
+    logger.debug(f"unit price: {unit_price}")
+    if unit_price:
+        try:
+            await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
+                token=token,
+                price_usd=unit_price,
+            )
+        except Exception as e:
+            logger.warning(
+                f"Error creating TokenHistoricalPrice: {e} token: {token} unit_price: {unit_price}"
+            )
+            # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
+            historical = await TokenHistoricalPrice.objects.aget(token=token)
+            unit_price = historical.price_usd
 
     total_amount = donation_data["total_amount"]
     net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
@@ -632,9 +644,7 @@ async def handle_new_donations(
     created = False
     if actionName == "direct":
         donation, created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"],
-            defaults={},
-            create_defaults=default_data
+            on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
         )
 
     # forgot why i didn't use else, but didn't for a reason.
@@ -643,15 +653,12 @@ async def handle_new_donations(
         pot = await Pot.objects.aget(id=receiverId)
         default_data["pot"] = pot
         donation, created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"],
-            defaults={},
-            create_defaults=default_data
+            on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
         )
 
-    
     logger.info(f"Backfilling data? {created}")
 
-    if created: # only do updates if donation object was created
+    if created:  # only do updates if donation object was created
 
         if actionName != "direct":
 
@@ -683,7 +690,9 @@ async def handle_new_donations(
 
                 # accountUpdate = {}
             else:
-                potUpdate["public_donations_count"] = (pot.public_donations_count or 0) + 1
+                potUpdate["public_donations_count"] = (
+                    pot.public_donations_count or 0
+                ) + 1
 
             await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
 
@@ -726,14 +735,20 @@ async def handle_new_donations(
         )
 
 
-async def cache_block_height(key: str, height: int, block_count: int, block_timestamp: int) -> int:
+async def cache_block_height(
+    key: str, height: int, block_count: int, block_timestamp: int
+) -> int:
     await cache.aset(key, height)
     # the cache os the default go to for the restart block, the db is a backup if the redis server crashes.
     if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
         logger.info(f"saving daylight, {height}")
         await BlockHeight.objects.aupdate_or_create(
             id=1,
-            defaults={"block_height": height, "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000), "updated_at": timezone.now()}
+            defaults={
+                "block_height": height,
+                "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000),
+                "updated_at": timezone.now(),
+            },
         )  # better than ovverriding model's save method to get a singleton? we need only one entry
     return height
 
