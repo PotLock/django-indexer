@@ -664,6 +664,8 @@ async def handle_new_donations(
 
     logger.info(f"Backfilling data? {created}")
 
+    logger.error(f"ERROR test")
+
     if created:  # only do updates if donation object was created
 
         if actionName != "direct":
