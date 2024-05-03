@@ -45,7 +45,7 @@ echo "Migration check output: $PENDING_MIGRATIONS" >> "$LOG_FILE"
 echo "Checking for pending migrations..." >> "$LOG_FILE"
 python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full output to diagnose
 
-# Now, let's use a more direct check for unapplied migrations
+# Check for unapplied migrations
 PENDING_MIGRATIONS=$(python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
 
 if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
@@ -61,35 +61,6 @@ else
     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
     sudo systemctl restart gunicorn celery
-fi
-# # not working version
-# if [[ ! -z "$PENDING_MIGRATIONS" ]]; then
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Migrations found; stopping services..." >> "$LOG_FILE"
-#     sudo systemctl stop gunicorn celery
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Applying migrations..." >> "$LOG_FILE"
-#     python manage.py migrate >> "$LOG_FILE"
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting services..." >> "$LOG_FILE"
-#     sudo systemctl start gunicorn celery
-# else
-#     echo "$(date '+%Y-%m-%d %H:%M:%S') - No migrations found. Running collectstatic and restarting services..." >> "$LOG_FILE"
-#     python manage.py collectstatic --noinput >> "$LOG_FILE"
-#     sudo systemctl restart gunicorn celery
-# fi
-
-# # Check if there are pending migrations
-# if python manage.py showmigrations | grep '\[ \]'; then
-#     echo 'Migrations found; stopping services...' >> "$LOG_FILE"
-#     sudo systemctl stop gunicorn celery
-
-#     echo 'Applying migrations...' >> "$LOG_FILE"
-#     python manage.py migrate >> "$LOG_FILE"
-
-#     echo 'Starting services...' >> "$LOG_FILE"
-#     sudo systemctl start gunicorn celery
-# else
-#     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
-#     python manage.py collectstatic --noinput >> "$LOG_FILE"
-#     sudo systemctl restart gunicorn celery
-# fi
+f
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"
