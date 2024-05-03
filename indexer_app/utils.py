@@ -611,6 +611,7 @@ async def handle_new_donations(
             await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
                 token=token,
                 price_usd=unit_price,
+                timestamp=donated_at,
             )
         except Exception as e:
             logger.warning(
