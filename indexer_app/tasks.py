@@ -73,47 +73,47 @@ def update_account_statistics():
     accounts = Account.objects.all()
     for account in accounts:
         try:
-            with transaction.atomic():
-                logger.info(f"Updating statistics for account {account.id}...")
-                # donors count
-                account.donors_count = Donation.objects.filter(
-                    recipient=account
-                ).aggregate(Count("donor", distinct=True))["donor__count"]
+            # with transaction.atomic():
+            logger.info(f"Updating statistics for account {account.id}...")
+            # donors count
+            account.donors_count = Donation.objects.filter(recipient=account).aggregate(
+                Count("donor", distinct=True)
+            )["donor__count"]
 
-                # donations received usd
-                account.total_donations_in_usd = (
-                    Donation.objects.filter(recipient=account).aggregate(
-                        Sum("total_amount_usd")
-                    )["total_amount_usd__sum"]
-                    or 0
-                )
+            # donations received usd
+            account.total_donations_in_usd = (
+                Donation.objects.filter(recipient=account).aggregate(
+                    Sum("total_amount_usd")
+                )["total_amount_usd__sum"]
+                or 0
+            )
 
-                # donations sent usd
-                account.total_donations_out_usd = (
-                    Donation.objects.filter(donor=account).aggregate(
-                        Sum("total_amount_usd")
-                    )["total_amount_usd__sum"]
-                    or 0
-                )
+            # donations sent usd
+            account.total_donations_out_usd = (
+                Donation.objects.filter(donor=account).aggregate(
+                    Sum("total_amount_usd")
+                )["total_amount_usd__sum"]
+                or 0
+            )
 
-                # matching pool allocations usd
-                account.total_matching_pool_allocations_usd = (
-                    PotPayout.objects.filter(
-                        recipient=account, paid_at__isnull=False
-                    ).aggregate(Sum("amount_paid_usd"))["amount_paid_usd__sum"]
-                    or 0
-                )
+            # matching pool allocations usd
+            account.total_matching_pool_allocations_usd = (
+                PotPayout.objects.filter(
+                    recipient=account, paid_at__isnull=False
+                ).aggregate(Sum("amount_paid_usd"))["amount_paid_usd__sum"]
+                or 0
+            )
 
-                # Save changes
-                account.save(
-                    update_fields=[
-                        "donors_count",
-                        "total_donations_in_usd",
-                        "total_donations_out_usd",
-                        "total_matching_pool_allocations_usd",
-                    ]
-                )
-                logger.info(f"Account {account.id} statistics updated.")
+            # Save changes
+            account.save(
+                update_fields=[
+                    "donors_count",
+                    "total_donations_in_usd",
+                    "total_donations_out_usd",
+                    "total_matching_pool_allocations_usd",
+                ]
+            )
+            logger.info(f"Account {account.id} statistics updated.")
         except Exception as e:
             logger.error(f"Failed to update statistics for account {account.id}: {e}")
 
