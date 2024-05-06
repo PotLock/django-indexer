@@ -681,7 +681,7 @@ async def handle_new_donations(
         "timestamp": donation.donated_at,
         "tx_hash": receipt_obj.receipt_id,
     }
-    activity, activity_created = Activity.objects.aupdate_or_create(
+    activity, activity_created = await Activity.objects.aupdate_or_create(
         action_result=donation_data, type=activity_type, defaults=defaults
     )
     if activity_created:
