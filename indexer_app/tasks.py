@@ -100,7 +100,7 @@ def update_account_statistics():
                 account.total_matching_pool_allocations_usd = (
                     PotPayout.objects.filter(
                         recipient=account, paid_at__isnull=False
-                    ).aggregate(Sum("amount_usd"))["amount_usd__sum"]
+                    ).aggregate(Sum("amount_paid_usd"))["amount_paid_usd__sum"]
                     or 0
                 )
 
