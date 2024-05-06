@@ -68,6 +68,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 continue
             # 1. HANDLE LOGS
             log_data = []
+            receipt = receipt_execution_outcome.receipt
 
             for log_index, log in enumerate(
                 receipt_execution_outcome.execution_outcome.outcome.logs, start=1
