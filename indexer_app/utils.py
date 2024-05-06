@@ -648,22 +648,16 @@ async def handle_new_donations(
         "tx_hash": receipt_obj.receipt_id,
     }
     logger.info(f"default donation data: {default_data}")
-    created = False
-    if actionName == "direct":
-        donation, created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
-        )
 
-    # forgot why i didn't use else, but didn't for a reason.
     if actionName != "direct":
         logger.info("selecting pot to make public donation update")
         pot = await Pot.objects.aget(id=receiverId)
         default_data["pot"] = pot
-        donation, created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
-        )
 
-    logger.info(f"Backfilling data? {created}")
+    donation, donation_created = await Donation.objects.aupdate_or_create(
+        on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
+    )
+    logger.info(f"Created donation? {donation_created}")
 
     # convert total_amount_usd and net_amount_usd from None
     if total_amount_usd is None:
@@ -671,7 +665,31 @@ async def handle_new_donations(
     if net_amount_usd is None:
         net_amount_usd = 0.0
 
-    if created:  # only do updates if donation object was created
+    # Insert or update activity record
+    activity_type = (
+        "Donate_Direct"
+        if actionName == "direct"
+        else (
+            "Donate_Pot_Matching_Pool"
+            if donation.matching_pool
+            else "Donate_Pot_Public"
+        )
+    )
+    defaults = {
+        "signer_id": signerId,
+        "receiver_id": receiverId,
+        "timestamp": donation.donated_at,
+        "tx_hash": receipt_obj.receipt_id,
+    }
+    activity, activity_created = Activity.objects.aupdate_or_create(
+        action_result=donation_data, type=activity_type, defaults=defaults
+    )
+    if activity_created:
+        logger.info(f"Activity created: {activity}")
+    else:
+        logger.info(f"Activity updated: {activity}")
+
+    if donation_created:  # only do stats updates if donation object was created
 
         if actionName != "direct":
 
@@ -728,30 +746,6 @@ async def handle_new_donations(
                 + decimal.Decimal(net_amount_usd),
             }
             await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
-
-        # Insert or update activity record
-        activity_type = (
-            "Donate_Direct"
-            if actionName == "direct"
-            else (
-                "Donate_Pot_Matching_Pool"
-                if donation.matching_pool
-                else "Donate_Pot_Public"
-            )
-        )
-        defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
-            "timestamp": donation.donated_at,
-            "tx_hash": receipt_obj.receipt_id,
-        }
-        activity, created = Activity.objects.aupdate_or_create(
-            action_result=donation_data, type=activity_type, defaults=defaults
-        )
-        if created:
-            logger.info(f"Activity created: {activity}")
-        else:
-            logger.info(f"Activity updated: {activity}")
 
 
 async def cache_block_height(
