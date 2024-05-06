@@ -2,10 +2,15 @@ import asyncio
 from pathlib import Path
 
 from celery import shared_task
+from celery.signals import task_revoked
 from django.conf import settings
+from django.db.models import Count, Sum
 from near_lake_framework import LakeConfig, streamer
 
+from accounts.models import Account
+from donations.models import Donation
 from indexer_app.handler import handle_streamer_message
+from pots.models import PotPayout
 
 from .logging import logger
 from .utils import cache_block_height, get_block_height
@@ -58,7 +63,45 @@ def listen_to_near_events():
         loop.close()
 
 
-from celery.signals import task_revoked
+@shared_task
+def update_account_statistics():
+    # Logic to update account statistics
+    print("Updating account statistics...")
+    for account in Account.objects.all():
+        # donors count
+        account.donors_count = Donation.objects.filter(recipient=account).aggregate(
+            Count("donor", distinct=True)
+        )
+        # donations received usd
+        account.total_donations_in_usd = (
+            Donation.objects.filter(recipient=account).aggregate(
+                Sum("total_amount_usd")
+            )["total_amount_usd__sum"]
+            or 0
+        )
+        # donations sent usd
+        account.total_donations_out_usd = (
+            Donation.objects.filter(donor=account).aggregate(Sum("total_amount_usd"))[
+                "total_amount_usd__sum"
+            ]
+            or 0
+        )
+        # matching pool allocations usd
+        account.total_matching_pool_allocations_usd = (
+            PotPayout.objects.filter(
+                recipient=account, paid_at__isnull=False
+            ).aggregate(Sum("amount_usd"))["amount_usd__sum"]
+            or 0
+        )
+        # save changes
+        account.save(
+            update_fields=[
+                "donors_count",
+                "total_donations_in_usd",
+                "total_donations_out_usd",
+                "total_matching_pool_allocations_usd",
+            ]
+        )
 
 
 @task_revoked.connect

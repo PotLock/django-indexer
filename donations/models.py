@@ -92,6 +92,7 @@ class Donation(models.Model):
         related_name="received_donations",
         null=True,
         help_text=_("Donation recipient."),
+        db_index=True,
     )
     protocol_fee = models.CharField(
         _("protocol fee"),

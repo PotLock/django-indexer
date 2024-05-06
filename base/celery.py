@@ -1,15 +1,16 @@
 import os
-
-from django.conf import settings
+import ssl
 
 from celery import Celery
-import ssl
+from celery.schedules import crontab
+from django.conf import settings
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "base.settings")
 
-app = Celery("indexer",
-# broker=settings.CELERY_BROKER_URL,
-# backend=settings.CELERY_RESULT_BACKEND
+app = Celery(
+    "indexer",
+    # broker=settings.CELERY_BROKER_URL,
+    # backend=settings.CELERY_RESULT_BACKEND
 )
 
 # SSL configurations for broker and backend
@@ -22,3 +23,10 @@ app = Celery("indexer",
 
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
+
+app.conf.beat_schedule = {
+    "update_account_statistics_every_5_minutes": {
+        "task": "indexer_app.tasks.update_account_statistics",
+        "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+    },
+}
