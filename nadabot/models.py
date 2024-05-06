@@ -21,7 +21,7 @@ class NadabotRegistry(models.Model):
     owner = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
-        related_name="nadabot",
+        related_name="nadabot_owner_registries",
         null=False,
         help_text=_("Nadabot Registry owner."),
     )
@@ -41,7 +41,7 @@ class NadabotRegistry(models.Model):
     )
     admins = models.ManyToManyField(
         Account,
-        related_name="admin_registry",
+        related_name="nadabot_admin_registries",
         help_text=_("registry admins."),
     )
     source_metadata = models.JSONField(
@@ -122,8 +122,9 @@ class Provider(models.Model):
         null=True,
         help_text=_("Optional external URL.")
     )
-    submitted_by = models.CharField(
-        _("submitted by"),
+    submitted_by = models.ForeignKey(
+        Account,
+        verbose_name=_("submitted by"),
         max_length=100,
         null=False,
         help_text=_("User who submitted this provider.")
@@ -132,12 +133,6 @@ class Provider(models.Model):
         _("submitted at (milliseconds)"),
         null=False,
         help_text=_("Timestamp of when this provider was submitted.")
-    )
-    stamp_count = models.BigIntegerField(
-        _("stamp count"),
-        default=0,
-        help_text=_("Total number of times this provider has been used successfully."),
-        db_index=True
     )
     stamp_validity_ms = models.BigIntegerField(
         _("stamp validity"),

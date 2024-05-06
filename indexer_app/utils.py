@@ -55,7 +55,7 @@ async def handle_nadabot_registry(
         receiverId: str,
         created_at: datetime
 ):
-    print("nadabot registry init...", data)
+    logger.info(f"nadabot registry init... {data}")
 
     registry, _ = await Account.objects.aget_or_create(id=receiverId)
     owner, _ = await Account.objects.aget_or_create(id=data["owner"])
@@ -911,13 +911,13 @@ async def handle_update_default_human_threshold(
         data: dict,
         receiverId: str
 ):
-    print("update landing...", data)
+    logger.info(f"update threshold data... {data}")
 
     reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
         **{"default_human_threshold": data["default_human_threshold"]}
     )
 
-    print("updated threshold..")
+    logger.info("updated threshold..")
 
 
 async def handle_new_provider(
@@ -925,12 +925,11 @@ async def handle_new_provider(
         receiverId: str,
         signerId: str
 ):
-    print("new provider data:", data, receiverId)
+    logger.info(f"new provider data: {data}, {receiverId}")
     data = data["provider"]
 
-    print(
-        "upserting accounts involved",
-        data["submitted_by"]
+    logger.info(
+        f"upserting accounts involved, {data['submitted_by']}"
     )
 
     # Upsert donor account
@@ -969,13 +968,10 @@ async def handle_add_stamp(
         receiverId: str,
         signerId: str
 ):
-    print("new stamp data:", data, receiverId)
+    logger.info(f"new stamp data: {data}, {receiverId} ")
     data = data["stamp"]
 
-    print(
-        "upserting accounts involved",
-        data["user_id"]
-    )
+    logger.info(f"upserting accounts involved, {data["user_id"]} ")
 
     # Upsert donor account
     user, _ = await Account.objects.aget_or_create(id=data["user_id"])
