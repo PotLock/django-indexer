@@ -729,23 +729,29 @@ async def handle_new_donations(
             }
             await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
 
-        # Insert activity record
-        await Activity.objects.acreate(
-            signer_id=signerId,
-            receiver_id=receiverId,
-            timestamp=donation.donated_at,
-            type=(
-                "Donate_Direct"
-                if actionName == "direct"
-                else (
-                    "Donate_Pot_Matching_Pool"
-                    if donation.matching_pool
-                    else "Donate_Pot_Public"
-                )
-            ),
-            action_result=donation_data,
-            tx_hash=receipt_obj.receipt_id,
+        # Insert or update activity record
+        activity_type = (
+            "Donate_Direct"
+            if actionName == "direct"
+            else (
+                "Donate_Pot_Matching_Pool"
+                if donation.matching_pool
+                else "Donate_Pot_Public"
+            )
         )
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": donation.donated_at,
+            "tx_hash": receipt_obj.receipt_id,
+        }
+        activity, created = Activity.objects.aupdate_or_create(
+            action_result=donation_data, type=activity_type, defaults=defaults
+        )
+        if created:
+            logger.info(f"Activity created: {activity}")
+        else:
+            logger.info(f"Activity updated: {activity}")
 
 
 async def cache_block_height(

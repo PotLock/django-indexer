@@ -66,3 +66,5 @@ class Activity(models.Model):
 
     class Meta:
         verbose_name_plural = "Activities"
+
+        unique_together = (("action_result", "type"),)
