@@ -156,6 +156,13 @@ class Donation(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["on_chain_id", "pot"], name="unique_pot_on_chain_id"
-            )
+                fields=["on_chain_id"],
+                condition=models.Q(pot__isnull=True),
+                name="unique_on_chain_id_when_pot_is_null",
+            ),
+            models.UniqueConstraint(
+                fields=["on_chain_id", "pot"],
+                condition=models.Q(pot__isnull=False),
+                name="unique_on_chain_id_with_pot",
+            ),
         ]
