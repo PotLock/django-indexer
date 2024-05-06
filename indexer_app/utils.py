@@ -665,6 +665,12 @@ async def handle_new_donations(
 
     logger.info(f"Backfilling data? {created}")
 
+    # convert total_amount_usd and net_amount_usd from None
+    if total_amount_usd is None:
+        total_amount_usd = 0.0
+    if net_amount_usd is None:
+        net_amount_usd = 0.0
+
     if created:  # only do updates if donation object was created
 
         if actionName != "direct":
@@ -705,7 +711,7 @@ async def handle_new_donations(
 
         # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
         logger.info(
-            f"update totl donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
+            f"update total donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
         )
         await Account.objects.filter(id=donor.id).aupdate(
             **{
