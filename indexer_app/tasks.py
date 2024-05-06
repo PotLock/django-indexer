@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 
 from celery import shared_task
@@ -65,9 +66,11 @@ def listen_to_near_events():
 
 @shared_task
 def update_account_statistics():
+    logger = logging.getLogger("jobs")
     # Logic to update account statistics
     logger.info("Updating account statistics...")
     for account in Account.objects.all():
+        logger.info(f"Updating statistics for account {account.id}...")
         # donors count
         account.donors_count = Donation.objects.filter(recipient=account).aggregate(
             Count("donor", distinct=True)
