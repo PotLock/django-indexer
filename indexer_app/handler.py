@@ -70,7 +70,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     continue
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
-                    print("parsa parsa...", parsed_log)
                     event_name = parsed_log.get("event")
                     if event_name == "add_or_update_provider":
                         await handle_new_provider(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
