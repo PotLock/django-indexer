@@ -66,7 +66,7 @@ def listen_to_near_events():
 @shared_task
 def update_account_statistics():
     # Logic to update account statistics
-    print("Updating account statistics...")
+    logger.info("Updating account statistics...")
     for account in Account.objects.all():
         # donors count
         account.donors_count = Donation.objects.filter(recipient=account).aggregate(
@@ -102,6 +102,7 @@ def update_account_statistics():
                 "total_matching_pool_allocations_usd",
             ]
         )
+        logger.info(f"Account {account.id} statistics updated.")
 
 
 @task_revoked.connect
