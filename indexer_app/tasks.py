@@ -68,13 +68,13 @@ def listen_to_near_events():
 @shared_task
 def update_account_statistics():
     logger = logging.getLogger("jobs")
-    logger.info("Updating account statistics...")
 
     accounts = Account.objects.all()
+    accounts_count = accounts.count()
+    logger.info(f"Updating statistics for {accounts_count} accounts...")
     for account in accounts:
         try:
-            # with transaction.atomic():
-            logger.info(f"Updating statistics for account {account.id}...")
+            # logger.info(f"Updating statistics for account {account.id}...")
             # donors count
             account.donors_count = Donation.objects.filter(recipient=account).aggregate(
                 Count("donor", distinct=True)
@@ -113,9 +113,10 @@ def update_account_statistics():
                     "total_matching_pool_allocations_usd",
                 ]
             )
-            logger.info(f"Account {account.id} statistics updated.")
+            # logger.info(f"Account {account.id} statistics updated.")
         except Exception as e:
             logger.error(f"Failed to update statistics for account {account.id}: {e}")
+    logger.info(f"Account stats for {accounts.count()} accounts updated.")
 
 
 @task_revoked.connect
