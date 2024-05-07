@@ -53,6 +53,10 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
+COINGECKO_URL = "https://api.coingecko.com/api/v3"
+# Number of hours around a given timestamp for querying historical prices
+HISTORICAL_PRICE_QUERY_HOURS = 24
+
 # Application definition
 
 INSTALLED_APPS = [

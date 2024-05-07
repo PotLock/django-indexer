@@ -21,6 +21,10 @@ class Token(models.Model):
     def get_most_recent_price(self):
         return self.historical_prices.order_by("-timestamp").first()
 
+    def format_price(self, amount_str: str):
+        formatted_amount = int(amount_str) / (10**self.decimals)
+        return formatted_amount
+
 
 class TokenHistoricalPrice(models.Model):
     token = models.ForeignKey(

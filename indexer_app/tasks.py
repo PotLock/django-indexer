@@ -6,7 +6,7 @@ from celery import shared_task
 from celery.signals import task_revoked
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from near_lake_framework import LakeConfig, streamer
 
 from accounts.models import Account
@@ -65,16 +65,37 @@ def listen_to_near_events():
         loop.close()
 
 
+jobs_logger = logging.getLogger("jobs")
+
+
+@shared_task
+async def fetch_usd_prices():
+    # fetch all Donation records that have a null total_amount_usd or net_amount_usd
+    # get closest TokenHistoricalPrice record for each donation, and check if it's within 1 day
+    # if not, fetch the price from coingecko API, create new TokenHistoricalPrice record and update the Donation record
+
+    donations = Donation.objects.filter(
+        Q(total_amount_usd__isnull=True) | Q(net_amount_usd__isnull=True)
+    )
+    jobs_logger.info(f"Fetching USD prices for {donations.count()} donations...")
+    for donation in donations:
+        try:
+            await donation.fetch_usd_prices()
+        except Exception as e:
+            jobs_logger.error(
+                f"Failed to fetch USD prices for donation {donation.id}: {e}"
+            )
+
+
 @shared_task
 def update_account_statistics():
-    logger = logging.getLogger("jobs")
 
     accounts = Account.objects.all()
     accounts_count = accounts.count()
-    logger.info(f"Updating statistics for {accounts_count} accounts...")
+    jobs_logger.info(f"Updating statistics for {accounts_count} accounts...")
     for account in accounts:
         try:
-            # logger.info(f"Updating statistics for account {account.id}...")
+            # jobs_logger.info(f"Updating statistics for account {account.id}...")
             # donors count
             account.donors_count = Donation.objects.filter(recipient=account).aggregate(
                 Count("donor", distinct=True)
@@ -113,10 +134,12 @@ def update_account_statistics():
                     "total_matching_pool_allocations_usd",
                 ]
             )
-            # logger.info(f"Account {account.id} statistics updated.")
+            # jobs_logger.info(f"Account {account.id} statistics updated.")
         except Exception as e:
-            logger.error(f"Failed to update statistics for account {account.id}: {e}")
-    logger.info(f"Account stats for {accounts.count()} accounts updated.")
+            jobs_logger.error(
+                f"Failed to update statistics for account {account.id}: {e}"
+            )
+    jobs_logger.info(f"Account stats for {accounts.count()} accounts updated.")
 
 
 @task_revoked.connect
