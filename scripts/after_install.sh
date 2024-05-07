@@ -56,11 +56,11 @@ if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
     python manage.py migrate >> "$LOG_FILE" 2>&1
 
     echo 'Starting services...' >> "$LOG_FILE"
-    sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker
+    sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker celery-beat
 else
     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
-    sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker
+    sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker celery-beat
 fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"
