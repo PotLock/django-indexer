@@ -28,5 +28,12 @@ app.conf.beat_schedule = {
     "update_account_statistics_every_5_minutes": {
         "task": "indexer_app.tasks.update_account_statistics",
         "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+        "options": {"queue": "beat_tasks"},
     },
 }
+
+app.conf.task_routes = {
+    "indexer_app.tasks.update_account_statistics": {"queue": "beat_tasks"},
+}
+
+# TODO: (pick up here): rename & restart services, using correct workers
