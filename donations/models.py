@@ -206,7 +206,6 @@ class Donation(models.Model):
             timestamp__lte=self.donated_at + time_window,
         )
         existing_token_price = token_prices.first()
-        logger.info(f"existing token price: {existing_token_price}")
         total_amount = token.format_price(self.total_amount)
         net_amount = token.format_price(self.net_amount)
         protocol_amount = token.format_price(self.protocol_fee)
@@ -221,6 +220,9 @@ class Donation(models.Model):
                 self.referrer_fee_usd = referrer_amount * price_usd
                 self.chef_fee_usd = chef_amount * price_usd
                 self.save()
+                logger.info(
+                    "USD prices calculated and saved using existing TokenHistoricalPrice"
+                )
             except Exception as e:
                 logger.error(
                     f"Failed to calculate and save USD prices using existing TokenHistoricalPrice: {e}"
