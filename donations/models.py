@@ -176,11 +176,13 @@ class Donation(models.Model):
         ]
 
     def get_ft_token(self):
-        try:
-            token = Token.objects.aget(id=self.ft)
-        except Token.DoesNotExist:
-            # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-            token = Token.objects.acreate(id=self.ft, decimals=12)
+        token, created = Token.objects.get_or_create(
+            id=self.ft,
+            defaults={"decimals": 12},  # Default values for new Token creation
+        )
+        if created:
+            # TODO: fetch token metadata and add correct decimals, possibly other metadata
+            pass
         return token
 
     async def fetch_usd_prices_async(self):
