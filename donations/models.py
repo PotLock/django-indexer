@@ -211,7 +211,7 @@ class Donation(models.Model):
         net_amount = token.format_price(self.net_amount)
         protocol_amount = token.format_price(self.protocol_fee)
         referrer_amount = token.format_price(self.referrer_fee or "0")
-        chef_amount = token.format_price(self.chef_fee)
+        chef_amount = token.format_price(self.chef_fee or "0")
         if existing_token_price:
             try:
                 price_usd = existing_token_price.price_usd
