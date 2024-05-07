@@ -582,19 +582,19 @@ async def handle_new_donations(
         id=(donation_data.get("ft_id") or "near")
     )
 
-    # Upsert token
-    try:
-        token = await Token.objects.aget(id=token_acct)
-    except Token.DoesNotExist:
-        # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-        token = await Token.objects.acreate(id=token_acct, decimals=12)
+    # # Upsert token
+    # try:
+    #     token = await Token.objects.aget(id=token_acct)
+    # except Token.DoesNotExist:
+    #     # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
+    #     token = await Token.objects.acreate(id=token_acct, decimals=12)
 
-        # # Fetch historical token data
-        # # late_p = await token.get_most_recent_price()
-        # try:
-        #     logger.info("fetching historical price...")
-        #     logger.info(f"donated at: {donated_at}")
-        endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
+    # # Fetch historical token data
+    # # late_p = await token.get_most_recent_price()
+    # try:
+    #     logger.info("fetching historical price...")
+    #     logger.info(f"donated at: {donated_at}")
+    # endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
     #     logger.info(f"endpoint: {endpoint}")
     #     response = requests.get(endpoint)
     #     logger.info(f"response: {response}")

@@ -144,7 +144,7 @@ class Donation(models.Model):
     chef_fee = models.CharField(
         _("chef fee"),
         max_length=64,
-        null=False,
+        null=True,
         help_text=_("Chef fee."),
     )
     chef_fee_usd = models.DecimalField(
