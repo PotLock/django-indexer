@@ -68,23 +68,32 @@ def listen_to_near_events():
 jobs_logger = logging.getLogger("jobs")
 
 
-@shared_task
-async def fetch_usd_prices():
-    # fetch all Donation records that have a null total_amount_usd or net_amount_usd
-    # get closest TokenHistoricalPrice record for each donation, and check if it's within 1 day
-    # if not, fetch the price from coingecko API, create new TokenHistoricalPrice record and update the Donation record
+# @shared_task
+# def fetch_usd_prices():
+#     donations = Donation.objects.filter(
+#         Q(total_amount_usd__isnull=True) | Q(net_amount_usd__isnull=True)
+#     )
+#     jobs_logger.info(f"Fetching USD prices for {donations.count()} donations...")
+#     loop = asyncio.get_event_loop()
+#     tasks = [loop.create_task(donation.fetch_usd_prices()) for donation in donations]
+#     loop.run_until_complete(asyncio.gather(*tasks))
 
+
+@shared_task
+def fetch_usd_prices():
     donations = Donation.objects.filter(
         Q(total_amount_usd__isnull=True) | Q(net_amount_usd__isnull=True)
     )
-    jobs_logger.info(f"Fetching USD prices for {donations.count()} donations...")
+    donations_count = donations.count()
+    jobs_logger.info(f"Fetching USD prices for {donations_count} donations...")
     for donation in donations:
         try:
-            await donation.fetch_usd_prices()
+            donation.fetch_usd_prices()
         except Exception as e:
             jobs_logger.error(
                 f"Failed to fetch USD prices for donation {donation.id}: {e}"
             )
+    jobs_logger.info(f"USD prices fetched for {donations_count} donations.")
 
 
 @shared_task

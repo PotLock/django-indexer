@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import requests
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -174,16 +175,20 @@ class Donation(models.Model):
             ),
         ]
 
-    async def get_ft_token(self):
+    def get_ft_token(self):
         try:
-            token = await Token.objects.aget(id=self.ft)
+            token = Token.objects.aget(id=self.ft)
         except Token.DoesNotExist:
             # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-            token = await Token.objects.acreate(id=self.ft, decimals=12)
+            token = Token.objects.acreate(id=self.ft, decimals=12)
         return token
 
+    async def fetch_usd_prices_async(self):
+        fetch_prices = sync_to_async(self.fetch_usd_prices)
+        await fetch_prices()
+
     ### Fetches USD prices for the Donation record and saves USD totals
-    async def fetch_usd_prices(self):
+    def fetch_usd_prices(self):
         # get existing values for stats adjustments later
         existing_total_amount_usd = self.total_amount_usd
         existing_net_amount_usd = self.net_amount_usd
@@ -191,7 +196,7 @@ class Donation(models.Model):
         existing_referrer_fee_usd = self.referrer_fee_usd
         existing_chef_fee_usd = self.chef_fee_usd
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.donated_at
-        token = await self.get_ft_token()
+        token = self.get_ft_token()
         time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
         token_prices = TokenHistoricalPrice.objects.filter(
             token=token,
@@ -253,7 +258,7 @@ class Donation(models.Model):
                     )
                 # TODO: update totals for relevant accounts
                 try:
-                    await TokenHistoricalPrice.objects.acreate(
+                    TokenHistoricalPrice.objects.create(
                         token=token,
                         price_usd=price_usd,
                         timestamp=self.donated_at,

@@ -662,7 +662,7 @@ async def handle_new_donations(
     logger.info(f"Created donation? {donation_created}")
 
     # fetch USD prices
-    await donation.fetch_usd_prices()  # might not need to await this?
+    await donation.fetch_usd_prices_async()  # might not need to await this?
 
     # # convert total_amount_usd and net_amount_usd from None
     # if total_amount_usd is None:
