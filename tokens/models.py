@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -20,6 +22,11 @@ class Token(models.Model):
 
     def get_most_recent_price(self):
         return self.historical_prices.order_by("-timestamp").first()
+
+    def format_price(self, amount_str: str):
+        # Convert the string amount to a Decimal, then adjust by the token's decimal places
+        formatted_amount = Decimal(amount_str) / (Decimal("10") ** self.decimals)
+        return formatted_amount
 
 
 class TokenHistoricalPrice(models.Model):

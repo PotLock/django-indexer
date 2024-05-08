@@ -30,7 +30,7 @@ from tokens.models import Token, TokenHistoricalPrice
 
 from .logging import logger
 
-GECKO_URL = "https://api.coingecko.com/api/v3"
+# GECKO_URL = "https://api.coingecko.com/api/v3"  # TODO: move to settings
 
 
 async def handle_new_pot(
@@ -672,92 +672,98 @@ async def handle_new_donations(
     except Exception as e:
         logger.warning(f"Failed to create/get an account involved in donation: {e}")
 
-    # Upsert token
-    try:
-        token = await Token.objects.aget(id=token_acct)
-    except Token.DoesNotExist:
-        # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-        token = await Token.objects.acreate(id=token_acct, decimals=12)
+    # # Upsert token
+    # try:
+    #     token = await Token.objects.aget(id=token_acct)
+    # except Token.DoesNotExist:
+    #     # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
+    #     token = await Token.objects.acreate(id=token_acct, decimals=12)
 
-    # Fetch historical token data
-    # late_p = await token.get_most_recent_price()
-    try:
-        logger.info("fetching historical price...")
-        logger.info(f"donated at: {donated_at}")
-        endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
-        logger.info(f"endpoint: {endpoint}")
-        response = requests.get(endpoint)
-        logger.info(f"response: {response}")
-        if response.status_code == 429:
-            logger.warning("Coingecko rate limit exceeded")
-        price_data = response.json()
-    except Exception as e:
-        logger.warning(f"Failed to fetch price data: {e}")
-    logger.info(f"price data: {price_data}")
-    unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
-    logger.info(f"unit price: {unit_price}")
-    if unit_price:
-        try:
-            await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
-                token=token,
-                price_usd=unit_price,
-                timestamp=donated_at,
-            )
-        except Exception as e:
-            logger.warning(
-                f"Error creating TokenHistoricalPrice: {e} token: {token} unit_price: {unit_price}"
-            )
-            # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
-            historical = await TokenHistoricalPrice.objects.aget(token=token)
-            unit_price = historical.price_usd
+    # # Fetch historical token data
+    # # late_p = await token.get_most_recent_price()
+    # try:
+    #     logger.info("fetching historical price...")
+    #     logger.info(f"donated at: {donated_at}")
+    # endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
+    #     logger.info(f"endpoint: {endpoint}")
+    #     response = requests.get(endpoint)
+    #     logger.info(f"response: {response}")
+    #     if response.status_code == 429:
+    #         logger.warning("Coingecko rate limit exceeded")
+    #     price_data = response.json()
+    # except Exception as e:
+    #     logger.warning(f"Failed to fetch price data: {e}")
+    # logger.info(f"price data: {price_data}")
+    # unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
+    # logger.info(f"unit price: {unit_price}")
+    # if unit_price:
+    #     try:
+    #         await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
+    #             token=token,
+    #             price_usd=unit_price,
+    #             timestamp=donated_at,
+    #         )
+    #     except Exception as e:
+    #         logger.warning(
+    #             f"Error creating TokenHistoricalPrice: {e} token: {token} unit_price: {unit_price}"
+    #         )
+    #         # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
+    #         historical = await TokenHistoricalPrice.objects.aget(token=token)
+    #         unit_price = historical.price_usd
 
-    total_amount = donation_data["total_amount"]
-    net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
+    # total_amount = donation_data["total_amount"]
+    # net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
 
-    # Calculate and format amounts
-    total_near_amount = format_to_near(total_amount)
-    net_near_amount = format_to_near(net_amount)
-    total_amount_usd = None if not unit_price else unit_price * total_near_amount
-    net_amount_usd = None if not unit_price else unit_price * net_near_amount
-
-    logger.info(f"inserting donations... by {actionName}")
-    default_data = {
-        "donor": donor,
-        "total_amount": total_amount,
-        "total_amount_usd": total_amount_usd,
-        "net_amount_usd": net_amount_usd,
-        "net_amount": net_amount,
-        "ft": token_acct,
-        "message": donation_data.get("message"),
-        "donated_at": donated_at,
-        "matching_pool": donation_data.get("matching_pool", False),
-        "recipient": recipient,
-        "protocol_fee": donation_data["protocol_fee"],
-        "referrer": referrer if donation_data.get("referrer_id") else None,
-        "referrer_fee": donation_data.get("referrer_fee"),
-        "tx_hash": receipt_obj.receipt_id,
-    }
-    logger.info(f"default donation data: {default_data}")
-
-    if actionName != "direct":
-        logger.info("selecting pot to make public donation update")
-        pot = await Pot.objects.aget(id=receiverId)
-        default_data["pot"] = pot
+    # # Calculate and format amounts
+    # total_near_amount = format_to_near(total_amount)
+    # net_near_amount = format_to_near(net_amount)
+    # total_amount_usd = None if not unit_price else unit_price * total_near_amount
+    # net_amount_usd = None if not unit_price else unit_price * net_near_amount
 
     try:
-        
+
+        total_amount = donation_data["total_amount"]
+
+        logger.info(f"inserting donations... by {actionName}")
+        default_data = {
+            "donor": donor,
+            "total_amount": total_amount,
+            "total_amount_usd": None,  # USD amounts will be added later (could be in pre-save hook)
+            "net_amount_usd": None,
+            "net_amount": net_amount,
+            "ft": token_acct,
+            "message": donation_data.get("message"),
+            "donated_at": donated_at,
+            "matching_pool": donation_data.get("matching_pool", False),
+            "recipient": recipient,
+            "protocol_fee": donation_data["protocol_fee"],
+            "referrer": referrer if donation_data.get("referrer_id") else None,
+            "referrer_fee": donation_data.get("referrer_fee"),
+            "tx_hash": receipt_obj.receipt_id,
+        }
+        logger.info(f"default donation data: {default_data}")
+
+        if actionName != "direct":
+            logger.info("selecting pot to make public donation update")
+            pot = await Pot.objects.aget(id=receiverId)
+            default_data["pot"] = pot
+
         donation, donation_created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"], defaults=default_data
+            on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
         )
         logger.info(f"Created donation? {donation_created}")
 
-        # convert total_amount_usd and net_amount_usd from None
-        if total_amount_usd is None:
-            total_amount_usd = 0.0
-        if net_amount_usd is None:
-            net_amount_usd = 0.0
+        # fetch USD prices
+        await donation.fetch_usd_prices_async()  # might not need to await this?
 
-        # Insert or update activity record
+        # # convert total_amount_usd and net_amount_usd from None
+        # if total_amount_usd is None:
+        #     total_amount_usd = 0.0
+        # if net_amount_usd is None:
+        #     net_amount_usd = 0.0
+
+        logger.info(f"Created donation? {donation_created}")
+            # Insert or update activity record
         activity_type = (
             "Donate_Direct"
             if actionName == "direct"
@@ -787,67 +793,65 @@ async def handle_new_donations(
     except Exception as e:
         logger.warning(f"Failed to create/update donation: {e}")
 
-    if donation_created:  # only do stats updates if donation object was created
+    ### COMMENTING OUT FOR NOW SINCE WE HAVE PERIODIC JOB RUNNING TO UPDATE ACCOUNT STATS (NB: DOESN'T CURRENTLY COVER POT STATS)
+    ### CAN ALWAYS ADD BACK IF DESIRED
+    # if donation_created:  # only do stats updates if donation object was created
 
-        try:
+    #     if actionName != "direct":
 
-            if actionName != "direct":
+    #         potUpdate = {
+    #             "total_public_donations": str(
+    #                 int(pot.total_public_donations or 0) + int(total_amount)
+    #             ),
+    #             "total_public_donations_usd": int(pot.total_public_donations_usd or 0.0)
+    #             + total_amount_usd,
+    #         }
+    #         if donation_data.get("matching_pool"):
+    #             potUpdate["total_matching_pool"] = str(
+    #                 int(pot.total_matching_pool or 0) + int(total_amount)
+    #             )
+    #             potUpdate["total_matching_pool"] = (
+    #                 pot.total_matching_pool_usd or 0.0
+    #             ) + total_amount_usd
+    #             potUpdate["matching_pool_donations_count"] = (
+    #                 pot.matching_pool_donations_count or 0
+    #             ) + 1
 
-                potUpdate = {
-                    "total_public_donations": str(
-                        int(pot.total_public_donations or 0) + int(total_amount)
-                    ),
-                    "total_public_donations_usd": int(pot.total_public_donations_usd or 0.0)
-                    + total_amount_usd,
-                }
-                if donation_data.get("matching_pool"):
-                    potUpdate["total_matching_pool"] = str(
-                        int(pot.total_matching_pool or 0) + int(total_amount)
-                    )
-                    potUpdate["total_matching_pool"] = (
-                        pot.total_matching_pool_usd or 0.0
-                    ) + total_amount_usd
-                    potUpdate["matching_pool_donations_count"] = (
-                        pot.matching_pool_donations_count or 0
-                    ) + 1
+    #             if recipient:
+    #                 await Account.objects.filter(id=recipient.id).aupdate(
+    #                     **{
+    #                         "total_matching_pool_allocations_usd": recipient.total_matching_pool_allocations_usd
+    #                         + total_amount_usd
+    #                     }
+    #                 )
 
-                    if recipient:
-                        await Account.objects.filter(id=recipient.id).aupdate(
-                            **{
-                                "total_matching_pool_allocations_usd": recipient.total_matching_pool_allocations_usd
-                                + total_amount_usd
-                            }
-                        )
+    #             # accountUpdate = {}
+    #         else:
+    #             potUpdate["public_donations_count"] = (
+    #                 pot.public_donations_count or 0
+    #             ) + 1
 
-                    # accountUpdate = {}
-                else:
-                    potUpdate["public_donations_count"] = (
-                        pot.public_donations_count or 0
-                    ) + 1
+    #         await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
 
-                await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
-
-            # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
-            logger.info(
-                f"update total donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
-            )
-            await Account.objects.filter(id=donor.id).aupdate(
-                **{
-                    "total_donations_out_usd": donor.total_donations_out_usd
-                    + decimal.Decimal(total_amount_usd)
-                }
-            )
-            if recipient:
-                acct = await Account.objects.aget(id=recipient.id)
-                logger.info(f"selected {acct} to perform donor count update")
-                acctUpdate = {
-                    "donors_count": acct.donors_count + 1,
-                    "total_donations_in_usd": acct.total_donations_in_usd
-                    + decimal.Decimal(net_amount_usd),
-                }
-                await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
-        except Exception as e:
-            logger.info(f"Failed to update Stats: {e}")
+    #     # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
+    #     logger.info(
+    #         f"update total donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
+    #     )
+    #     await Account.objects.filter(id=donor.id).aupdate(
+    #         **{
+    #             "total_donations_out_usd": donor.total_donations_out_usd
+    #             + decimal.Decimal(total_amount_usd)
+    #         }
+    #     )
+    #     if recipient:
+    #         acct = await Account.objects.aget(id=recipient.id)
+    #         logger.info(f"selected {acct} to perform donor count update")
+    #         acctUpdate = {
+    #             "donors_count": acct.donors_count + 1,
+    #             "total_donations_in_usd": acct.total_donations_in_usd
+    #             + decimal.Decimal(net_amount_usd),
+    #         }
+    #         await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
 
 
 async def cache_block_height(

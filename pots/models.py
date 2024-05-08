@@ -496,7 +496,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         Account,
         on_delete=models.CASCADE,
         related_name="payout_admin_responses",
-        null=False,
+        null=True,
         help_text=_("challenger being responded to."),
     )
 
@@ -504,7 +504,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         Pot,
         on_delete=models.CASCADE,
         related_name="payout_responses",
-        null=False,
+        null=True,
         help_text=_("Pot being challenged."),
     )
 

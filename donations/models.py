@@ -1,9 +1,16 @@
-from django import db
+from datetime import timedelta
+
+import requests
+from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
+from base.logging import logger
+from base.utils import format_date
 from pots.models import Pot
+from tokens.models import Token, TokenHistoricalPrice
 
 
 class Donation(models.Model):
@@ -54,7 +61,7 @@ class Donation(models.Model):
         help_text=_("Net amount in USD."),
     )
     ft = models.ForeignKey(
-        Account,
+        Account,  # should probably be Token
         on_delete=models.CASCADE,
         related_name="ft_donations",
         null=False,
@@ -137,7 +144,7 @@ class Donation(models.Model):
     chef_fee = models.CharField(
         _("chef fee"),
         max_length=64,
-        null=False,
+        null=True,
         help_text=_("Chef fee."),
     )
     chef_fee_usd = models.DecimalField(
@@ -167,3 +174,100 @@ class Donation(models.Model):
                 name="unique_on_chain_id_with_pot",
             ),
         ]
+
+    def get_ft_token(self):
+        token, created = Token.objects.get_or_create(
+            id=self.ft,
+            defaults={"decimals": 12},  # Default values for new Token creation
+        )
+        if created:
+            # TODO: fetch token metadata and add correct decimals, possibly other metadata
+            pass
+        return token
+
+    async def fetch_usd_prices_async(self):
+        fetch_prices = sync_to_async(self.fetch_usd_prices)
+        await fetch_prices()
+
+    ### Fetches USD prices for the Donation record and saves USD totals
+    def fetch_usd_prices(self):
+        # get existing values for stats adjustments later
+        existing_total_amount_usd = self.total_amount_usd
+        existing_net_amount_usd = self.net_amount_usd
+        existing_protocol_fee_usd = self.protocol_fee_usd
+        existing_referrer_fee_usd = self.referrer_fee_usd
+        existing_chef_fee_usd = self.chef_fee_usd
+        # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.donated_at
+        token = self.get_ft_token()
+        time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
+        token_prices = TokenHistoricalPrice.objects.filter(
+            token=token,
+            timestamp__gte=self.donated_at - time_window,
+            timestamp__lte=self.donated_at + time_window,
+        )
+        existing_token_price = token_prices.first()
+        total_amount = token.format_price(self.total_amount)
+        net_amount = token.format_price(self.net_amount)
+        protocol_amount = token.format_price(self.protocol_fee)
+        referrer_amount = token.format_price(self.referrer_fee or "0")
+        chef_amount = token.format_price(self.chef_fee or "0")
+        if existing_token_price:
+            try:
+                price_usd = existing_token_price.price_usd
+                self.total_amount_usd = total_amount * price_usd
+                self.net_amount_usd = net_amount * price_usd
+                self.protocol_fee_usd = protocol_amount * price_usd
+                self.referrer_fee_usd = referrer_amount * price_usd
+                self.chef_fee_usd = chef_amount * price_usd
+                self.save()
+                logger.info(
+                    "USD prices calculated and saved using existing TokenHistoricalPrice"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to calculate and save USD prices using existing TokenHistoricalPrice: {e}"
+                )
+            # TODO: update totals for relevant accounts
+        else:
+            # no existing price within acceptable time period; fetch from coingecko
+            try:
+                logger.info(
+                    "No existing price within acceptable time period; fetching historical price..."
+                )
+                endpoint = f"{settings.COINGECKO_URL}/coins/{self.ft.id}/history?date={format_date(self.donated_at)}&localization=false"
+                logger.info(f"coingecko endpoint: {endpoint}")
+                response = requests.get(endpoint)
+                logger.info(f"coingecko response: {response}")
+                if response.status_code == 429:
+                    logger.warning("Coingecko rate limit exceeded")
+                price_data = response.json()
+            except Exception as e:
+                logger.warning(f"Failed to fetch coingecko price data: {e}")
+            logger.info(f"coingecko price data: {price_data}")
+            price_usd = (
+                price_data.get("market_data", {}).get("current_price", {}).get("usd")
+            )
+            logger.info(f"unit price: {price_usd}")
+            if price_usd:
+                try:
+                    self.total_amount_usd = total_amount * price_usd
+                    self.net_amount_usd = net_amount * price_usd
+                    self.protocol_fee_usd = protocol_amount * price_usd
+                    self.referrer_fee_usd = referrer_amount * price_usd
+                    self.chef_fee_usd = chef_amount * price_usd
+                    self.save()
+                except Exception as e:
+                    logger.error(
+                        f"Failed to calculate and save USD prices using fetched price: {e}"
+                    )
+                # TODO: update totals for relevant accounts
+                try:
+                    TokenHistoricalPrice.objects.create(
+                        token=token,
+                        price_usd=price_usd,
+                        timestamp=self.donated_at,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Error creating TokenHistoricalPrice: {e} token: {token} price_usd: {price_usd}"
+                    )

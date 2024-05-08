@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import PotFactory, Pot, PotApplication, PotPayout, PotPayoutChallenge, PotPayoutChallengeAdminResponse
+
+from .models import (
+    Pot,
+    PotApplication,
+    PotFactory,
+    PotPayout,
+    PotPayoutChallenge,
+    PotPayoutChallengeAdminResponse,
+)
+
 
 @admin.register(PotFactory)
 class PotFactoryAdmin(admin.ModelAdmin):
@@ -32,6 +41,6 @@ class PotPayoutChallengeAdmin(admin.ModelAdmin):
 
 @admin.register(PotPayoutChallengeAdminResponse)
 class PotPayoutChallengeAdminResponseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'challenge', 'admin', 'created_at', 'resolved')
+    list_display = ('id', 'pot', 'admin', 'created_at', 'resolved')
     search_fields = ('admin__id', 'challenge__id')
     list_filter = ('created_at', 'resolved')

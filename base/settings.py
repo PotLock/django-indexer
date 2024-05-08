@@ -53,6 +53,10 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
+COINGECKO_URL = "https://api.coingecko.com/api/v3"
+# Number of hours around a given timestamp for querying historical prices
+HISTORICAL_PRICE_QUERY_HOURS = 24
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -223,6 +227,11 @@ LOGGING = {
             "level": log_level,
             "propagate": False,
         },
+        "jobs": {
+            "handlers": ["console"],
+            "level": log_level,
+            "propagate": False,
+        },
         "": {"handlers": ["console"], "level": log_level},  # root logger
     },
 }
@@ -241,6 +250,7 @@ if ENVIRONMENT != "local":
     LOGGING["loggers"][""]["handlers"].append("watchtower")
     LOGGING["loggers"]["django"]["handlers"].append("watchtower")
     LOGGING["loggers"]["indexer"]["handlers"].append("watchtower")
+    LOGGING["loggers"]["jobs"]["handlers"].append("watchtower")
 
 # log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 # print("LOG_LEVEL: ", LOG_LEVEL)
