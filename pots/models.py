@@ -333,6 +333,12 @@ class PotApplication(models.Model):
     )
 
 
+    class Meta:
+        verbose_name_plural = "PotApplications"
+
+        unique_together = (("pot", "applicant"),)
+
+
 class PotApplicationReview(models.Model):
     id = models.AutoField(
         _("review id"),
@@ -377,6 +383,12 @@ class PotApplicationReview(models.Model):
         null=False,
         help_text=_("Transaction hash."),
     )
+
+
+    class Meta:
+        verbose_name_plural = "POtApplicationReviews"
+
+        unique_together = (("application", "reviewer", "reviewed_at"),)
 
 
 class PotPayout(models.Model):
@@ -468,6 +480,11 @@ class PotPayoutChallenge(models.Model):
         help_text=_("Challenge message."),
     )
 
+    class Meta:
+        verbose_name_plural = "PayoutChallenges"
+
+        unique_together = (("challenger", "pot"),)
+
 
 class PotPayoutChallengeAdminResponse(models.Model):
     id = models.AutoField(
@@ -475,13 +492,22 @@ class PotPayoutChallengeAdminResponse(models.Model):
         primary_key=True,
         help_text=_("Admin response id."),
     )
-    challenge = models.ForeignKey(
-        PotPayoutChallenge,
+    challenger = models.ForeignKey(
+        Account,
         on_delete=models.CASCADE,
-        related_name="admin_responses",
+        related_name="payout_admin_responses",
         null=False,
-        help_text=_("Challenge responded to."),
+        help_text=_("challenger being responded to."),
     )
+
+    pot = models.ForeignKey(
+        Pot,
+        on_delete=models.CASCADE,
+        related_name="payout_responses",
+        null=False,
+        help_text=_("Pot being challenged."),
+    )
+
     admin = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
@@ -511,3 +537,9 @@ class PotPayoutChallengeAdminResponse(models.Model):
         null=False,
         help_text=_("Transaction hash."),
     )
+
+
+    class Meta:
+        verbose_name_plural = "PotPayoutChallengeResponses"
+
+        unique_together = (("challenger", "pot", "created_at"),)

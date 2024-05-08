@@ -2,6 +2,8 @@ import base64
 import decimal
 import json
 from datetime import date, datetime
+from email.policy import default
+from sys import exception
 
 import requests
 from django.conf import settings
@@ -22,6 +24,7 @@ from pots.models import (
     PotFactory,
     PotPayout,
     PotPayoutChallenge,
+    PotPayoutChallengeAdminResponse,
 )
 from tokens.models import Token, TokenHistoricalPrice
 
@@ -38,152 +41,166 @@ async def handle_new_pot(
     receiptId: str,
     created_at: datetime,
 ):
-    logger.info("new pot deployment process... upsert accounts,")
+    try:
 
-    # Upsert accounts
-    owner, _ = await Account.objects.aget_or_create(id=data["owner"])
-    signer, _ = await Account.objects.aget_or_create(id=signerId)
-    receiver, _ = await Account.objects.aget_or_create(id=receiverId)
+        logger.info("new pot deployment process... upsert accounts,")
 
-    logger.info("upsert chef")
-    if data.get("chef"):
-        chef, _ = await Account.objects.aget_or_create(id=data["chef"])
+        # Upsert accounts
+        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        signer, _ = await Account.objects.aget_or_create(id=signerId)
+        receiver, _ = await Account.objects.aget_or_create(id=receiverId)
 
-    # Create Pot object
-    logger.info("create pot....")
-    potObject = await Pot.objects.acreate(
-        id=receiver,
-        pot_factory_id=predecessorId,
-        deployer=signer,
-        deployed_at=created_at,
-        source_metadata=data["source_metadata"],
-        owner_id=data["owner"],
-        chef_id=data.get("chef"),
-        name=data["pot_name"],
-        description=data["pot_description"],
-        max_approved_applicants=data["max_projects"],
-        base_currency="near",
-        application_start=datetime.fromtimestamp(data["application_start_ms"] / 1000),
-        application_end=datetime.fromtimestamp(data["application_end_ms"] / 1000),
-        matching_round_start=datetime.fromtimestamp(
-            data["public_round_start_ms"] / 1000
-        ),
-        matching_round_end=datetime.fromtimestamp(data["public_round_end_ms"] / 1000),
-        registry_provider=data["registry_provider"],
-        min_matching_pool_donation_amount=data["min_matching_pool_donation_amount"],
-        sybil_wrapper_provider=data["sybil_wrapper_provider"],
-        custom_sybil_checks=data.get("custom_sybil_checks"),
-        custom_min_threshold_score=data.get("custom_min_threshold_score"),
-        referral_fee_matching_pool_basis_points=data[
-            "referral_fee_matching_pool_basis_points"
-        ],
-        referral_fee_public_round_basis_points=data[
-            "referral_fee_public_round_basis_points"
-        ],
-        chef_fee_basis_points=data["chef_fee_basis_points"],
-        total_matching_pool="0",
-        matching_pool_balance="0",
-        matching_pool_donations_count=0,
-        total_public_donations="0",
-        public_donations_count=0,
-        cooldown_period_ms=None,
-        all_paid_out=False,
-        protocol_config_provider=data["protocol_config_provider"],
-    )
+        logger.info("upsert chef")
+        if data.get("chef"):
+            chef, _ = await Account.objects.aget_or_create(id=data["chef"])
 
-    # Add admins to the Pot
-    if data.get("admins"):
-        for admin_id in data["admins"]:
-            admin, _ = await Account.objects.aget_or_create(id=admin_id)
-            potObject.admins.aadd(admin)
+        # Create Pot object
+        logger.info("create pot....")
+        pot_defaults = {
+            "pot_factory_id": predecessorId,
+            "deployer": signer,
+            "deployed_at": created_at,
+            "source_metadata": data["source_metadata"],
+            "owner_id": data["owner"],
+            "chef_id": data.get("chef"),
+            "name": data["pot_name"],
+            "description": data["pot_description"],
+            "max_approved_applicants": data["max_projects"],
+            "base_currency": "near",
+            "application_start": datetime.fromtimestamp(data["application_start_ms"] / 1000),
+            "application_end": datetime.fromtimestamp(data["application_end_ms"] / 1000),
+            "matching_round_start": datetime.fromtimestamp(data["public_round_start_ms"] / 1000),
+            "matching_round_end": datetime.fromtimestamp(data["public_round_end_ms"] / 1000),
+            "registry_provider": data["registry_provider"],
+            "min_matching_pool_donation_amount": data["min_matching_pool_donation_amount"],
+            "sybil_wrapper_provider": data["sybil_wrapper_provider"],
+            "custom_sybil_checks": data.get("custom_sybil_checks"),
+            "custom_min_threshold_score": data.get("custom_min_threshold_score"),
+            "referral_fee_matching_pool_basis_points": data["referral_fee_matching_pool_basis_points"],
+            "referral_fee_public_round_basis_points": data["referral_fee_public_round_basis_points"],
+            "chef_fee_basis_points": data["chef_fee_basis_points"],
+            "total_matching_pool": "0",
+            "matching_pool_balance": "0",
+            "matching_pool_donations_count": 0,
+            "total_public_donations": "0",
+            "public_donations_count": 0,
+            "cooldown_period_ms": None,
+            "all_paid_out": False,
+            "protocol_config_provider": data["protocol_config_provider"],
+        }
+        potObject = await Pot.objects.aupdate_or_create(
+            id=receiver,
+            defaults=pot_defaults
+        )
 
-    # Create activity object
-    await Activity.objects.acreate(
-        signer_id=signerId,
-        receiver_id=receiverId,
-        timestamp=created_at,
-        type="Deploy_Pot",
-        action_result=data,
-        tx_hash=receiptId,
-    )
+        # Add admins to the Pot
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                potObject.admins.aadd(admin)
+
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": created_at,
+            "tx_hash": receiptId,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            action_result=data, type="Deploy_Pot", defaults=defaults
+        )
+    except Exception as e:
+        logger.error(f"Failed to handle new pot, Error: {e}")
 
 
 async def handle_new_pot_factory(data: dict, receiverId: str, created_at: datetime):
-    logger.info("upserting accounts...")
+    try:
 
-    # Upsert accounts
-    owner, _ = await Account.objects.aget_or_create(
-        id=data["owner"],
-    )
-    protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(
-        id=data["protocol_fee_recipient_account"],
-    )
+        logger.info("upserting accounts...")
 
-    receiver, _ = await Account.objects.aget_or_create(
-        id=receiverId,
-    )
+        # Upsert accounts
+        owner, _ = await Account.objects.aget_or_create(
+            id=data["owner"],
+        )
+        protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(
+            id=data["protocol_fee_recipient_account"],
+        )
 
-    logger.info("creating factory....")
-    # Create Factory object
-    factory = await PotFactory.objects.acreate(
-        id=receiver,
-        owner=owner,
-        deployed_at=created_at,
-        source_metadata=data["source_metadata"],
-        protocol_fee_basis_points=data["protocol_fee_basis_points"],
-        protocol_fee_recipient=protocol_fee_recipient_account,
-        require_whitelist=data["require_whitelist"],
-    )
+        receiver, _ = await Account.objects.aget_or_create(
+            id=receiverId,
+        )
 
-    # Add admins to the PotFactory
-    if data.get("admins"):
-        for admin_id in data["admins"]:
-            admin, _ = await Account.objects.aget_or_create(
-                id=admin_id,
-            )
-            await factory.admins.aadd(admin)
+        logger.info("creating factory....")
+        defaults = {
+            "owner": owner,
+            "deployed_at": created_at,
+            "source_metadata": data["source_metadata"],
+            "protocol_fee_basis_points": data["protocol_fee_basis_points"],
+            "protocol_fee_recipient": protocol_fee_recipient_account,
+            "require_whitelist": data["require_whitelist"],
+        }
+        # Create Factory object
+        factory, factory_created = await PotFactory.objects.aupdate_or_create(
+            id=receiver,
+            defaults=defaults
+        )
 
-    # Add whitelisted deployers to the PotFactory
-    if data.get("whitelisted_deployers"):
-        for deployer_id in data["whitelisted_deployers"]:
-            deployer, _ = await Account.objects.aget_or_create(id=deployer_id)
-            await factory.whitelisted_deployers.aadd(deployer)
+        # Add admins to the PotFactory
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin, _ = await Account.objects.aget_or_create(
+                    id=admin_id,
+                )
+                await factory.admins.aadd(admin)
+
+        # Add whitelisted deployers to the PotFactory
+        if data.get("whitelisted_deployers"):
+            for deployer_id in data["whitelisted_deployers"]:
+                deployer, _ = await Account.objects.aget_or_create(id=deployer_id)
+                await factory.whitelisted_deployers.aadd(deployer)
+    except Exception as e:
+        logger.error(f"Failed to handle new pot Factory, Error: {e}")
 
 
 async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionOutcome):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
-    data = json.loads(
-        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
-    )
+    try:
 
-    logger.info(f"creating list..... {data}")
+        data = json.loads(
+            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+        )
 
-    listObject = await List.objects.acreate(
-        id=data["id"],
-        owner_id=data["owner"],
-        default_registration_status=data["default_registration_status"],
-        name=data["name"],
-        description=data["description"],
-        cover_image_url=data["cover_image_url"],
-        admin_only_registrations=data["admin_only_registrations"],
-        created_at=datetime.fromtimestamp(data["created_at"] / 1000),
-        updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
-    )
+        logger.info(f"creating list..... {data}")
 
-    logger.info("upserting involveed accts...")
+        listObject = await List.objects.acreate(
+            id=data["id"],
+            owner_id=data["owner"],
+            default_registration_status=data["default_registration_status"],
+            name=data["name"],
+            description=data["description"],
+            cover_image_url=data["cover_image_url"],
+            admin_only_registrations=data["admin_only_registrations"],
+            created_at=datetime.fromtimestamp(data["created_at"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+        )
 
-    await Account.objects.aget_or_create(id=data["owner"])
+        logger.info("upserting involveed accts...")
 
-    await Account.objects.aget_or_create(id=signerId)
+        await Account.objects.aget_or_create(id=data["owner"])
 
-    await Account.objects.aget_or_create(id=receiverId)
+        await Account.objects.aget_or_create(id=signerId)
 
-    if data.get("admins"):
-        for admin_id in data["admins"]:
-            admin_object, _ = await Account.objects.aget_or_create(
-                id=admin_id,
-            )
-            await listObject.admins.aadd(admin_object)
+        await Account.objects.aget_or_create(id=receiverId)
+
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin_object, _ = await Account.objects.aget_or_create(
+                    id=admin_id,
+                )
+                await listObject.admins.aadd(admin_object)
+    except Exception as e:
+        logger.error(f"Failed to handle new list, Error: {e}")
+
 
 
 async def handle_new_list_registration(
@@ -240,13 +257,15 @@ async def handle_new_list_registration(
 
     # Insert activity
     try:
-        await Activity.objects.acreate(
-            signer_id=signerId,
-            receiver_id=receiverId,
-            timestamp=insert_data[0]["submitted_at"],
-            type="Register_Batch",
-            action_result=reg_data,
-            tx_hash=receipt.receipt_id,
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": datetime.fromtimestamp(insert_data[0]["submitted_at"] / 1000),
+            "tx_hash": receipt.receipt_id,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            action_result=reg_data, type="Register_Batch", defaults=defaults
         )
     except Exception as e:
         logger.error(f"Encountered error trying to insert activity: {e}")
@@ -283,47 +302,57 @@ async def handle_pot_application(
     status_obj: ExecutionOutcome,
     created_at: datetime,
 ):
-    # receipt = block.receipts().filter(lambda receipt: receipt.receiptId == receiptId)[0]
-    result = status_obj.status.get("SuccessValue")
-    if not result:
-        return
+    try:
 
-    appl_data = json.loads(base64.b64decode(result).decode("utf-8"))
-    logger.info(f"new pot application data: {data}, {appl_data}")
+        # receipt = block.receipts().filter(lambda receipt: receipt.receiptId == receiptId)[0]
+        result = status_obj.status.get("SuccessValue")
+        if not result:
+            return
 
-    # Update or create the account
-    project, _ = await Account.objects.aget_or_create(
-        id=data["project_id"],
-    )
+        appl_data = json.loads(base64.b64decode(result).decode("utf-8"))
+        logger.info(f"new pot application data: {data}, {appl_data}")
 
-    signer, _ = await Account.objects.aget_or_create(
-        id=signerId,
-    )
+        # Update or create the account
+        project, _ = await Account.objects.aget_or_create(
+            id=data["project_id"],
+        )
 
-    # Create the PotApplication object
-    logger.info("creating application.......")
-    application = await PotApplication.objects.acreate(
-        pot_id=receiverId,
-        applicant=project,
-        message=appl_data["message"],
-        submitted_at=datetime.fromtimestamp(appl_data["submitted_at"] / 1000),
-        updated_at=created_at,
-        status=appl_data["status"],
-        tx_hash=receipt.receipt_id,
-    )
+        signer, _ = await Account.objects.aget_or_create(
+            id=signerId,
+        )
 
-    # Create the activity object
-    logger.info("creating activity for action....")
-    await Activity.objects.acreate(
-        signer=signer,
-        receiver_id=receiverId,
-        timestamp=application.submitted_at,
-        type="Submit_Application",
-        action_result=appl_data,
-        tx_hash=receipt.receipt_id,
-    )
+        # Create the PotApplication object
+        logger.info("creating application.......")
+        appl_defaults = {
+            "message": appl_data["message"],
+            "submitted_at": datetime.fromtimestamp(appl_data["submitted_at"] / 1000),
+            "updated_at": created_at,
+            "status": appl_data["status"],
+            "tx_hash": receipt.receipt_id,
+        }
+        application, application_created = await PotApplication.objects.aupdate_or_create(
+            applicant=project,
+            pot_id=receiverId,
+            defaults=appl_defaults,
+        )
 
-    logger.info("PotApplication and Activity created successfully.")
+        # Create the activity object
+        logger.info("creating activity for action....")
+
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": created_at,
+            "tx_hash": receipt.receipt_id,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            action_result=appl_data, type="Submit_Application", defaults=defaults
+        )
+
+        logger.info(f"PotApplication and Activity created successfully, {activity_created}")
+    except Exception as e:
+        logger.error(f"Failed to handle pot application, Error: {e}")
 
 
 async def handle_pot_application_status_change(
@@ -333,166 +362,223 @@ async def handle_pot_application_status_change(
     receipt: Receipt,
     status_obj: ExecutionOutcome,
 ):
-    logger.info(f"pot application update data: {data}, {receiverId}")
+    try:
 
-    # receipt = next(receipt for receipt in block.receipts() if receipt.receiptId == receiptId)
-    update_data = json.loads(
-        base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
-    )
+        logger.info(f"pot application update data: {data}, {receiverId}")
 
-    # Retrieve the PotApplication object
-    appl = await PotApplication.objects.filter(
-        applicant_id=data["project_id"]
-    ).afirst()  # TODO: handle this being None
+        # receipt = next(receipt for receipt in block.receipts() if receipt.receiptId == receiptId)
+        update_data = json.loads(
+            base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
+        )
 
-    # Create the PotApplicationReview object
-    logger.info(f"create review...... {appl}")
-    updated_at = datetime.fromtimestamp(update_data.get("updated_at") / 1000)
-    await PotApplicationReview.objects.acreate(
-        application_id=appl.id,
-        reviewer_id=signerId,
-        notes=update_data.get("review_notes"),
-        status=update_data["status"],
-        reviewed_at=updated_at,
-        tx_hash=receipt.receipt_id,
-    )
+        # Retrieve the PotApplication object
+        appl = await PotApplication.objects.filter(
+            applicant_id=data["project_id"]
+        ).afirst()  # TODO: handle this being None
 
-    # Update the PotApplication object
-    await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
-        **{"status": update_data["status"], "updated_at": updated_at}
-    )
+        # Create the PotApplicationReview object
+        logger.info(f"create review...... {appl}")
+        updated_at = datetime.fromtimestamp(update_data.get("updated_at") / 1000)
+        
+        defaults = {
+            "notes": update_data.get("review_notes"),
+            "status": update_data["status"],
+            "tx_hash": receipt.receipt_id,
+        }
+        
+        await PotApplicationReview.objects.aupdate_or_create(
+            application_id=appl.id,
+            reviewer_id=signerId,
+            reviewed_at=updated_at,
+            defaults=defaults
+        )
 
-    logger.info("PotApplicationReview and PotApplication updated successfully.")
+        
+
+        # Update the PotApplication object
+        await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
+            **{"status": update_data["status"], "updated_at": updated_at}
+        )
+
+        logger.info("PotApplicationReview and PotApplication updated successfully.")
+    except Exception as e:
+        logger.warning(f"Failed to change pot application status, Error: {e}")
 
 
 async def handle_default_list_status_change(
     data: dict, receiverId: str, status_obj: ExecutionOutcome
 ):
-    logger.info(f"update project data: {data}, {receiverId}")
+    try:
 
-    result_data = json.loads(
-        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
-    )
+        logger.info(f"update project data: {data}, {receiverId}")
 
-    list_id = data.get("registration_id")
-    list_update = {
-        "name": result_data["name"],
-        "owner_id": result_data["owner"],
-        "default_registration_status": result_data["default_registration_status"],
-        "admin_only_registrations": result_data["admin_only_registrations"],
-        "updated_at": result_data["updated_at"],
-    }
-    if result_data.get("description"):
-        list_update["description"] = result_data["description"]
-    if result_data.get("cover_image_url"):
-        list_update["cover_image_url"] = result_data["cover_image_url"]
+        result_data = json.loads(
+            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+        )
 
-    await List.objects.filter(id=list_id).aupdate(**list_update)
+        list_id = data.get("registration_id")
+        list_update = {
+            "name": result_data["name"],
+            "owner_id": result_data["owner"],
+            "default_registration_status": result_data["default_registration_status"],
+            "admin_only_registrations": result_data["admin_only_registrations"],
+            "updated_at": result_data["updated_at"],
+        }
+        if result_data.get("description"):
+            list_update["description"] = result_data["description"]
+        if result_data.get("cover_image_url"):
+            list_update["cover_image_url"] = result_data["cover_image_url"]
 
-    logger.info("List updated successfully.")
+        await List.objects.filter(id=list_id).aupdate(**list_update)
+
+        logger.info("List updated successfully.")
+    except Exception as e:
+        logger.warning(f"Failed to change list status, Error: {e}")
 
 
 async def handle_list_upvote(
     data: dict, receiverId: str, signerId: str, receiptId: str
 ):
-    logger.info(f"upvote list: {data}, {receiverId}")
+    try:
 
-    acct, _ = await Account.objects.aget_or_create(
-        id=signerId,
-    )
+        logger.info(f"upvote list: {data}, {receiverId}")
 
-    created_at = datetime.now()
+        acct, _ = await Account.objects.aget_or_create(
+            id=signerId,
+        )
 
-    await ListUpvote.objects.acreate(
-        list_id=data.get("list_id") or receiverId,
-        account_id=signerId,
-        created_at=created_at,
-    )
+        created_at = datetime.now()
 
-    await Activity.objects.acreate(
-        signer_id=signerId,
-        receiver_id=receiverId,
-        timestamp=created_at,
-        type="Upvote",
-        action_result=data,
-        tx_hash=receiptId,
-    )
+        await ListUpvote.objects.aupdate_or_create(
+            list_id=data.get("list_id") or receiverId,
+            account_id=signerId,
+            
+        )
 
-    logger.info("Upvote and activity records created successfully.")
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": created_at,
+            "tx_hash": receiptId,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            action_result=data, type="Upvote", defaults=defaults
+        )
+
+        logger.info(f"Upvote and activity records created successfully. {activity_created}")
+    except Exception as e:
+        logger.warning(f"Failed to upvote list, Error: {e}")
 
 
 async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
-    logger.info(f"set payout data: {data}, {receiverId}")
-    payouts = data.get("payouts", [])
+    try:
 
-    insertion_data = []
-    for payout in payouts:
-        # General question: should we register projects as accounts?
-        potPayout = {
-            "recipient_id": payout.get("project_id"),
-            "amount": payout.get("amount"),
-            "ft_id": payout.get("ft_id", "near"),
-            "tx_hash": receipt.receipt_id,
-        }
-        insertion_data.append(potPayout)
+        logger.info(f"set payout data: {data}, {receiverId}")
+        payouts = data.get("payouts", [])
 
-    await PotPayout.objects.abulk_create(insertion_data)
+        insertion_data = []
+        for payout in payouts:
+            # General question: should we register projects as accounts?
+            potPayout = {
+                "recipient_id": payout.get("project_id"),
+                "amount": payout.get("amount"),
+                "ft_id": payout.get("ft_id", "near"),
+                "tx_hash": receipt.receipt_id,
+            }
+            insertion_data.append(potPayout)
+
+        await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
+    except Exception as e:
+        logger.warning(f"Failed to set payouts, Error: {e}")
 
 
 async def handle_transfer_payout(
     data: dict, receiverId: str, receiptId: str, created_at: datetime
 ):
-    data = data["payout"]
-    logger.info(f"fulfill payout data: {data}, {receiverId}")
-    payout = {
-        "recipient_id": data["project_id"],
-        "amount": data["amount"],
-        "paid_at": data.get("paid_at", created_at),
-        "tx_hash": receiptId,
-    }
-    await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(**payout)
+    try:
+
+        data = data["payout"]
+        logger.info(f"fulfill payout data: {data}, {receiverId}")
+        payout = {
+            "recipient_id": data["project_id"],
+            "amount": data["amount"],
+            "paid_at": data.get("paid_at", created_at),
+            "tx_hash": receiptId,
+        }
+        await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(**payout)
+    except Exception as e:
+        logger.warning(f"Failed to create payout data, Error: {e}")
 
 
 async def handle_payout_challenge(
-    data: dict, receiverId: str, signerId: str, receiptId: str
+    data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime
 ):
-    logger.info(f"challenging payout..: {data}, {receiverId}")
-    created_at = datetime.now()
-    payoutChallenge = {
-        "challenger_id": signerId,
-        "pot_id": receiverId,
-        "created_at": created_at,
-        "message": data["reason"],
-        "tx_hash": receiptId,
-    }
-    await PotPayoutChallenge.objects.acreate(**payoutChallenge)
+    try:
 
-    await Activity.objects.acreate(
-        signer_id=signerId,
-        receiver_id=receiverId,
-        timestamp=created_at,
-        type="Challenge_Payout",
-        action_result=payoutChallenge,
-        tx_hash=receiptId,
-    )
+        logger.info(f"challenging payout..: {data}, {receiverId}")
+        payoutChallenge = {
+            "created_at": created_at,
+            "message": data["reason"],
+            "tx_hash": receiptId,
+        }
+        await PotPayoutChallenge.objects.aupdate_or_create(
+            challenger_id = signerId, pot_id=receiverId, defaults=payoutChallenge
+        )
 
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": created_at,
+            "tx_hash": receiptId,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            action_result=payoutChallenge, type="Challenge_Payout", defaults=defaults
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create payoutchallenge, Error: {e}")
+
+
+async def handle_payout_challenge_response(data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime):
+    try:
+        logger.info(f"responding to payout challenge..: {data}, {receiverId}")
+        response_defaults = {
+            "admin": signerId,
+            "message": data.get("notes"),
+            "resolved": data.get("resolve_challenge"),
+            "tx_hash": receiptId
+        }
+        await PotPayoutChallengeAdminResponse.objects.aupdate_or_create(
+            challenger_id=data["challenger_id"],
+            pot_id=receiverId,
+            created_at=created_at,
+            defaults=response_defaults
+        )
+    except Exception as e:
+        logger.error(f"Failed to handle admin challeneg response, Error: {e}")
 
 async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
-    logger.info(f"removing admin...: {data}, {receiverId}")
-    list_obj = await List.objects.aget(id=data["list_id"])
+    try:
 
-    for acct in data["admins"]:
-        list_obj.admins.remove({"admins_id": acct})  # ??
+        logger.info(f"removing admin...: {data}, {receiverId}")
+        list_obj = await List.objects.aget(id=data["list_id"])
 
-    activity = {
-        "signer_id": signerId,
-        "receiver_id": receiverId,
-        "timestamp": datetime.now(),
-        "type": "Remove_List_Admin",
-        "tx_hash": receiptId,
-    }
+        for acct in data["admins"]:
+            list_obj.admins.remove({"admins_id": acct})  # maybe check
 
-    await Activity.objects.acreate(**activity)
+        activity = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": datetime.now(),
+            "tx_hash": receiptId,
+        }
+
+        activity, activity_created = await Activity.objects.aupdate_or_create(
+            type="Remove_List_Admin", defaults=activity
+        )
+    except Exception as e:
+        logger.warning(f"Failed to remove list admin, Error: {e}")
 
 
 # TODO: Need to abstract some actions.
@@ -559,28 +645,32 @@ async def handle_new_donations(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
     )
 
-    # Upsert donor account
-    donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
-    recipient = None
+    try:
 
-    if donation_data.get("recipient_id"):
-        recipient, _ = await Account.objects.aget_or_create(
-            id=donation_data["recipient_id"]
-        )
-    if donation_data.get("project_id"):
-        recipient, _ = await Account.objects.aget_or_create(
-            id=donation_data["project_id"]
-        )
+        # Upsert donor account
+        donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
+        recipient = None
 
-    if donation_data.get("referrer_id"):
-        referrer, _ = await Account.objects.aget_or_create(
-            id=donation_data["referrer_id"]
-        )
+        if donation_data.get("recipient_id"):
+            recipient, _ = await Account.objects.aget_or_create(
+                id=donation_data["recipient_id"]
+            )
+        if donation_data.get("project_id"):
+            recipient, _ = await Account.objects.aget_or_create(
+                id=donation_data["project_id"]
+            )
 
-    # Upsert token account
-    token_acct, _ = await Account.objects.aget_or_create(
-        id=(donation_data.get("ft_id") or "near")
-    )
+        if donation_data.get("referrer_id"):
+            referrer, _ = await Account.objects.aget_or_create(
+                id=donation_data["referrer_id"]
+            )
+
+        # Upsert token account
+        token_acct, _ = await Account.objects.aget_or_create(
+            id=(donation_data.get("ft_id") or "near")
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create/get an account involved in donation: {e}")
 
     # Upsert token
     try:
@@ -654,98 +744,110 @@ async def handle_new_donations(
         pot = await Pot.objects.aget(id=receiverId)
         default_data["pot"] = pot
 
-    donation, donation_created = await Donation.objects.aupdate_or_create(
-        on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
-    )
-    logger.info(f"Created donation? {donation_created}")
-
-    # convert total_amount_usd and net_amount_usd from None
-    if total_amount_usd is None:
-        total_amount_usd = 0.0
-    if net_amount_usd is None:
-        net_amount_usd = 0.0
-
-    # Insert or update activity record
-    activity_type = (
-        "Donate_Direct"
-        if actionName == "direct"
-        else (
-            "Donate_Pot_Matching_Pool"
-            if donation.matching_pool
-            else "Donate_Pot_Public"
+    try:
+        
+        donation, donation_created = await Donation.objects.aupdate_or_create(
+            on_chain_id=donation_data["id"], defaults=default_data
         )
-    )
-    defaults = {
-        "signer_id": signerId,
-        "receiver_id": receiverId,
-        "timestamp": donation.donated_at,
-        "tx_hash": receipt_obj.receipt_id,
-    }
-    activity, activity_created = await Activity.objects.aupdate_or_create(
-        action_result=donation_data, type=activity_type, defaults=defaults
-    )
-    if activity_created:
-        logger.info(f"Activity created: {activity}")
-    else:
-        logger.info(f"Activity updated: {activity}")
+        logger.info(f"Created donation? {donation_created}")
+
+        # convert total_amount_usd and net_amount_usd from None
+        if total_amount_usd is None:
+            total_amount_usd = 0.0
+        if net_amount_usd is None:
+            net_amount_usd = 0.0
+
+        # Insert or update activity record
+        activity_type = (
+            "Donate_Direct"
+            if actionName == "direct"
+            else (
+                "Donate_Pot_Matching_Pool"
+                if donation.matching_pool
+                else "Donate_Pot_Public"
+            )
+        )
+        defaults = {
+            "signer_id": signerId,
+            "receiver_id": receiverId,
+            "timestamp": donation.donated_at,
+            "tx_hash": receipt_obj.receipt_id,
+        }
+        try:
+
+            activity, activity_created = await Activity.objects.aupdate_or_create(
+                action_result=donation_data, type=activity_type, defaults=defaults
+            )
+            if activity_created:
+                logger.info(f"Activity created: {activity}")
+            else:
+                logger.info(f"Activity updated: {activity}")
+        except Exception as e:
+            logger.info(f"Failed to create Activity: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to create/update donation: {e}")
 
     if donation_created:  # only do stats updates if donation object was created
 
-        if actionName != "direct":
+        try:
 
-            potUpdate = {
-                "total_public_donations": str(
-                    int(pot.total_public_donations or 0) + int(total_amount)
-                ),
-                "total_public_donations_usd": int(pot.total_public_donations_usd or 0.0)
-                + total_amount_usd,
-            }
-            if donation_data.get("matching_pool"):
-                potUpdate["total_matching_pool"] = str(
-                    int(pot.total_matching_pool or 0) + int(total_amount)
-                )
-                potUpdate["total_matching_pool"] = (
-                    pot.total_matching_pool_usd or 0.0
-                ) + total_amount_usd
-                potUpdate["matching_pool_donations_count"] = (
-                    pot.matching_pool_donations_count or 0
-                ) + 1
+            if actionName != "direct":
 
-                if recipient:
-                    await Account.objects.filter(id=recipient.id).aupdate(
-                        **{
-                            "total_matching_pool_allocations_usd": recipient.total_matching_pool_allocations_usd
-                            + total_amount_usd
-                        }
+                potUpdate = {
+                    "total_public_donations": str(
+                        int(pot.total_public_donations or 0) + int(total_amount)
+                    ),
+                    "total_public_donations_usd": int(pot.total_public_donations_usd or 0.0)
+                    + total_amount_usd,
+                }
+                if donation_data.get("matching_pool"):
+                    potUpdate["total_matching_pool"] = str(
+                        int(pot.total_matching_pool or 0) + int(total_amount)
                     )
+                    potUpdate["total_matching_pool"] = (
+                        pot.total_matching_pool_usd or 0.0
+                    ) + total_amount_usd
+                    potUpdate["matching_pool_donations_count"] = (
+                        pot.matching_pool_donations_count or 0
+                    ) + 1
 
-                # accountUpdate = {}
-            else:
-                potUpdate["public_donations_count"] = (
-                    pot.public_donations_count or 0
-                ) + 1
+                    if recipient:
+                        await Account.objects.filter(id=recipient.id).aupdate(
+                            **{
+                                "total_matching_pool_allocations_usd": recipient.total_matching_pool_allocations_usd
+                                + total_amount_usd
+                            }
+                        )
 
-            await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
+                    # accountUpdate = {}
+                else:
+                    potUpdate["public_donations_count"] = (
+                        pot.public_donations_count or 0
+                    ) + 1
 
-        # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
-        logger.info(
-            f"update total donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
-        )
-        await Account.objects.filter(id=donor.id).aupdate(
-            **{
-                "total_donations_out_usd": donor.total_donations_out_usd
-                + decimal.Decimal(total_amount_usd)
-            }
-        )
-        if recipient:
-            acct = await Account.objects.aget(id=recipient.id)
-            logger.info(f"selected {acct} to perform donor count update")
-            acctUpdate = {
-                "donors_count": acct.donors_count + 1,
-                "total_donations_in_usd": acct.total_donations_in_usd
-                + decimal.Decimal(net_amount_usd),
-            }
-            await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
+                await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
+
+            # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
+            logger.info(
+                f"update total donated for {donor.id}, {donor.total_donations_out_usd + decimal.Decimal(total_amount_usd)}"
+            )
+            await Account.objects.filter(id=donor.id).aupdate(
+                **{
+                    "total_donations_out_usd": donor.total_donations_out_usd
+                    + decimal.Decimal(total_amount_usd)
+                }
+            )
+            if recipient:
+                acct = await Account.objects.aget(id=recipient.id)
+                logger.info(f"selected {acct} to perform donor count update")
+                acctUpdate = {
+                    "donors_count": acct.donors_count + 1,
+                    "total_donations_in_usd": acct.total_donations_in_usd
+                    + decimal.Decimal(net_amount_usd),
+                }
+                await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
+        except Exception as e:
+            logger.info(f"Failed to update Stats: {e}")
 
 
 async def cache_block_height(
