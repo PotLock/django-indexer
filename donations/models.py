@@ -210,16 +210,21 @@ class Donation(models.Model):
         total_amount = token.format_price(self.total_amount)
         net_amount = token.format_price(self.net_amount)
         protocol_amount = token.format_price(self.protocol_fee)
-        referrer_amount = token.format_price(self.referrer_fee or "0")
-        chef_amount = token.format_price(self.chef_fee or "0")
+        referrer_amount = (
+            None if not self.referrer_fee else token.format_price(self.referrer_fee)
+        )
+        chef_amount = None if not self.chef_fee else token.format_price(self.chef_fee)
+        # chef_amount = token.format_price(self.chef_fee or "0")
         if existing_token_price:
             try:
                 price_usd = existing_token_price.price_usd
                 self.total_amount_usd = total_amount * price_usd
                 self.net_amount_usd = net_amount * price_usd
                 self.protocol_fee_usd = protocol_amount * price_usd
-                self.referrer_fee_usd = referrer_amount * price_usd
-                self.chef_fee_usd = chef_amount * price_usd
+                self.referrer_fee_usd = (
+                    None if not referrer_amount else referrer_amount * price_usd
+                )
+                self.chef_fee_usd = None if not chef_amount else chef_amount * price_usd
                 self.save()
                 logger.info(
                     "USD prices calculated and saved using existing TokenHistoricalPrice"
@@ -256,8 +261,12 @@ class Donation(models.Model):
                     self.total_amount_usd = total_amount * price_usd
                     self.net_amount_usd = net_amount * price_usd
                     self.protocol_fee_usd = protocol_amount * price_usd
-                    self.referrer_fee_usd = referrer_amount * price_usd
-                    self.chef_fee_usd = chef_amount * price_usd
+                    self.referrer_fee_usd = (
+                        None if not referrer_amount else referrer_amount * price_usd
+                    )
+                    self.chef_fee_usd = (
+                        None if not chef_amount else chef_amount * price_usd
+                    )
                     self.save()
                 except Exception as e:
                     logger.error(

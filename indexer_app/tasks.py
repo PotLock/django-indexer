@@ -82,7 +82,11 @@ jobs_logger = logging.getLogger("jobs")
 @shared_task
 def fetch_usd_prices():
     donations = Donation.objects.filter(
-        Q(total_amount_usd__isnull=True) | Q(net_amount_usd__isnull=True)
+        Q(total_amount_usd__isnull=True)
+        | Q(net_amount_usd__isnull=True)
+        | Q(protocol_fee_usd__isnull=True)
+        | Q(referrer_fee_usd__isnull=True)
+        | Q(chef_fee_usd__isnull=True)
     )
     donations_count = donations.count()
     jobs_logger.info(f"Fetching USD prices for {donations_count} donations...")
