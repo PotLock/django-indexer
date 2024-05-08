@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 import requests
 from asgiref.sync import sync_to_async
@@ -250,6 +251,8 @@ class Donation(models.Model):
             logger.info(f"unit price: {price_usd}")
             if price_usd:
                 try:
+                    # convert price_usd to decimal
+                    price_usd = Decimal(price_usd)
                     self.total_amount_usd = total_amount * price_usd
                     self.net_amount_usd = net_amount * price_usd
                     self.protocol_fee_usd = protocol_amount * price_usd
