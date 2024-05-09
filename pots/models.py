@@ -332,7 +332,6 @@ class PotApplication(models.Model):
         help_text=_("Transaction hash."),
     )
 
-
     class Meta:
         verbose_name_plural = "PotApplications"
 
@@ -384,9 +383,8 @@ class PotApplicationReview(models.Model):
         help_text=_("Transaction hash."),
     )
 
-
     class Meta:
-        verbose_name_plural = "POtApplicationReviews"
+        verbose_name_plural = "PotApplicationReviews"
 
         unique_together = (("application", "reviewer", "reviewed_at"),)
 
@@ -537,7 +535,6 @@ class PotPayoutChallengeAdminResponse(models.Model):
         null=False,
         help_text=_("Transaction hash."),
     )
-
 
     class Meta:
         verbose_name_plural = "PotPayoutChallengeResponses"
