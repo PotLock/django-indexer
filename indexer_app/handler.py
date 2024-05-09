@@ -21,6 +21,7 @@ from .utils import (
     handle_new_pot,
     handle_new_pot_factory,
     handle_payout_challenge,
+    handle_payout_challenge_response,
     handle_pot_application,
     handle_pot_application_status_change,
     handle_set_payouts,
@@ -270,7 +271,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case "challenge_payouts":
                             logger.info(f"challenge payout: {args_dict}")
                             await handle_payout_challenge(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id
+                                args_dict, receiver_id, signer_id, receipt.receipt_id, created_at
+                            )
+                            break
+                        
+                        case "admin_update_payouts_challenge":
+                            logger.info(f"challenge payout: {args_dict}")
+                            await handle_payout_challenge_response(
+                                args_dict, receiver_id, signer_id, receipt.receipt_id, created_at
                             )
                             break
 

@@ -101,6 +101,11 @@ class ListUpvote(models.Model):
         help_text=_("Upvote creation date."),
     )
 
+    class Meta:
+        verbose_name_plural = "ListUpvotes"
+
+        unique_together = (("list", "account"),)
+
 
 class ListRegistration(models.Model):
     id = models.AutoField(
