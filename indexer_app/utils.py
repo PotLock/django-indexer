@@ -1,9 +1,7 @@
 import base64
 import decimal
 import json
-from datetime import date, datetime
-from email.policy import default
-from sys import exception
+from datetime import datetime
 
 import requests
 from django.conf import settings
@@ -13,7 +11,6 @@ from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
 from accounts.models import Account
 from activities.models import Activity
-from base.utils import format_date, format_to_near
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
@@ -26,7 +23,6 @@ from pots.models import (
     PotPayoutChallenge,
     PotPayoutChallengeAdminResponse,
 )
-from tokens.models import Token, TokenHistoricalPrice
 
 from .logging import logger
 
@@ -67,17 +63,31 @@ async def handle_new_pot(
             "description": data["pot_description"],
             "max_approved_applicants": data["max_projects"],
             "base_currency": "near",
-            "application_start": datetime.fromtimestamp(data["application_start_ms"] / 1000),
-            "application_end": datetime.fromtimestamp(data["application_end_ms"] / 1000),
-            "matching_round_start": datetime.fromtimestamp(data["public_round_start_ms"] / 1000),
-            "matching_round_end": datetime.fromtimestamp(data["public_round_end_ms"] / 1000),
+            "application_start": datetime.fromtimestamp(
+                data["application_start_ms"] / 1000
+            ),
+            "application_end": datetime.fromtimestamp(
+                data["application_end_ms"] / 1000
+            ),
+            "matching_round_start": datetime.fromtimestamp(
+                data["public_round_start_ms"] / 1000
+            ),
+            "matching_round_end": datetime.fromtimestamp(
+                data["public_round_end_ms"] / 1000
+            ),
             "registry_provider": data["registry_provider"],
-            "min_matching_pool_donation_amount": data["min_matching_pool_donation_amount"],
+            "min_matching_pool_donation_amount": data[
+                "min_matching_pool_donation_amount"
+            ],
             "sybil_wrapper_provider": data["sybil_wrapper_provider"],
             "custom_sybil_checks": data.get("custom_sybil_checks"),
             "custom_min_threshold_score": data.get("custom_min_threshold_score"),
-            "referral_fee_matching_pool_basis_points": data["referral_fee_matching_pool_basis_points"],
-            "referral_fee_public_round_basis_points": data["referral_fee_public_round_basis_points"],
+            "referral_fee_matching_pool_basis_points": data[
+                "referral_fee_matching_pool_basis_points"
+            ],
+            "referral_fee_public_round_basis_points": data[
+                "referral_fee_public_round_basis_points"
+            ],
             "chef_fee_basis_points": data["chef_fee_basis_points"],
             "total_matching_pool": "0",
             "matching_pool_balance": "0",
@@ -89,8 +99,7 @@ async def handle_new_pot(
             "protocol_config_provider": data["protocol_config_provider"],
         }
         potObject = await Pot.objects.aupdate_or_create(
-            id=receiver,
-            defaults=pot_defaults
+            id=receiver, defaults=pot_defaults
         )
 
         # Add admins to the Pot
@@ -141,8 +150,7 @@ async def handle_new_pot_factory(data: dict, receiverId: str, created_at: dateti
         }
         # Create Factory object
         factory, factory_created = await PotFactory.objects.aupdate_or_create(
-            id=receiver,
-            defaults=defaults
+            id=receiver, defaults=defaults
         )
 
         # Add admins to the PotFactory
@@ -200,7 +208,6 @@ async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionO
                 await listObject.admins.aadd(admin_object)
     except Exception as e:
         logger.error(f"Failed to handle new list, Error: {e}")
-
 
 
 async def handle_new_list_registration(
@@ -330,10 +337,12 @@ async def handle_pot_application(
             "status": appl_data["status"],
             "tx_hash": receipt.receipt_id,
         }
-        application, application_created = await PotApplication.objects.aupdate_or_create(
-            applicant=project,
-            pot_id=receiverId,
-            defaults=appl_defaults,
+        application, application_created = (
+            await PotApplication.objects.aupdate_or_create(
+                applicant=project,
+                pot_id=receiverId,
+                defaults=appl_defaults,
+            )
         )
 
         # Create the activity object
@@ -350,7 +359,9 @@ async def handle_pot_application(
             action_result=appl_data, type="Submit_Application", defaults=defaults
         )
 
-        logger.info(f"PotApplication and Activity created successfully, {activity_created}")
+        logger.info(
+            f"PotApplication and Activity created successfully, {activity_created}"
+        )
     except Exception as e:
         logger.error(f"Failed to handle pot application, Error: {e}")
 
@@ -379,21 +390,19 @@ async def handle_pot_application_status_change(
         # Create the PotApplicationReview object
         logger.info(f"create review...... {appl}")
         updated_at = datetime.fromtimestamp(update_data.get("updated_at") / 1000)
-        
+
         defaults = {
             "notes": update_data.get("review_notes"),
             "status": update_data["status"],
             "tx_hash": receipt.receipt_id,
         }
-        
+
         await PotApplicationReview.objects.aupdate_or_create(
             application_id=appl.id,
             reviewer_id=signerId,
             reviewed_at=updated_at,
-            defaults=defaults
+            defaults=defaults,
         )
-
-        
 
         # Update the PotApplication object
         await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
@@ -452,7 +461,6 @@ async def handle_list_upvote(
         await ListUpvote.objects.aupdate_or_create(
             list_id=data.get("list_id") or receiverId,
             account_id=signerId,
-            
         )
 
         defaults = {
@@ -466,7 +474,9 @@ async def handle_list_upvote(
             action_result=data, type="Upvote", defaults=defaults
         )
 
-        logger.info(f"Upvote and activity records created successfully. {activity_created}")
+        logger.info(
+            f"Upvote and activity records created successfully. {activity_created}"
+        )
     except Exception as e:
         logger.warning(f"Failed to upvote list, Error: {e}")
 
@@ -506,7 +516,9 @@ async def handle_transfer_payout(
             "paid_at": data.get("paid_at", created_at),
             "tx_hash": receiptId,
         }
-        await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(**payout)
+        await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(
+            **payout
+        )
     except Exception as e:
         logger.warning(f"Failed to create payout data, Error: {e}")
 
@@ -523,7 +535,7 @@ async def handle_payout_challenge(
             "tx_hash": receiptId,
         }
         await PotPayoutChallenge.objects.aupdate_or_create(
-            challenger_id = signerId, pot_id=receiverId, defaults=payoutChallenge
+            challenger_id=signerId, pot_id=receiverId, defaults=payoutChallenge
         )
 
         defaults = {
@@ -540,23 +552,26 @@ async def handle_payout_challenge(
         logger.warning(f"Failed to create payoutchallenge, Error: {e}")
 
 
-async def handle_payout_challenge_response(data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime):
+async def handle_payout_challenge_response(
+    data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime
+):
     try:
         logger.info(f"responding to payout challenge..: {data}, {receiverId}")
         response_defaults = {
             "admin": signerId,
             "message": data.get("notes"),
             "resolved": data.get("resolve_challenge"),
-            "tx_hash": receiptId
+            "tx_hash": receiptId,
         }
         await PotPayoutChallengeAdminResponse.objects.aupdate_or_create(
             challenger_id=data["challenger_id"],
             pot_id=receiverId,
             created_at=created_at,
-            defaults=response_defaults
+            defaults=response_defaults,
         )
     except Exception as e:
         logger.error(f"Failed to handle admin challeneg response, Error: {e}")
+
 
 async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
     try:
@@ -763,7 +778,7 @@ async def handle_new_donations(
         #     net_amount_usd = 0.0
 
         logger.info(f"Created donation? {donation_created}")
-            # Insert or update activity record
+        # Insert or update activity record
         activity_type = (
             "Donate_Direct"
             if actionName == "direct"
