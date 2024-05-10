@@ -58,7 +58,7 @@ def listen_to_near_events():
     try:
         # Update below with desired network & block height
         # start_block = get_block_height("current_block_height")
-        start_block = 106388588  # manually setting for reindexing TODO: remove this
+        start_block = 106431915  # manually setting for reindexing TODO: remove this
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer("mainnet", start_block - 1, None))
     finally:
