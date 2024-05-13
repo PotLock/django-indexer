@@ -6,7 +6,10 @@ from django.core.cache import cache
 from near_lake_framework import near_primitives
 
 from base.utils import convert_ns_to_utc
-from pots.utils import match_pot_factory_version_pattern
+from pots.utils import (
+    match_pot_factory_version_pattern,
+    match_pot_subaccount_version_pattern,
+)
 
 from .logging import logger
 from .utils import (
@@ -129,7 +132,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, created_at
                                 )
-                            else:
+                            elif match_pot_subaccount_version_pattern(
+                                receipt.receiver_id
+                            ):
                                 logger.info(
                                     f"new pot deployment: {args_dict}, {action}"
                                 )
@@ -271,14 +276,22 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case "challenge_payouts":
                             logger.info(f"challenge payout: {args_dict}")
                             await handle_payout_challenge(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id, created_at
+                                args_dict,
+                                receiver_id,
+                                signer_id,
+                                receipt.receipt_id,
+                                created_at,
                             )
                             break
-                        
+
                         case "admin_update_payouts_challenge":
                             logger.info(f"challenge payout: {args_dict}")
                             await handle_payout_challenge_response(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id, created_at
+                                args_dict,
+                                receiver_id,
+                                signer_id,
+                                receipt.receipt_id,
+                                created_at,
                             )
                             break
 
