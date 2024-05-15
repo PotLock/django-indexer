@@ -43,23 +43,23 @@ echo "Migration check output: $PENDING_MIGRATIONS" >> "$LOG_FILE"
 
 # Log the full output of showmigrations
 echo "Checking for pending migrations..." >> "$LOG_FILE"
-python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full output to diagnose
+poetry run python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full output to diagnose
 
 # Check for unapplied migrations
-PENDING_MIGRATIONS=$(python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
+PENDING_MIGRATIONS=$(poetry run python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
 
 if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
     echo "Migrations found; stopping services..." >> "$LOG_FILE"
     sudo systemctl stop gunicorn celery-indexer-worker celery-beat-worker celery-beat
 
     echo 'Applying migrations...' >> "$LOG_FILE"
-    python manage.py migrate >> "$LOG_FILE" 2>&1
+    poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
 
     echo 'Starting services...' >> "$LOG_FILE"
     sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker celery-beat
 else
     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
-    python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
+    poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
     sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker celery-beat
 fi
 
