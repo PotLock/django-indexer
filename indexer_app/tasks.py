@@ -2,8 +2,9 @@ import asyncio
 import logging
 from pathlib import Path
 
+from billiard.exceptions import WorkerLostError
 from celery import shared_task
-from celery.signals import task_revoked
+from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q, Sum
@@ -58,11 +59,23 @@ def listen_to_near_events():
     try:
         # Update below with desired network & block height
         # start_block = get_block_height("current_block_height")
-        start_block = 110046700
+        start_block = 111932487
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer("mainnet", start_block - 1, None))
+    except WorkerLostError:
+        pass  # don't log to Sentry
     finally:
         loop.close()
+
+
+@worker_shutdown.connect
+def worker_shutdown_handler(sig, how, exitcode, **kwargs):
+    if sig == 15:
+        logger.info(
+            "Celery worker shutdown initiated by signal 15 (SIGTERM)."
+        )  # avoid logging to Sentry
+    else:
+        logger.error("Celery worker shutdown due to signal %d.", sig)
 
 
 jobs_logger = logging.getLogger("jobs")
