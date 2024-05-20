@@ -57,6 +57,9 @@ class PotFactory(models.Model):
         help_text=_("Require whitelist."),
     )
 
+    class Meta:
+        verbose_name_plural = "Pot Factories"
+
 
 class Pot(models.Model):
     id = models.OneToOneField(
@@ -333,7 +336,7 @@ class PotApplication(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = "PotApplications"
+        verbose_name_plural = "Pot Applications"
 
         unique_together = (("pot", "applicant"),)
 
@@ -384,7 +387,7 @@ class PotApplicationReview(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = "PotApplicationReviews"
+        verbose_name_plural = "Pot Application Reviews"
 
         unique_together = (("application", "reviewer", "reviewed_at"),)
 
@@ -479,7 +482,7 @@ class PotPayoutChallenge(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = "PayoutChallenges"
+        verbose_name_plural = "Payout Challenges"
 
         unique_together = (("challenger", "pot"),)
 
@@ -537,6 +540,6 @@ class PotPayoutChallengeAdminResponse(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = "PotPayoutChallengeResponses"
+        verbose_name_plural = "Payout Challenge Responses"
 
         unique_together = (("challenger", "pot", "created_at"),)

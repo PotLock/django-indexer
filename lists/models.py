@@ -102,7 +102,7 @@ class ListUpvote(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = "ListUpvotes"
+        verbose_name_plural = "List Upvotes"
 
         unique_together = (("list", "account"),)
 
