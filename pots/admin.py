@@ -6,6 +6,7 @@ from accounts.models import Account
 from .models import (
     Pot,
     PotApplication,
+    PotApplicationReview,
     PotFactory,
     PotPayout,
     PotPayoutChallenge,
@@ -78,6 +79,21 @@ class PotApplicationAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "applicant", "status", "submitted_at")
     search_fields = ("pot__id", "applicant__id")
     list_filter = ("status", "submitted_at")
+
+
+@admin.register(PotApplicationReview)
+class PotApplicationReviewAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "application",
+        "reviewer",
+        "notes",
+        "status",
+        "reviewed_at",
+        "tx_hash",
+    )
+    search_fields = ("application__id", "reviewer__id")
+    list_filter = ("status", "reviewed_at")
 
 
 @admin.register(PotPayout)
