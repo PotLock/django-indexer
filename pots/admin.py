@@ -46,11 +46,31 @@ class PotFactoryAdmin(admin.ModelAdmin):
         return form
 
 
+class PotForm(forms.ModelForm):
+    class Meta:
+        model = Pot
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super(PotForm, self).__init__(*args, **kwargs)
+        # Ensure self.instance is available before accessing it
+        if self.instance.pk:
+            # Set the queryset for the admins field to only include relevant accounts
+            self.fields["admins"].queryset = self.instance.admins.all()
+
+
 @admin.register(Pot)
 class PotAdmin(admin.ModelAdmin):
+    form = PotForm
     list_display = ("id", "pot_factory", "deployer", "deployed_at", "name")
     search_fields = ("id", "name", "deployer__id")
     list_filter = ("deployed_at",)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(PotAdmin, self).get_form(request, obj, **kwargs)
+        if obj:
+            form.base_fields["admins"].queryset = obj.admins.all()
+        return form
 
 
 @admin.register(PotApplication)
