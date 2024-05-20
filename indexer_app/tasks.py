@@ -68,14 +68,14 @@ def listen_to_near_events():
         loop.close()
 
 
-@worker_shutdown.connect
-def worker_shutdown_handler(sig, how, exitcode, **kwargs):
-    if sig == 15:
-        logger.info(
-            "Celery worker shutdown initiated by signal 15 (SIGTERM)."
-        )  # avoid logging to Sentry
-    else:
-        logger.error("Celery worker shutdown due to signal %d.", sig)
+# @worker_shutdown.connect
+# def worker_shutdown_handler(sig, how, exitcode, **kwargs):
+#     if sig == 15:
+#         logger.info(
+#             "Celery worker shutdown initiated by signal 15 (SIGTERM)."
+#         )  # avoid logging to Sentry
+#     else:
+#         logger.error("Celery worker shutdown due to signal %d.", sig)
 
 
 jobs_logger = logging.getLogger("jobs")
