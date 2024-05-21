@@ -98,7 +98,7 @@ async def handle_new_pot(
             "all_paid_out": False,
             "protocol_config_provider": data["protocol_config_provider"],
         }
-        potObject = await Pot.objects.aupdate_or_create(
+        pot, created = await Pot.objects.aupdate_or_create(
             id=receiver, defaults=pot_defaults
         )
 
@@ -106,7 +106,7 @@ async def handle_new_pot(
         if data.get("admins"):
             for admin_id in data["admins"]:
                 admin, _ = await Account.objects.aget_or_create(id=admin_id)
-                potObject.admins.aadd(admin)
+                pot.admins.aadd(admin)
 
         defaults = {
             "signer_id": signerId,
