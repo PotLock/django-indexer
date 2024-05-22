@@ -59,7 +59,7 @@ def listen_to_near_events():
     try:
         # Update below with desired network & block height
         # start_block = get_block_height("current_block_height")
-        start_block = 113066329
+        start_block = 113155075
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer("mainnet", start_block - 1, None))
     except WorkerLostError:
