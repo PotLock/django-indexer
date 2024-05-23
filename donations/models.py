@@ -241,6 +241,8 @@ class Donation(models.Model):
                     "No existing price within acceptable time period; fetching historical price..."
                 )
                 endpoint = f"{settings.COINGECKO_URL}/coins/{self.ft.id}/history?date={format_date(self.donated_at)}&localization=false"
+                if settings.COINGECKO_API_KEY:
+                    endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
                 logger.info(f"coingecko endpoint: {endpoint}")
                 response = requests.get(endpoint)
                 logger.info(f"coingecko response: {response}")

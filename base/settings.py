@@ -37,6 +37,7 @@ AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
 # CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "False"))
 # CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
+COINGECKO_API_KEY = os.environ.get("PL_COINGECKO_API_KEY")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 LOG_LEVEL = os.getenv("PL_LOG_LEVEL", "INFO").upper()
@@ -53,7 +54,11 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
-COINGECKO_URL = "https://api.coingecko.com/api/v3"
+COINGECKO_URL = (
+    "https://pro-api.coingecko.com/api/v3"
+    if COINGECKO_API_KEY
+    else "https://api.coingecko.com/api/v3"
+)
 # Number of hours around a given timestamp for querying historical prices
 HISTORICAL_PRICE_QUERY_HOURS = 24
 
