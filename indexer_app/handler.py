@@ -147,7 +147,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                     created_at,
                                 )
                             break
-
+                        # TODO: update to use handle_apply method??
                         case "assert_can_apply_callback":
                             logger.info(
                                 f"application case: {args_dict}, {action}, {receipt}"

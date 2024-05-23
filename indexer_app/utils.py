@@ -385,7 +385,13 @@ async def handle_pot_application_status_change(
         # Retrieve the PotApplication object
         appl = await PotApplication.objects.filter(
             applicant_id=data["project_id"]
-        ).afirst()  # TODO: handle this being None
+        ).afirst()
+
+        if not appl:
+            logger.error(
+                f"PotApplication object not found for project_id: {data['project_id']}"
+            )
+            return
 
         # Create the PotApplicationReview object
         logger.info(f"create review...... {appl}")
@@ -411,7 +417,7 @@ async def handle_pot_application_status_change(
 
         logger.info("PotApplicationReview and PotApplication updated successfully.")
     except Exception as e:
-        logger.warning(f"Failed to change pot application status, Error: {e}")
+        logger.error(f"Failed to change pot application status, Error: {e}")
 
 
 async def handle_default_list_status_change(
@@ -442,7 +448,7 @@ async def handle_default_list_status_change(
 
         logger.info("List updated successfully.")
     except Exception as e:
-        logger.warning(f"Failed to change list status, Error: {e}")
+        logger.error(f"Failed to change list status, Error: {e}")
 
 
 async def handle_list_upvote(
@@ -478,7 +484,7 @@ async def handle_list_upvote(
             f"Upvote and activity records created successfully. {activity_created}"
         )
     except Exception as e:
-        logger.warning(f"Failed to upvote list, Error: {e}")
+        logger.error(f"Failed to upvote list, Error: {e}")
 
 
 async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
@@ -500,7 +506,7 @@ async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
 
         await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
     except Exception as e:
-        logger.warning(f"Failed to set payouts, Error: {e}")
+        logger.error(f"Failed to set payouts, Error: {e}")
 
 
 async def handle_transfer_payout(
@@ -520,7 +526,7 @@ async def handle_transfer_payout(
             **payout
         )
     except Exception as e:
-        logger.warning(f"Failed to create payout data, Error: {e}")
+        logger.error(f"Failed to create payout data, Error: {e}")
 
 
 async def handle_payout_challenge(
@@ -549,7 +555,7 @@ async def handle_payout_challenge(
             action_result=payoutChallenge, type="Challenge_Payout", defaults=defaults
         )
     except Exception as e:
-        logger.warning(f"Failed to create payoutchallenge, Error: {e}")
+        logger.error(f"Failed to create payoutchallenge, Error: {e}")
 
 
 async def handle_payout_challenge_response(
@@ -593,7 +599,7 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
             type="Remove_List_Admin", defaults=activity
         )
     except Exception as e:
-        logger.warning(f"Failed to remove list admin, Error: {e}")
+        logger.error(f"Failed to remove list admin, Error: {e}")
 
 
 # TODO: Need to abstract some actions.
@@ -685,7 +691,7 @@ async def handle_new_donations(
             id=(donation_data.get("ft_id") or "near")
         )
     except Exception as e:
-        logger.warning(f"Failed to create/get an account involved in donation: {e}")
+        logger.error(f"Failed to create/get an account involved in donation: {e}")
 
     # # Upsert token
     # try:
@@ -704,10 +710,10 @@ async def handle_new_donations(
     #     response = requests.get(endpoint)
     #     logger.info(f"response: {response}")
     #     if response.status_code == 429:
-    #         logger.warning("Coingecko rate limit exceeded")
+    #         logger.error("Coingecko rate limit exceeded")
     #     price_data = response.json()
     # except Exception as e:
-    #     logger.warning(f"Failed to fetch price data: {e}")
+    #     logger.error(f"Failed to fetch price data: {e}")
     # logger.info(f"price data: {price_data}")
     # unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
     # logger.info(f"unit price: {unit_price}")
@@ -719,7 +725,7 @@ async def handle_new_donations(
     #             timestamp=donated_at,
     #         )
     #     except Exception as e:
-    #         logger.warning(
+    #         logger.error(
     #             f"Error creating TokenHistoricalPrice: {e} token: {token} unit_price: {unit_price}"
     #         )
     #         # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
@@ -806,7 +812,7 @@ async def handle_new_donations(
         except Exception as e:
             logger.info(f"Failed to create Activity: {e}")
     except Exception as e:
-        logger.warning(f"Failed to create/update donation: {e}")
+        logger.error(f"Failed to create/update donation: {e}")
 
     ### COMMENTING OUT FOR NOW SINCE WE HAVE PERIODIC JOB RUNNING TO UPDATE ACCOUNT STATS (NB: DOESN'T CURRENTLY COVER POT STATS)
     ### CAN ALWAYS ADD BACK IF DESIRED
