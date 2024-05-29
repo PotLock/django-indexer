@@ -19,15 +19,23 @@ from .logging import logger
 from .utils import cache_block_height, get_block_height
 
 
-async def indexer(network: str, from_block: int, to_block: int):
+async def indexer(from_block: int, to_block: int):
     """
     Runs the lake indexer framework
     """
     # Initialize lake indexer
     logger.info(f"from block: {from_block}")
-    lake_config = LakeConfig.mainnet() if network == "mainnet" else LakeConfig.testnet()
+    lake_config = (
+        LakeConfig.testnet()
+        if settings.ENVIRONMENT == "testnet"
+        else LakeConfig.mainnet()
+    )
     lake_config.start_block_height = (
-        from_block if from_block else logger.info("Starting to index from latest block")
+        from_block
+        if from_block
+        else logger.info(
+            "Starting to index from latest block"
+        )  # TODO: wtf is this shitty code
     )
     lake_config.aws_access_key_id = settings.AWS_ACCESS_KEY_ID
     lake_config.aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
@@ -58,10 +66,10 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        # start_block = get_block_height("current_block_height")
-        start_block = 112959664
+        start_block = get_block_height("current_block_height")
+        # start_block = 112959664
         logger.info(f"what's the start block, pray tell? {start_block-1}")
-        loop.run_until_complete(indexer("mainnet", start_block - 1, None))
+        loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
         pass  # don't log to Sentry
     finally:
