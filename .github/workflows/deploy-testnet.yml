@@ -23,17 +23,16 @@ jobs:
           role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
-      # Hello from AWS: WhoAmI
       - name: Sts GetCallerIdentity
         run: |
           aws sts get-caller-identity
-
-      # Step 3 - check the application-name and deployment group name
+      - name: Generate appspec.yml for testnet
+        run: cp appspec-testnet.yml appspec.yml
       - name: Create CodeDeploy Deployment
         id: deploy
         run: |
           aws deploy create-deployment \
           --application-name django-indexer-testnet \
-          --deployment-group-name django-indexer-testnet \
+          --deployment-group-name django-indexer-testnet-group \
           --deployment-config-name CodeDeployDefault.AllAtOnce \
           --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
