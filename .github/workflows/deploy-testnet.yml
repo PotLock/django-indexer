@@ -28,6 +28,8 @@ jobs:
           aws sts get-caller-identity
       - name: Generate appspec.yml for testnet
         run: cp appspec-testnet.yml appspec.yml
+      - name: Verify appspec.yml content
+        run: cat appspec.yml
       - name: Create CodeDeploy Deployment
         id: deploy
         run: |
