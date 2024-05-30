@@ -12,24 +12,47 @@ permissions:
   id-token: write # This is required for requesting the JWT
   contents: read # This is required for actions/checkout
 jobs:
-  AssumeRoleAndCallIdentity:
+  GenerateAndDeploy:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone the repository
         uses: actions/checkout@v3
-      - name: configure aws credentials
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
-      - name: Sts GetCallerIdentity
-        run: |
-          aws sts get-caller-identity
+
       - name: Generate appspec.yml for testnet
         run: cp appspec-testnet.yml appspec.yml
-      - name: Verify appspec.yml content
-        run: cat appspec.yml
+
+      - name: Upload appspec.yml as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: appspec
+          path: appspec.yml
+
+  DeployToCodeDeploy:
+    needs: GenerateAndDeploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v3
+
+      - name: Download appspec.yml artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: appspec
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Create CodeDeploy Deployment
         id: deploy
         run: |
@@ -38,3 +61,31 @@ jobs:
           --deployment-group-name django-indexer-testnet-group \
           --deployment-config-name CodeDeployDefault.AllAtOnce \
           --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
+
+# jobs:
+#   AssumeRoleAndCallIdentity:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Git clone the repository
+#         uses: actions/checkout@v3
+#       - name: configure aws credentials
+#         uses: aws-actions/configure-aws-credentials@v1.7.0
+#         with:
+#           role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
+#           role-session-name: GitHub_to_AWS_via_FederatedOIDC
+#           aws-region: ${{ env.AWS_REGION }}
+#       - name: Sts GetCallerIdentity
+#         run: |
+#           aws sts get-caller-identity
+#       - name: Generate appspec.yml for testnet
+#         run: cp appspec-testnet.yml appspec.yml
+#       - name: Verify appspec.yml content
+#         run: cat appspec.yml
+#       - name: Create CodeDeploy Deployment
+#         id: deploy
+#         run: |
+#           aws deploy create-deployment \
+#           --application-name django-indexer-testnet \
+#           --deployment-group-name django-indexer-testnet-group \
+#           --deployment-config-name CodeDeployDefault.AllAtOnce \
+#           --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
