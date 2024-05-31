@@ -11,12 +11,6 @@ echo "=========================================" >> "$LOG_FILE"
 export PL_ENVIRONMENT=dev
 source /home/ec2-user/.bashrc
 
-echo "PL_ENVIRONMENT: $PL_ENVIRONMENT" >> "$LOG_FILE"
-echo "PL_POSTGRES_HOST: $PL_POSTGRES_HOST" >> "$LOG_FILE"
-
-echo "PL_ENVIRONMENT: $PL_ENVIRONMENT" >> "$LOG_FILE"
-echo "PL_POSTGRES_HOST: $PL_POSTGRES_HOST" >> "$LOG_FILE"
-
 # Set correct ownership recursively for project directory
 sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer-dev/
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Corrected ownership to ec2-user:nginx" >> "$LOG_FILE"
