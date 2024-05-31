@@ -213,6 +213,9 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 # print("LOG_LEVEL: ", LOG_LEVEL)
 
+# Set log group name based on environment
+log_group_name = f"django-indexer-{ENVIRONMENT}"
+
 # Setting up the logging configuration
 LOGGING = {
     "version": 1,
@@ -254,7 +257,7 @@ if ENVIRONMENT != "local":
     LOGGING["handlers"]["watchtower"] = {
         "class": "watchtower.CloudWatchLogHandler",
         "boto3_client": boto3_logs_client,
-        "log_group_name": "django-indexer",
+        "log_group_name": log_group_name,
         "formatter": "standard",
         "level": log_level,
     }
