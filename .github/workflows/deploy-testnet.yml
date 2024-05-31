@@ -28,15 +28,18 @@ jobs:
       - name: Generate appspec.yml for testnet
         run: cp appspec-testnet.yml appspec.yml
 
-      - name: Set filename variable
+      - name: Set environment variables
         id: vars
-        run: echo "FILENAME=django-indexer-testnet-$(date +'%Y-%m-%d_%H-%M-%S').zip" >> $GITHUB_ENV
+        run: |
+          echo "DATETIME=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+          echo "FILENAME=django-indexer-testnet-${DATETIME}.zip" >> $GITHUB_ENV
+          echo "S3_BUCKET=django-indexer-testnet" >> $GITHUB_ENV
 
       - name: Create zip of repository
         run: zip -r "${{ env.FILENAME }}" .
 
       - name: Upload repository to S3
-        run: aws s3 cp "${{ env.FILENAME }}" s3://django-indexer-testnet/
+        run: aws s3 cp "${{ env.FILENAME }}" "s3://${{ env.S3_BUCKET }}/"
 
       - name: Create CodeDeploy Deployment
         id: deploy
@@ -45,7 +48,7 @@ jobs:
             --application-name django-indexer-testnet \
             --deployment-group-name django-indexer-testnet-group \
             --deployment-config-name CodeDeployDefault.AllAtOnce \
-            --s3-location bucket=django-indexer-testnet,bundleType=zip,key=${{ env.FILENAME }}
+            --s3-location bucket=${{ env.S3_BUCKET }},bundleType=zip,key=${{ env.FILENAME }}
 
       # - name: Create zip of repository
       #   run: zip -r django-indexer-testnet.zip .

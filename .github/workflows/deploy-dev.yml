@@ -12,28 +12,37 @@ permissions:
   id-token: write # This is required for requesting the JWT
   contents: read # This is required for actions/checkout
 jobs:
-  AssumeRoleAndCallIdentity:
+  DeployToCodeDeploy:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone the repository
         uses: actions/checkout@v3
-      - name: configure aws credentials
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
           role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
-      # Hello from AWS: WhoAmI
-      - name: Sts GetCallerIdentity
-        run: |
-          aws sts get-caller-identity
 
-      # Step 3 - check the application-name and deployment group name
+      - name: Generate appspec.yml for dev
+        run: cp appspec-dev.yml appspec.yml
+
+      - name: Set filename variable
+        id: vars
+        run: echo "FILENAME=django-indexer-dev-$(date +'%Y-%m-%d_%H-%M-%S').zip" >> $GITHUB_ENV
+
+      - name: Create zip of repository
+        run: zip -r "${{ env.FILENAME }}" .
+
+      - name: Upload repository to S3
+        run: aws s3 cp "${{ env.FILENAME }}" s3://django-indexer-dev/
+
       - name: Create CodeDeploy Deployment
         id: deploy
         run: |
           aws deploy create-deployment \
-          --application-name django-indexer \
-          --deployment-group-name django-indexer-dev \
-          --deployment-config-name CodeDeployDefault.AllAtOnce \
-          --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
+            --application-name django-indexer \
+            --deployment-group-name django-indexer-dev-group \
+            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --s3-location bucket=django-indexer-dev,bundleType=zip,key=${{ env.FILENAME }}
