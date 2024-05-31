@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import datetime
 
+from django.conf import settings
 from django.core.cache import cache
 from near_lake_framework import near_primitives
 
@@ -49,8 +50,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     for shard in streamer_message.shards:
         for receipt_execution_outcome in shard.receipt_execution_outcomes:
             # we only want to proceed if it's a potlock tx and it succeeded.... (unreadable if statement?)
+            potlock_tla = (
+                "potlock.testnet"
+                if settings.ENVIRONMENT == "testnet"
+                else "potlock.near"
+            )
+            lists_contract = "lists." + potlock_tla
             if not receipt_execution_outcome.receipt.receiver_id.endswith(
-                "potlock.near"
+                potlock_tla
             ) or (
                 "SuccessReceiptId"
                 not in receipt_execution_outcome.execution_outcome.outcome.status
@@ -232,7 +239,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             logger.info(
                                 f"registrations incoming: {args_dict}, {action}"
                             )
-                            if receiver_id != "lists.potlock.near":
+                            if receiver_id != lists_contract:
                                 break
                             await handle_new_list_registration(
                                 args_dict, receiver_id, signer_id, receipt, status_obj
@@ -306,7 +313,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             "owner_remove_admins"
                         ):  # TODO: use update_admins event instead of method call to handle all cases
                             logger.info(f"attempting to remove admins....: {args_dict}")
-                            if receiver_id != "lists.potlock.near":
+                            if receiver_id != lists_contract:
                                 break
                             await handle_list_admin_removal(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id
@@ -315,14 +322,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
                         case "create_list":
                             logger.info(f"creating list... {args_dict}, {action}")
-                            if receiver_id != "lists.potlock.near":
+                            if receiver_id != lists_contract:
                                 break
                             await handle_new_list(signer_id, receiver_id, status_obj)
                             break
 
                         case "upvote":
                             logger.info(f"up voting... {args_dict}")
-                            if receiver_id != "lists.potlock.near":
+                            if receiver_id != lists_contract:
                                 break
                             await handle_list_upvote(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id
