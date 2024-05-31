@@ -46,6 +46,15 @@ class PotFactoryAdmin(admin.ModelAdmin):
             )
         return form
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 class PotForm(forms.ModelForm):
     class Meta:
@@ -73,12 +82,30 @@ class PotAdmin(admin.ModelAdmin):
             form.base_fields["admins"].queryset = obj.admins.all()
         return form
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(PotApplication)
 class PotApplicationAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "applicant", "status", "submitted_at")
     search_fields = ("pot__id", "applicant__id")
     list_filter = ("status", "submitted_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PotApplicationReview)
@@ -95,12 +122,30 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(PotPayout)
 class PotPayoutAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "recipient", "amount", "paid_at")
     search_fields = ("pot__id", "recipient__id")
     list_filter = ("paid_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PotPayoutChallenge)
@@ -109,9 +154,27 @@ class PotPayoutChallengeAdmin(admin.ModelAdmin):
     search_fields = ("challenger__id", "pot__id")
     list_filter = ("created_at",)
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(PotPayoutChallengeAdminResponse)
 class PotPayoutChallengeAdminResponseAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "admin", "created_at", "resolved")
     search_fields = ("admin__id", "challenge__id")
     list_filter = ("created_at", "resolved")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
