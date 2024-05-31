@@ -5,7 +5,7 @@ files:
     destination: /home/ec2-user/django-indexer-dev
 hooks:
   BeforeInstall:
-    - location: "echo 'Cleaning up destination directory' && rm -rf /home/ec2-user/django-indexer-dev/*"
+    - location: scripts/clean_destination_dev.sh
       timeout: 300
       runas: ec2-user
   AfterInstall:

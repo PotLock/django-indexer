@@ -5,6 +5,10 @@ files:
     destination: /home/ec2-user/django-indexer-testnet
 hooks:
   # # Install:
+  BeforeInstall:
+    - location: scripts/clean_destination_testnet.sh
+      timeout: 300
+      runas: ec2-user
   AfterInstall:
     - location: scripts/after_install_testnet.sh
       timeout: 300
