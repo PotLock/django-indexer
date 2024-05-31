@@ -50,14 +50,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     for shard in streamer_message.shards:
         for receipt_execution_outcome in shard.receipt_execution_outcomes:
             # we only want to proceed if it's a potlock tx and it succeeded.... (unreadable if statement?)
-            potlock_tla = (
-                "potlock.testnet"
-                if settings.ENVIRONMENT == "testnet"
-                else "potlock.near"
-            )
-            lists_contract = "lists." + potlock_tla
+            lists_contract = "lists." + settings.POTLOCK_TLA
             if not receipt_execution_outcome.receipt.receiver_id.endswith(
-                potlock_tla
+                settings.POTLOCK_TLA
             ) or (
                 "SuccessReceiptId"
                 not in receipt_execution_outcome.execution_outcome.outcome.status

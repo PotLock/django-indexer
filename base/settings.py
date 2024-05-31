@@ -52,6 +52,8 @@ REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
 COINGECKO_URL = (
