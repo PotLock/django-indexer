@@ -633,10 +633,11 @@ async def handle_new_donations(
     log_data: list,
 ):
     logger.info(f"new donation data: {data}, {receiverId}")
+    donate_contract_addr = "donate." + settings.POTLOCK_TLA
 
     if (
         actionName == "direct"
-    ) and receiverId == "donate.potlock.near":  # early pot donations followed similarly to direct donations i.e they returned result instead of events.
+    ) and receiverId == donate_contract_addr:  # early pot donations followed similarly to direct donations i.e they returned result instead of events.
         logger.info("calling donate contract...")
         # Handle direct donation
 

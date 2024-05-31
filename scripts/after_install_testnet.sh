@@ -1,22 +1,22 @@
 #!/bin/bash
-# TODO: deprecate this (move to _dev & _testnet files)
 # Log output to a specific file
-LOG_FILE="/home/ec2-user/django-indexer/logs/deploy.log"
+LOG_FILE="/home/ec2-user/django-indexer-testnet/logs/deploy.log"
 
 echo -e "\n\n" >> "$LOG_FILE"
 echo "=========================================" >> "$LOG_FILE"
-echo "Running after_install.sh at $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+echo "Running after_install_testnet.sh at $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 echo "=========================================" >> "$LOG_FILE"
 
 # Load env vars
+export PL_ENVIRONMENT=testnet
 source /home/ec2-user/.bashrc
 
 # Set correct ownership recursively for project directory
-sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer/
+sudo chown -R ec2-user:nginx /home/ec2-user/django-indexer-testnet/
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Corrected ownership to ec2-user:nginx" >> "$LOG_FILE"
 
 # Set the necessary permissions
-sudo chmod -R 775 /home/ec2-user/django-indexer/
+sudo chmod -R 775 /home/ec2-user/django-indexer-testnet/
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Set permissions to 775" >> "$LOG_FILE"
 
 # Restart nginx to apply any configuration changes
@@ -24,13 +24,13 @@ sudo systemctl restart nginx
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Restarted nginx" >> "$LOG_FILE"
 
 # Define the project directory
-PROJECT_DIR="/home/ec2-user/django-indexer"
+PROJECT_DIR="/home/ec2-user/django-indexer-testnet"
 
 # Navigate to the project directory
 cd "$PROJECT_DIR"
 
 # Source the specific poetry virtual environment
-source "/home/ec2-user/.cache/pypoetry/virtualenvs/django-indexer-Y-SQFfhb-py3.11/bin/activate"
+source "/home/ec2-user/.cache/pypoetry/virtualenvs/django-indexer-AhfQkQzj-py3.11/bin/activate"
 
 # Install dependencies using Poetry
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Installing dependencies with Poetry" >> "$LOG_FILE"
@@ -51,17 +51,17 @@ PENDING_MIGRATIONS=$(poetry run python manage.py showmigrations | grep "\[ \]" |
 
 if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
     echo "Migrations found; stopping services..." >> "$LOG_FILE"
-    sudo systemctl stop gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    sudo systemctl stop gunicorn-testnet celery-indexer-worker-testnet celery-beat-worker-testnet celery-beat-testnet
 
     echo 'Applying migrations...' >> "$LOG_FILE"
     poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
 
     echo 'Starting services...' >> "$LOG_FILE"
-    sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    sudo systemctl start gunicorn-testnet celery-indexer-worker-testnet celery-beat-worker-testnet celery-beat-testnet
 else
     echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
-    sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    sudo systemctl restart gunicorn-testnet celery-indexer-worker-testnet celery-beat-worker-testnet celery-beat-testnet
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install_testnet.sh completed" >> "$LOG_FILE"

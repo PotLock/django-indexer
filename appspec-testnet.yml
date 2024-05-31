@@ -1,0 +1,16 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ec2-user/django-indexer-testnet
+hooks:
+  # # Install:
+  AfterInstall:
+    - location: scripts/after_install_testnet.sh
+      timeout: 300
+      runas: ec2-user
+#   ApplicationStart:
+#     - location: scripts/application_start.sh
+#       timeout: 300
+#       runas: root
+# # ValidateService:

@@ -30,7 +30,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
-ALLOWED_HOSTS = ["ec2-100-27-57-47.compute-1.amazonaws.com", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "ec2-100-27-57-47.compute-1.amazonaws.com",
+    "127.0.0.1",
+    "dev.potlock.io",
+    "test-dev.potlock.io",
+]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
@@ -51,6 +56,8 @@ POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
 REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
+
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
@@ -213,6 +220,9 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 # print("LOG_LEVEL: ", LOG_LEVEL)
 
+# Set log group name based on environment
+log_group_name = f"django-indexer-{ENVIRONMENT}"
+
 # Setting up the logging configuration
 LOGGING = {
     "version": 1,
@@ -254,7 +264,7 @@ if ENVIRONMENT != "local":
     LOGGING["handlers"]["watchtower"] = {
         "class": "watchtower.CloudWatchLogHandler",
         "boto3_client": boto3_logs_client,
-        "log_group_name": "django-indexer",
+        "log_group_name": log_group_name,
         "formatter": "standard",
         "level": log_level,
     }
