@@ -30,7 +30,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
-ALLOWED_HOSTS = ["ec2-100-27-57-47.compute-1.amazonaws.com", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "ec2-100-27-57-47.compute-1.amazonaws.com",
+    "127.0.0.1",
+    "dev.potlock.io",
+    "test-dev.potlock.io",
+]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
