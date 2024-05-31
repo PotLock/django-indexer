@@ -28,45 +28,36 @@ jobs:
       - name: Generate appspec.yml for testnet
         run: cp appspec-testnet.yml appspec.yml
 
+      - name: Set filename variable
+        id: vars
+        run: echo "FILENAME=django-indexer-testnet-$(date +'%Y-%m-%d_%H-%M-%S').zip" >> $GITHUB_ENV
+
       - name: Create zip of repository
-        run: zip -r django-indexer-testnet.zip .
+        run: zip -r "${{ env.FILENAME }}" .
 
       - name: Upload repository to S3
-        run: aws s3 cp django-indexer-testnet.zip s3://django-indexer-testnet/
+        run: aws s3 cp "${{ env.FILENAME }}" s3://django-indexer-testnet/
 
       - name: Create CodeDeploy Deployment
         id: deploy
         run: |
           aws deploy create-deployment \
-          --application-name django-indexer-testnet \
-          --deployment-group-name django-indexer-testnet-group \
-          --deployment-config-name CodeDeployDefault.AllAtOnce \
-          --s3-location bucket=django-indexer-testnet,bundleType=zip,key=django-indexer-testnet.zip
+            --application-name django-indexer-testnet \
+            --deployment-group-name django-indexer-testnet-group \
+            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --s3-location bucket=django-indexer-testnet,bundleType=zip,key=${{ env.FILENAME }}
 
-# jobs:
-#   AssumeRoleAndCallIdentity:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Git clone the repository
-#         uses: actions/checkout@v3
-#       - name: configure aws credentials
-#         uses: aws-actions/configure-aws-credentials@v1.7.0
-#         with:
-#           role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
-#           role-session-name: GitHub_to_AWS_via_FederatedOIDC
-#           aws-region: ${{ env.AWS_REGION }}
-#       - name: Sts GetCallerIdentity
-#         run: |
-#           aws sts get-caller-identity
-#       - name: Generate appspec.yml for testnet
-#         run: cp appspec-testnet.yml appspec.yml
-#       - name: Verify appspec.yml content
-#         run: cat appspec.yml
-#       - name: Create CodeDeploy Deployment
-#         id: deploy
-#         run: |
-#           aws deploy create-deployment \
-#           --application-name django-indexer-testnet \
-#           --deployment-group-name django-indexer-testnet-group \
-#           --deployment-config-name CodeDeployDefault.AllAtOnce \
-#           --github-location repository=${{ github.repository }},commitId=${{ github.sha }}
+      # - name: Create zip of repository
+      #   run: zip -r django-indexer-testnet.zip .
+
+      # - name: Upload repository to S3
+      #   run: aws s3 cp django-indexer-testnet.zip s3://django-indexer-testnet/
+
+      # - name: Create CodeDeploy Deployment
+      #   id: deploy
+      #   run: |
+      #     aws deploy create-deployment \
+      #     --application-name django-indexer-testnet \
+      #     --deployment-group-name django-indexer-testnet-group \
+      #     --deployment-config-name CodeDeployDefault.AllAtOnce \
+      #     --s3-location bucket=django-indexer-testnet,bundleType=zip,key=django-indexer-testnet.zip
