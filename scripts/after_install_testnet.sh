@@ -2,9 +2,6 @@
 # Log output to a specific file
 LOG_FILE="/home/ec2-user/django-indexer-testnet/logs/deploy.log"
 
-# # print placeholder
-# echo -e "\n THIS IS A PLACEHOLDER \n" >> "$LOG_FILE"
-
 echo -e "\n\n" >> "$LOG_FILE"
 echo "=========================================" >> "$LOG_FILE"
 echo "Running after_install_testnet.sh at $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
@@ -22,11 +19,9 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Corrected ownership to ec2-user:nginx" >> "
 sudo chmod -R 775 /home/ec2-user/django-indexer-testnet/
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Set permissions to 775" >> "$LOG_FILE"
 
-# TODO: ADD BELOW BACK IN
-
-# # Restart nginx to apply any configuration changes
-# sudo systemctl restart nginx
-# echo "$(date '+%Y-%m-%d %H:%M:%S') - Restarted nginx" >> "$LOG_FILE"
+# Restart nginx to apply any configuration changes
+sudo systemctl restart nginx
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Restarted nginx" >> "$LOG_FILE"
 
 # Define the project directory
 PROJECT_DIR="/home/ec2-user/django-indexer-testnet"

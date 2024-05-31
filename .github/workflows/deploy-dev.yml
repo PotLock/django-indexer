@@ -28,15 +28,18 @@ jobs:
       - name: Generate appspec.yml for dev
         run: cp appspec-dev.yml appspec.yml
 
-      - name: Set filename variable
+      - name: Set environment variables
         id: vars
-        run: echo "FILENAME=django-indexer-dev-$(date +'%Y-%m-%d_%H-%M-%S').zip" >> $GITHUB_ENV
+        run: |
+          echo "DATETIME=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+          echo "FILENAME=django-indexer-dev-${DATETIME}.zip" >> $GITHUB_ENV
+          echo "S3_BUCKET=django-indexer-dev" >> $GITHUB_ENV
 
       - name: Create zip of repository
         run: zip -r "${{ env.FILENAME }}" .
 
       - name: Upload repository to S3
-        run: aws s3 cp "${{ env.FILENAME }}" s3://django-indexer-dev/
+        run: aws s3 cp "${{ env.FILENAME }}" "s3://${{ env.S3_BUCKET }}/"
 
       - name: Create CodeDeploy Deployment
         id: deploy
@@ -45,4 +48,4 @@ jobs:
             --application-name django-indexer \
             --deployment-group-name django-indexer-dev-group \
             --deployment-config-name CodeDeployDefault.AllAtOnce \
-            --s3-location bucket=django-indexer-dev,bundleType=zip,key=${{ env.FILENAME }}
+            --s3-location bucket=${{ env.S3_BUCKET }},bundleType=zip,key=${{ env.FILENAME }}
