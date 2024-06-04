@@ -34,6 +34,7 @@ source "/home/ec2-user/.cache/pypoetry/virtualenvs/django-indexer-AhfQkQzj-py3.1
 
 # Install dependencies using Poetry
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Installing dependencies with Poetry" >> "$LOG_FILE"
+poetry lock --no-update >> "$LOG_FILE"
 poetry install >> "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Dependencies installed" >> "$LOG_FILE"
 
