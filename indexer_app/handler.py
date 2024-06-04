@@ -7,10 +7,7 @@ from django.core.cache import cache
 from near_lake_framework import near_primitives
 
 from base.utils import convert_ns_to_utc
-from pots.utils import (
-    match_pot_factory_version_pattern,
-    match_pot_subaccount_version_pattern,
-)
+from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import logger
 from .utils import (
@@ -129,14 +126,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
                     match method_name:
                         case "new":
-                            if match_pot_factory_version_pattern(receipt.receiver_id):
+                            if match_pot_factory_pattern(receipt.receiver_id):
                                 logger.info(f"matched for factory pattern: {args_dict}")
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, created_at
                                 )
-                            elif match_pot_subaccount_version_pattern(
-                                receipt.receiver_id
-                            ):
+                            elif match_pot_subaccount_pattern(receipt.receiver_id):
                                 logger.info(
                                     f"new pot deployment: {args_dict}, {action}"
                                 )
