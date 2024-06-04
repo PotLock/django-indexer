@@ -2,9 +2,12 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/django-indexer
+    destination: /home/ec2-user/django-indexer-dev
 hooks:
-  # # Install:
+  # BeforeInstall:
+  #   - location: scripts/clean_destination_dev.sh
+  #     timeout: 300
+  #     runas: ec2-user
   AfterInstall:
     - location: scripts/after_install_dev.sh
       timeout: 300
