@@ -42,7 +42,10 @@ async def handle_new_pot(
         logger.info("new pot deployment process... upsert accounts,")
 
         # Upsert accounts
-        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        owner_id = (
+            data.get("owner") or signerId
+        )  # owner is optional; if not provided, owner will be transaction signer (this logic is implemented by Pot contract's "new" method)
+        owner, _ = await Account.objects.aget_or_create(id=owner_id)
         signer, _ = await Account.objects.aget_or_create(id=signerId)
         receiver, _ = await Account.objects.aget_or_create(id=receiverId)
 
@@ -51,13 +54,13 @@ async def handle_new_pot(
             chef, _ = await Account.objects.aget_or_create(id=data["chef"])
 
         # Create Pot object
-        logger.info("create pot....")
+        logger.info(f"creating pot with owner {owner_id}....")
         pot_defaults = {
             "pot_factory_id": predecessorId,
             "deployer": signer,
             "deployed_at": created_at,
             "source_metadata": data["source_metadata"],
-            "owner_id": data["owner"],
+            "owner_id": owner_id,
             "chef_id": data.get("chef"),
             "name": data["pot_name"],
             "description": data["pot_description"],

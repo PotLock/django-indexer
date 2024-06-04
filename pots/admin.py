@@ -22,7 +22,11 @@ class PotFactoryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(PotFactoryForm, self).__init__(*args, **kwargs)
         # Ensure self.instance is available before accessing it
-        if self.instance.pk:
+        if (
+            self.instance.pk
+            and "admins" in self.fields
+            and "whitelisted_deployers" in self.fields
+        ):
             # Set the queryset for the admins field to only include relevant accounts
             self.fields["admins"].queryset = self.instance.admins.all()
             # Set the queryset for the whitelisted_deployers field to only include relevant accounts
@@ -40,10 +44,13 @@ class PotFactoryAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(PotFactoryAdmin, self).get_form(request, obj, **kwargs)
         if obj:
-            form.base_fields["admins"].queryset = obj.admins.all()
-            form.base_fields["whitelisted_deployers"].queryset = (
-                obj.whitelisted_deployers.all()
-            )
+            try:
+                form.base_fields["admins"].queryset = obj.admins.all()
+                form.base_fields["whitelisted_deployers"].queryset = (
+                    obj.whitelisted_deployers.all()
+                )
+            except KeyError:
+                pass
         return form
 
     def has_add_permission(self, request):
@@ -64,7 +71,7 @@ class PotForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(PotForm, self).__init__(*args, **kwargs)
         # Ensure self.instance is available before accessing it
-        if self.instance.pk:
+        if self.instance.pk and "admins" in self.fields:
             # Set the queryset for the admins field to only include relevant accounts
             self.fields["admins"].queryset = self.instance.admins.all()
 
@@ -79,7 +86,10 @@ class PotAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(PotAdmin, self).get_form(request, obj, **kwargs)
         if obj:
-            form.base_fields["admins"].queryset = obj.admins.all()
+            try:
+                form.base_fields["admins"].queryset = obj.admins.all()
+            except KeyError:
+                pass
         return form
 
     def has_add_permission(self, request):

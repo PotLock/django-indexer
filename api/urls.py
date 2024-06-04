@@ -1,4 +1,9 @@
 from django.urls import path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 from accounts.api import AccountsAPI, DonorsAPI
 from base.api import StatsAPI
@@ -6,6 +11,16 @@ from lists.api import ListsAPI
 from pots.api import PotsAPI
 
 urlpatterns = [
+    # schema
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path(
+        "schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"
+    ),
     # accounts
     path("v1/accounts", AccountsAPI.as_view(), name="accounts_api"),
     path(
