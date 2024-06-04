@@ -3,10 +3,10 @@
   - [Steps to run:](#steps-to-run)
     - [Env vars example](#env-vars-example)
   - [API Basics](#api-basics)
-      - [Base URL](#base-url)
-      - [Authorization](#authorization)
-      - [Error Responses](#error-responses)
-      - [Pagination](#pagination)
+    - [Base URL](#base-url)
+    - [Authorization](#authorization)
+    - [Error Responses](#error-responses)
+    - [Pagination](#pagination)
   - [API Endpoints](#api-endpoints)
     - [`Account` endpoints](#account-endpoints)
       - [✅ Get all accounts: `GET /accounts` (paginated)](#-get-all-accounts-get-accounts-paginated)
@@ -52,6 +52,7 @@
   - If for some reason this doesn't kill any active celery tasks, run `ps auxww | grep 'celery' | grep -v grep` and kill resulting PIDs
 
 Extra commands that might come in useful:
+
 - Purge celery queue (`celery -A base purge`)
 
 ### Env vars example
@@ -77,13 +78,14 @@ export PL_SENTRY_DSN=
 
 #### Base URL
 
-`/api/v1/`
+**dev (mainnet):** `https://dev.potlock.io/api/v1/`
+**testnet:** `https://test-dev.potlock.io/api/v1/`
 
 #### Authorization
 
 This is a public, read-only API and as such does not currently implement authentication or authorization.
 
-Rate limits of (FILL THIS IN) are enforced to ensure service for all users.
+Rate limits of 100 requests/min are enforced to ensure service for all users.
 
 #### Error Responses
 

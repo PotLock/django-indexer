@@ -30,13 +30,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # TODO: update before prod release
 SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
 
-ALLOWED_HOSTS = ["ec2-52-23-183-168.compute-1.amazonaws.com", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "ec2-100-27-57-47.compute-1.amazonaws.com",
+    "127.0.0.1",
+    "dev.potlock.io",
+    "test-dev.potlock.io",
+]
 
 # Env vars
 AWS_ACCESS_KEY_ID = os.environ.get("PL_AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("PL_AWS_SECRET_ACCESS_KEY")
 # CACHALOT_ENABLED = strtobool(os.environ.get("PL_CACHALOT_ENABLED", "False"))
 # CACHALOT_TIMEOUT = os.environ.get("PL_CACHALOT_TIMEOUT")
+COINGECKO_API_KEY = os.environ.get("PL_COINGECKO_API_KEY")
 DEBUG = strtobool(os.environ.get("PL_DEBUG", "False"))
 ENVIRONMENT = os.environ.get("PL_ENVIRONMENT", "local")
 LOG_LEVEL = os.getenv("PL_LOG_LEVEL", "INFO").upper()
@@ -51,7 +57,17 @@ REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
+
+COINGECKO_URL = (
+    "https://pro-api.coingecko.com/api/v3"
+    if COINGECKO_API_KEY
+    else "https://api.coingecko.com/api/v3"
+)
+# Number of hours around a given timestamp for querying historical prices
+HISTORICAL_PRICE_QUERY_HOURS = 24
 
 # Application definition
 
@@ -63,6 +79,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "corsheaders",
     # "cachalot",
     "celery",
     "api",
@@ -80,10 +97,19 @@ DEFAULT_PAGE_SIZE = 30
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
     "PAGE_SIZE": DEFAULT_PAGE_SIZE,
+    "DEFAULT_THROTTLE_CLASSES": [
+        # "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # "user": "100/day",
+        "anon": "100/minute",
+    },
 }
 
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -113,6 +139,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "base.wsgi.application"
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+
 # REDIS / CACHE CONFIGS
 
 REDIS_SCHEMA = (
@@ -124,9 +154,13 @@ DJANGO_CACHE_URL = f"{REDIS_BASE_URL}/2"
 # Append SSL parameters as query parameters in the URL
 SSL_QUERY = "?ssl_cert_reqs=CERT_NONE"  # TODO: UPDATE ACCORDING TO ENV (prod should require cert)
 
-CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0{SSL_QUERY}"
+CELERY_BROKER_URL = f"{REDIS_BASE_URL}/0"
+CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/1"
 
-CELERY_RESULT_BACKEND = f"{REDIS_BASE_URL}/1{SSL_QUERY}"
+
+if ENVIRONMENT != "local":
+    CELERY_BROKER_URL += SSL_QUERY
+    CELERY_RESULT_BACKEND += SSL_QUERY
 
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {
@@ -190,24 +224,25 @@ CACHALOT_DATABASES = {"default"}
 # LOGGING
 
 # Setting the log level from an environment variable
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 # print("LOG_LEVEL: ", LOG_LEVEL)
+
+# Set log group name based on environment
+log_group_name = f"django-indexer-{ENVIRONMENT}"
 
 # Setting up the logging configuration
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        },
+        "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
     "handlers": {
         "console": {
             "level": log_level,
             "class": "logging.StreamHandler",
-            "formatter": "standard"
+            "formatter": "standard",
         },
     },
     "loggers": {
@@ -221,11 +256,13 @@ LOGGING = {
             "level": log_level,
             "propagate": False,
         },
-        "": {  # root logger
+        "jobs": {
             "handlers": ["console"],
-            "level": log_level
-        }
-    }
+            "level": log_level,
+            "propagate": False,
+        },
+        "": {"handlers": ["console"], "level": log_level},  # root logger
+    },
 }
 
 # Adding Watchtower logging handler for non-local environments
@@ -235,72 +272,17 @@ if ENVIRONMENT != "local":
     LOGGING["handlers"]["watchtower"] = {
         "class": "watchtower.CloudWatchLogHandler",
         "boto3_client": boto3_logs_client,
-        "log_group_name": "django-indexer",
+        "log_group_name": log_group_name,
         "formatter": "standard",
         "level": log_level,
     }
     LOGGING["loggers"][""]["handlers"].append("watchtower")
     LOGGING["loggers"]["django"]["handlers"].append("watchtower")
     LOGGING["loggers"]["indexer"]["handlers"].append("watchtower")
-
-# log_level = getattr(logging, LOG_LEVEL, logging.INFO)
-# print("LOG_LEVEL: ", LOG_LEVEL)
-# # print("log_level: ", log_level)
-
-# if ENVIRONMENT != "local":
-#     AWS_REGION_NAME = "us-east-1"
-#     boto3_logs_client = boto3.client("logs", region_name=AWS_REGION_NAME)
+    LOGGING["loggers"]["jobs"]["handlers"].append("watchtower")
 
 
-# LOGGING = {
-#     "version": 1,
-#     "disable_existing_loggers": False,
-#     "root": {
-#         "level": log_level,
-#         # Adding the watchtower handler here causes all loggers in the project that
-#         # have propagate=True (the default) to send messages to watchtower. If you
-#         # wish to send only from specific loggers instead, remove "watchtower" here
-#         # and configure individual loggers below.
-#         # "handlers": ["watchtower", "console"],
-#         "handlers": ["console"],
-#     },
-#     "handlers": {
-#         "console": {
-#             "class": "logging.StreamHandler",
-#         },
-#         # "watchtower": {
-#         #     "class": "watchtower.CloudWatchLogHandler",
-#         #     "boto3_client": boto3_logs_client,
-#         #     "log_group_name": "django-indexer",
-#         #     # Decrease the verbosity level here to send only those logs to watchtower,
-#         #     # but still see more verbose logs in the console. See the watchtower
-#         #     # documentation for other parameters that can be set here.
-#         #     "level": log_level,
-#         # },
-#     },
-#     "loggers": {
-#         # In the debug server (`manage.py runserver`), several Django system loggers cause
-#         # deadlocks when using threading in the logging handler, and are not supported by
-#         # watchtower. This limitation does not apply when running on production WSGI servers
-#         # (gunicorn, uwsgi, etc.), so we recommend that you set `propagate=True` below in your
-#         # production-specific Django settings file to receive Django system logs in CloudWatch.
-#         "django": {"level": log_level, "handlers": ["console"], "propagate": False}
-#         # Add any other logger-specific configuration here.
-#     },
-# }
-
-# if ENVIRONMENT != "local":
-#     LOGGING["handlers"]["watchtower"] = {
-#         "class": "watchtower.CloudWatchLogHandler",
-#         "boto3_client": boto3_logs_client,
-#         "log_group_name": "django-indexer",
-#         # Decrease the verbosity level here to send only those logs to watchtower,
-#         # but still see more verbose logs in the console. See the watchtower
-#         # documentation for other parameters that can be set here.
-#         "level": log_level,
-#     }
-
-#     LOGGING["root"]["handlers"].append("watchtower")
+## SENTRY CONFIG
 
 sentry_sdk.init(
     environment=ENVIRONMENT,
