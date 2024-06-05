@@ -5,10 +5,22 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-from accounts.api import AccountsAPI, DonorsAPI
+from accounts.api import (
+    AccountActivePotsAPI,
+    AccountDetailAPI,
+    AccountsListAPI,
+    DonorsAPI,
+)
 from base.api import StatsAPI
-from lists.api import ListsAPI
-from pots.api import PotsAPI
+from lists.api import ListDetailAPI, ListRegistrationsAPI, ListsListAPI
+from pots.api import (
+    PotApplicationsAPI,
+    PotDetailAPI,
+    PotDonationsAPI,
+    PotPayoutsAPI,
+    PotsListAPI,
+    PotSponsorsAPI,
+)
 
 urlpatterns = [
     # schema
@@ -22,32 +34,47 @@ urlpatterns = [
         "schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"
     ),
     # accounts
-    path("v1/accounts", AccountsAPI.as_view(), name="accounts_api"),
+    path("v1/accounts", AccountsListAPI.as_view(), name="accounts_api"),
     path(
-        "v1/accounts/<str:account_id>", AccountsAPI.as_view(), name="accounts_api_by_id"
+        "v1/accounts/<str:account_id>",
+        AccountDetailAPI.as_view(),
+        name="accounts_api_by_id",
     ),
     path(
-        "v1/accounts/<str:account_id>/<str:action>",  # e.g. /accounts/lachlan.near/active_pots - consider putting this under /pots instead of /accounts since Pots are the resource being fetched, even though the action is being performed on an Account
-        AccountsAPI.as_view(),
-        name="accounts_api_by_id_with_action",
+        "v1/accounts/<str:account_id>/active_pots",
+        AccountActivePotsAPI.as_view(),
+        name="accounts_api_by_id_active_pots",
     ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
     # lists
-    path("v1/lists", ListsAPI.as_view(), name="lists_api"),
-    path("v1/lists/<int:list_id>", ListsAPI.as_view(), name="lists_api_by_id"),
+    path("v1/lists", ListsListAPI.as_view(), name="lists_api"),
+    path("v1/lists/<int:list_id>", ListDetailAPI.as_view(), name="lists_api_by_id"),
     path(
-        "v1/lists/<int:list_id>/<str:action>",  # e.g. /lists/1/registrations
-        ListsAPI.as_view(),
-        name="lists_api_by_id_with_action",
+        "v1/lists/<int:list_id>/registrations",
+        ListRegistrationsAPI.as_view(),
+        name="lists_api_by_id_registrations",
     ),
     # pots
-    path("v1/pots", PotsAPI.as_view(), name="pots_api"),
-    path("v1/pots/<str:pot_id>/", PotsAPI.as_view(), name="pots_api_by_id"),
+    path("v1/pots", PotsListAPI.as_view(), name="pots_api"),
+    path("v1/pots/<str:pot_id>/", PotDetailAPI.as_view(), name="pots_api_by_id"),
     path(
-        "v1/pots/<str:pot_id>/<str:action>",
-        PotsAPI.as_view(),
-        name="pots_api_by_id_with_action",
+        "v1/pots/<str:pot_id>/applications",
+        PotApplicationsAPI.as_view(),
+        name="pots_applications_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/donations",
+        PotDonationsAPI.as_view(),
+        name="pots_donations_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/sponsors",
+        PotSponsorsAPI.as_view(),
+        name="pots_sponsors_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/payouts", PotPayoutsAPI.as_view(), name="pots_payouts_api"
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),

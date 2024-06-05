@@ -2,79 +2,237 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
-from accounts.serializers import AccountSerializer
+from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from donations.models import Donation
-from donations.serializers import DonationSerializer
+from donations.serializers import SIMPLE_DONATION_EXAMPLE, DonationSerializer
 
 from .models import Pot, PotApplication, PotApplicationStatus
-from .serializers import PotApplicationSerializer, PotPayoutSerializer, PotSerializer
+from .serializers import (
+    SIMPLE_PAYOUT_EXAMPLE,
+    SIMPLE_POT_APPLICATION_EXAMPLE,
+    SIMPLE_POT_EXAMPLE,
+    PotApplicationSerializer,
+    PotPayoutSerializer,
+    PotSerializer,
+)
 
 
-class PotsAPI(APIView, LimitOffsetPagination):
-    def dispatch(self, request, *args, **kwargs):
-        return super(PotsAPI, self).dispatch(request, *args, **kwargs)
+@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
+class PotsListAPI(APIView, LimitOffsetPagination):
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(
+                response=PotSerializer(many=True),
+                description="Returns a list of pots",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pots",
+                        value=SIMPLE_POT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+        }
+    )
     def get(self, request: Request, *args, **kwargs):
-        pot_id = kwargs.get("pot_id", None)
-        action = kwargs.get("action", None)
-        if pot_id:
-            # Request pertaining to a specific pot_id
-            try:
-                pot = Pot.objects.get(id=pot_id)
-            except Pot.DoesNotExist:
-                return Response(
-                    {"message": f"Pot with ID {pot_id} not found."}, status=404
-                )
-            if action:
-                # Handle action if present; only valid option currently is "applications"
-                if action == "applications":
-                    # Return applications for pot_id
-                    applications = pot.applications.all()
-                    results = self.paginate_queryset(applications, request, view=self)
-                    serializer = PotApplicationSerializer(results, many=True)
-                    return self.get_paginated_response(serializer.data)
-                elif action == "donations":
-                    # Return donations for pot_id
-                    donations = pot.donations.all()
-                    results = self.paginate_queryset(donations, request, view=self)
-                    serializer = DonationSerializer(results, many=True)
-                    return self.get_paginated_response(serializer.data)
-                elif action == "sponsors":
-                    # Return sponsors for pot_id
-                    sponsor_ids = (
-                        Donation.objects.filter(pot=pot, matching_pool=True)
-                        .values_list("donor", flat=True)
-                        .distinct()
-                    )
-                    sponsors = Account.objects.filter(id__in=sponsor_ids)
-                    results = self.paginate_queryset(sponsors, request, view=self)
-                    serializer = AccountSerializer(results, many=True)
-                    return self.get_paginated_response(serializer.data)
-                elif action == "payouts":
-                    # Return payouts for pot_id
-                    payouts = pot.payouts.all()
-                    results = self.paginate_queryset(payouts, request, view=self)
-                    serializer = PotPayoutSerializer(results, many=True)
-                    return self.get_paginated_response(serializer.data)
-                else:
-                    return Response(
-                        {"error": f"Invalid action: {action}"},
-                        status=400,
-                    )
-            else:
-                # Return pot
-                serializer = PotSerializer(pot)
-                return Response(serializer.data)
-        else:
-            # Return all pots
-            pots = Pot.objects.all()
-            results = self.paginate_queryset(pots, request, view=self)
-            serializer = PotSerializer(results, many=True)
-            return self.get_paginated_response(serializer.data)
+        pots = Pot.objects.all()
+        results = self.paginate_queryset(pots, request, view=self)
+        serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotDetailAPI(APIView):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PotSerializer,
+                description="Returns pot details",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple pot example",
+                        description="Example response for pot detail",
+                        value=SIMPLE_POT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Pot not found"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        pot_id = kwargs.get("pot_id")
+        try:
+            pot = Pot.objects.get(id=pot_id)
+        except Pot.DoesNotExist:
+            return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
+        serializer = PotSerializer(pot)
+        return Response(serializer.data)
+
+
+class PotApplicationsAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PotApplicationSerializer(many=True),
+                description="Returns applications for the pot",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pot applications",
+                        value=SIMPLE_POT_APPLICATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Pot not found"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        pot_id = kwargs.get("pot_id")
+        try:
+            pot = Pot.objects.get(id=pot_id)
+        except Pot.DoesNotExist:
+            return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
+
+        applications = pot.applications.all()
+        results = self.paginate_queryset(applications, request, view=self)
+        serializer = PotApplicationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotDonationsAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=DonationSerializer(many=True),
+                description="Returns donations for the pot",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for donations",
+                        value=SIMPLE_DONATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Pot not found"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        pot_id = kwargs.get("pot_id")
+        try:
+            pot = Pot.objects.get(id=pot_id)
+        except Pot.DoesNotExist:
+            return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
+
+        donations = pot.donations.all()
+        results = self.paginate_queryset(donations, request, view=self)
+        serializer = DonationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotSponsorsAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=AccountSerializer(many=True),
+                description="Returns sponsors for the pot",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="user.near",
+                        description="Example response for sponsors",
+                        value=SIMPLE_ACCOUNT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Pot not found"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        pot_id = kwargs.get("pot_id")
+        try:
+            pot = Pot.objects.get(id=pot_id)
+        except Pot.DoesNotExist:
+            return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
+
+        sponsor_ids = (
+            Donation.objects.filter(pot=pot, matching_pool=True)
+            .values_list("donor", flat=True)
+            .distinct()
+        )
+        sponsors = Account.objects.filter(id__in=sponsor_ids)
+        results = self.paginate_queryset(sponsors, request, view=self)
+        serializer = AccountSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotPayoutsAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PotPayoutSerializer(many=True),
+                description="Returns payouts for the pot",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for payouts",
+                        value=SIMPLE_PAYOUT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Pot not found"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        pot_id = kwargs.get("pot_id")
+        try:
+            pot = Pot.objects.get(id=pot_id)
+        except Pot.DoesNotExist:
+            return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
+
+        payouts = pot.payouts.all()
+        results = self.paginate_queryset(payouts, request, view=self)
+        serializer = PotPayoutSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
