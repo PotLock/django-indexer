@@ -11,6 +11,7 @@ class AccountAdmin(admin.ModelAdmin):
         "total_donations_out_usd",
         "total_matching_pool_allocations_usd",
         "donors_count",
+        "near_social_profile_data",
     )
     search_fields = ("id",)  # Allow searching by account address
     list_filter = (
