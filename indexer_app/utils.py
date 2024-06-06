@@ -40,7 +40,8 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
             account = await Account.objects.filter(id=signer_id).first()
             if account:
                 logger.info(f"updating social profile for {signer_id}")
-                account.fetch_near_social_profile_data()
+                await account.fetch_near_social_profile_data_async()
+                # account.fetch_near_social_profile_data()
         except Exception as e:
             logger.error(f"Error in handle_social_profile_update: {e}")
 

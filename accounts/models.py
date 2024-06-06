@@ -1,4 +1,5 @@
 import requests
+from asgiref.sync import sync_to_async
 from django import db
 from django.conf import settings
 from django.db import models
@@ -48,6 +49,10 @@ class Account(models.Model):
         null=True,
         help_text=_("NEAR social data contained under 'profile' key."),
     )
+
+    async def fetch_near_social_profile_data_async(self):
+        fetch_profile_data = sync_to_async(self.fetch_near_social_profile_data)
+        await fetch_profile_data()
 
     def fetch_near_social_profile_data(self, should_save=True):
         # Fetch social profile data from NEAR blockchain
