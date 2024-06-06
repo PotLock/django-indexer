@@ -59,6 +59,16 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
 
+NEAR_SOCIAL_CONTRACT_ADDRESS = (
+    "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
+)
+
+FASTNEAR_RPC_URL = (
+    "https://rpc.web4.testnet.page"
+    if ENVIRONMENT == "testnet"
+    else "https://rpc.web4.near.page"
+)
+
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
 COINGECKO_URL = (

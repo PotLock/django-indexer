@@ -26,6 +26,7 @@ from .utils import (
     handle_pot_application,
     handle_pot_application_status_change,
     handle_set_payouts,
+    handle_social_profile_update,
     handle_transfer_payout,
 )
 
@@ -46,19 +47,21 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
     for shard in streamer_message.shards:
         for receipt_execution_outcome in shard.receipt_execution_outcomes:
-            # we only want to proceed if it's a potlock tx and it succeeded.... (unreadable if statement?)
-            lists_contract = "lists." + settings.POTLOCK_TLA
-            if not receipt_execution_outcome.receipt.receiver_id.endswith(
-                settings.POTLOCK_TLA
-            ) or (
+            # we only want to proceed if the tx succeeded
+            if (
                 "SuccessReceiptId"
                 not in receipt_execution_outcome.execution_outcome.outcome.status
                 and "SuccessValue"
                 not in receipt_execution_outcome.execution_outcome.outcome.status
             ):
                 continue
+            receiver_id = receipt_execution_outcome.receipt.receiver_id
+            if (
+                receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
+                and not receiver_id.endswith(settings.POTLOCK_TLA)
+            ):
+                continue
             # 1. HANDLE LOGS
-
             log_data = []
 
             for log_index, log in enumerate(
@@ -89,6 +92,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     # consider logging failures to logging service; for now, just skip
             #     print("here we are...")
             #     continue
+            lists_contract = "lists." + settings.POTLOCK_TLA
 
             for index, action in enumerate(
                 receipt_execution_outcome.receipt.receipt["Action"]["actions"]
@@ -125,6 +129,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         args_dict = {}
 
                     match method_name:
+                        case "set":  # handle near social profile data updates
+                            if receiver_id == settings.NEAR_SOCIAL_CONTRACT_ADDRESS:
+                                logger.info(f"setting profile data: {args_dict}")
+                                await handle_social_profile_update(
+                                    args_dict, receiver_id, signer_id
+                                )
                         case "new":
                             if match_pot_factory_pattern(receipt.receiver_id):
                                 logger.info(f"matched for factory pattern: {args_dict}")

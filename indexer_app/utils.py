@@ -1,6 +1,7 @@
 import base64
 import decimal
 import json
+from ast import arg
 from datetime import datetime
 
 import requests
@@ -27,6 +28,23 @@ from pots.models import (
 from .logging import logger
 
 # GECKO_URL = "https://api.coingecko.com/api/v3"  # TODO: move to settings
+
+
+async def handle_social_profile_update(args_dict, receiver_id, signer_id):
+    logger.info(f"handling social profile update for {signer_id}")
+    if (
+        "data" in args_dict
+        and signer_id in args_dict["data"]
+        and "profile" in args_dict["data"][signer_id]
+    ):
+        try:
+            # only proceed if this account already exists in db
+            account = await Account.objects.filter(id=signer_id).first()
+            if account:
+                logger.info(f"updating social profile for {signer_id}")
+                account.fetch_near_social_profile_data()
+        except Exception as e:
+            logger.error(f"Error in handle_social_profile_update: {e}")
 
 
 async def handle_new_pot(
