@@ -1,7 +1,5 @@
 import base64
-import decimal
 import json
-from ast import arg
 from datetime import datetime
 
 import requests
