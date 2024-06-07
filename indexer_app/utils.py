@@ -37,7 +37,8 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
     ):
         try:
             # only proceed if this account already exists in db
-            account = await Account.objects.filter(id=signer_id).first()
+            account = await Account.objects.filter(id=signer_id).afirst()
+            logger.info(f"account: {account}")
             if account:
                 logger.info(f"updating social profile for {signer_id}")
                 await account.fetch_near_social_profile_data_async()
