@@ -78,7 +78,7 @@ class Account(models.Model):
                             contract_id = profile_data[image_type]["nft"]["contractId"]
                             token_id = profile_data[image_type]["nft"]["tokenId"]
                             # get base_uri
-                            url = f"https://rpc.web4.near.page/account/{contract_id}/view/nft_metadata"
+                            url = f"{settings.FASTNEAR_RPC_URL}/account/{contract_id}/view/nft_metadata"
                             response = requests.get(url)
                             if response.status_code == 200:
                                 metadata = response.json()
@@ -93,7 +93,7 @@ class Account(models.Model):
                                     f"Request for NFT metadata failed ({response.status_code}) with message: {response.text}"
                                 )
                             # get token metadata
-                            url = f"https://rpc.web4.near.page/account/{contract_id}/view/nft_token"
+                            url = f"{settings.FASTNEAR_RPC_URL}/account/{contract_id}/view/nft_token"
                             json_data = {"token_id": token_id}
                             response = requests.post(
                                 url, json=json_data
