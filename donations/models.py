@@ -5,6 +5,7 @@ import requests
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
+from django.forms.models import model_to_dict
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
@@ -175,6 +176,9 @@ class Donation(models.Model):
                 name="unique_on_chain_id_with_pot",
             ),
         ]
+
+    def to_dict(self):
+        return model_to_dict(self)
 
     def get_ft_token(self):
         token, created = Token.objects.get_or_create(

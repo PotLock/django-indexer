@@ -5,6 +5,7 @@ from datetime import datetime
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.forms.models import model_to_dict
 from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
@@ -682,6 +683,7 @@ async def handle_new_donations(
             return
         # Handle non-direct donation
         donation_data = json.loads(base64.b64decode(result).decode("utf-8"))
+        logger.info(f"Donation data: {donation_data}")
         net_amount = int(donation_data["net_amount"])
 
     donated_at = datetime.fromtimestamp(
@@ -784,17 +786,19 @@ async def handle_new_donations(
             "referrer_fee": donation_data.get("referrer_fee"),
             "tx_hash": receipt_obj.receipt_id,
         }
-        logger.info(f"default donation data: {default_data}")
 
         if actionName != "direct":
             logger.info("selecting pot to make public donation update")
             pot = await Pot.objects.aget(id=receiverId)
             default_data["pot"] = pot
 
+        logger.info(f"default donation data: {default_data}")
+
         donation, donation_created = await Donation.objects.aupdate_or_create(
             on_chain_id=donation_data["id"], defaults={}, create_defaults=default_data
         )
         logger.info(f"Created donation? {donation_created}")
+        logger.info(f"donation: {donation.to_dict()}")
 
         # fetch USD prices
         await donation.fetch_usd_prices_async()  # might not need to await this?
