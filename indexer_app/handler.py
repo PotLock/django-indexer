@@ -183,6 +183,23 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
+                        case (
+                            "handle_protocol_fee_callback"
+                        ):  # NB: It's important that this comes before the donate case
+                            logger.info(
+                                f"donations to pool incoming: {args_dict}, {receipt}, {receipt_execution_outcome}"
+                            )
+                            await handle_new_donations(
+                                args_dict,
+                                receiver_id,
+                                signer_id,
+                                "pot",
+                                receipt,
+                                status_obj,
+                                log_data,
+                            )
+                            break
+
                         case "donate":  # TODO: donate that produces result
                             logger.info(
                                 f"switching bazooka to knifee works!! donate his blood: {args_dict}, {receipt}, {action}, {log_data}"
@@ -201,21 +218,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                     status_obj,
                                     log_data,
                                 )
-                            break
-
-                        case "handle_protocol_fee_callback":
-                            logger.info(
-                                f"donations to pool incoming: {args_dict}, {receipt}, {receipt_execution_outcome}"
-                            )
-                            await handle_new_donations(
-                                args_dict,
-                                receiver_id,
-                                signer_id,
-                                "pot",
-                                receipt,
-                                status_obj,
-                                log_data,
-                            )
                             break
 
                         case "transfer_funds_callback":
