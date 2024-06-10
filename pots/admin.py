@@ -132,6 +132,7 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     )
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
+    autocomplete_fields = ["application"]
 
     def application_applicant_id(self, obj):
         return obj.application.applicant.id
