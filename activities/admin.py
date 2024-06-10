@@ -42,11 +42,11 @@ class ActivityAdmin(admin.ModelAdmin):
     #     return "Has Result" if obj.action_result else "No Result"
     # action_result_summary.short_description = 'Action Result'
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False

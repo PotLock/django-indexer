@@ -108,14 +108,14 @@ class PotApplicationAdmin(admin.ModelAdmin):
     search_fields = ("pot__id", "applicant__id")
     list_filter = ("status", "submitted_at")
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
 
 @admin.register(PotApplicationReview)
@@ -132,14 +132,14 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
 
 @admin.register(PotPayout)
