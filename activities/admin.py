@@ -19,6 +19,7 @@ class ActivityAdmin(admin.ModelAdmin):
     search_fields = ("signer__id", "receiver__id", "tx_hash")
     date_hierarchy = "timestamp"
     ordering = ("-timestamp",)
+    autocomplete_fields = ["signer", "receiver"]
 
     def signer_address(self, obj):
         return obj.signer.id
