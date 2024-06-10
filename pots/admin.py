@@ -123,7 +123,7 @@ class PotApplicationAdmin(admin.ModelAdmin):
 class PotApplicationReviewAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "application",
+        "application_applicant_id",
         "reviewer",
         "notes",
         "status",
@@ -132,6 +132,11 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     )
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
+
+    def application_applicant_id(self, obj):
+        return obj.application.applicant.id
+
+    application_applicant_id.short_description = "Application Applicant ID"
 
     # def has_add_permission(self, request):
     #     return False
