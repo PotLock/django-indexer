@@ -102,12 +102,45 @@ class PotAdmin(admin.ModelAdmin):
         return False
 
 
+class PotApplicationAdminForm(forms.ModelForm):
+    class Meta:
+        model = PotApplication
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["applicant"].widget.attrs.update(
+            {"data-placeholder": "Search by applicant ID..."}
+        )
+
+
 @admin.register(PotApplication)
 class PotApplicationAdmin(admin.ModelAdmin):
+    form = PotApplicationAdminForm
     list_display = ("id", "pot", "applicant", "status", "submitted_at")
     search_fields = ("pot__id", "applicant__id")
     list_filter = ("status", "submitted_at")
     autocomplete_fields = ["applicant"]
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+        try:
+            queryset |= self.model.objects.filter(applicant__id__icontains=search_term)
+        except ValueError:
+            pass
+        return queryset, use_distinct
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related("applicant")
+        return qs
+
+    def get_label(self, obj):
+        return f"{obj.applicant.id} - {obj.pot}"
+
+    get_label.short_description = "Application"
 
     # def has_add_permission(self, request):
     #     return False
@@ -123,7 +156,7 @@ class PotApplicationAdmin(admin.ModelAdmin):
 class PotApplicationReviewAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "application_applicant_id",
+        "application_applicant_id",  # Use the custom method here
         "reviewer",
         "notes",
         "status",
@@ -132,7 +165,9 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     )
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
-    autocomplete_fields = ["application"]
+    autocomplete_fields = [
+        "application"
+    ]  # Enable autocomplete for the application field
 
     def application_applicant_id(self, obj):
         return obj.application.applicant.id
