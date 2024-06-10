@@ -21,7 +21,7 @@ class DonationAdmin(admin.ModelAdmin):
         "message",
         "donor__id",
     )  # Correct field name from 'donor__address' to 'donor__id' if 'id' is used in the model
-    list_filter = ("donated_at", "donor", "pot")
+    list_filter = ("donated_at", "donor", "pot", "pot__id")
     date_hierarchy = "donated_at"
     ordering = ("-donated_at",)
 
