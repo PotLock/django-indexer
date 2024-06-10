@@ -340,6 +340,9 @@ class PotApplication(models.Model):
 
         unique_together = (("pot", "applicant"),)
 
+    def __str__(self):
+        return f"{self.applicant.id} - {self.pot}"
+
 
 class PotApplicationReview(models.Model):
     id = models.AutoField(
