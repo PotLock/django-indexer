@@ -107,6 +107,7 @@ class PotApplicationAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "applicant", "status", "submitted_at")
     search_fields = ("pot__id", "applicant__id")
     list_filter = ("status", "submitted_at")
+    autocomplete_fields = ["applicant"]
 
     # def has_add_permission(self, request):
     #     return False
