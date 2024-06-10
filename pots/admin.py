@@ -53,14 +53,14 @@ class PotFactoryAdmin(admin.ModelAdmin):
                 pass
         return form
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
 
 class PotForm(forms.ModelForm):
@@ -92,14 +92,14 @@ class PotAdmin(admin.ModelAdmin):
                 pass
         return form
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
 
 class PotApplicationAdminForm(forms.ModelForm):
@@ -166,7 +166,8 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
     search_fields = ("application__id", "reviewer__id")
     list_filter = ("status", "reviewed_at")
     autocomplete_fields = [
-        "application"
+        "application",
+        "reviewer",
     ]  # Enable autocomplete for the application field
 
     def application_applicant_id(self, obj):
