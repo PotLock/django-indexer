@@ -680,7 +680,8 @@ async def handle_new_donation(
         net_amount = (
             int(donation_data["total_amount"])
             - int(donation_data["protocol_fee"])
-            - donation_data.get("referrer_fee", 0)
+            - donation_data["referrer_fee"]
+            or 0
         )
 
     donated_at = datetime.fromtimestamp(
