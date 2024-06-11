@@ -92,6 +92,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     print("here we are...")
             #     continue
             lists_contract = "lists." + settings.POTLOCK_TLA
+            donate_contract = "donate." + settings.POTLOCK_TLA
 
             for index, action in enumerate(
                 receipt_execution_outcome.receipt.receipt["Action"]["actions"]
@@ -198,6 +199,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         #    - Example with result: https://nearblocks.io/txns/9beSPiZzR9Yu1951gC6AfQVCXiGPnBRxRFQsyfxUQr3H?tab=execution
                         #    - Example with no result: https://nearblocks.io/txns/7p9m3D2Ao3TX9BXXCKTFbBk51F2iEuSCi8r5gSesdkZ2?tab=execution
                         # 2. Direct donations
+                        # - donate
+                        #    - if result is not None, handle donation.
                         # - transfer_funds_callback
                         #    - check result (will always return DonationExternal IF it is a DonationTransfer)
                         #    - if result is not None, handle donation
@@ -209,14 +212,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             | "sybil_callback"
                             | "transfer_funds_callback"
                         ):
-                            pot_methods = [
-                                "handle_protocol_fee_callback",
-                                "sybil_callback",
-                                "donate",
-                            ]
-                            direct_methods = ["transfer_funds_callback"]
                             donation_type = (
-                                "pot" if method_name in pot_methods else "direct"
+                                "direct" if receiver_id == donate_contract else "pot"
                             )
                             logger.info(
                                 f"New {donation_type} donation ({method_name}) --- ARGS: {args_dict}, RECEIPT: {receipt}, STATUS: {status_obj}, OUTCOME: {receipt_execution_outcome}, LOGS: {log_data}"
