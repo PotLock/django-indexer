@@ -50,8 +50,8 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
 
 async def handle_new_pot(
     data: dict,
-    receiverId: str,
-    signerId: str,
+    receiver_id: str,
+    signer_id: str,
     predecessorId: str,
     receiptId: str,
     created_at: datetime,
@@ -62,11 +62,11 @@ async def handle_new_pot(
 
         # Upsert accounts
         owner_id = (
-            data.get("owner") or signerId
+            data.get("owner") or signer_id
         )  # owner is optional; if not provided, owner will be transaction signer (this logic is implemented by Pot contract's "new" method)
         owner, _ = await Account.objects.aget_or_create(id=owner_id)
-        signer, _ = await Account.objects.aget_or_create(id=signerId)
-        receiver, _ = await Account.objects.aget_or_create(id=receiverId)
+        signer, _ = await Account.objects.aget_or_create(id=signer_id)
+        receiver, _ = await Account.objects.aget_or_create(id=receiver_id)
 
         logger.info("upsert chef")
         if data.get("chef"):
@@ -131,8 +131,8 @@ async def handle_new_pot(
                 pot.admins.aadd(admin)
 
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": created_at,
             "tx_hash": receiptId,
         }
@@ -144,7 +144,7 @@ async def handle_new_pot(
         logger.error(f"Failed to handle new pot, Error: {e}")
 
 
-async def handle_new_pot_factory(data: dict, receiverId: str, created_at: datetime):
+async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datetime):
     try:
 
         logger.info("upserting accounts...")
@@ -158,7 +158,7 @@ async def handle_new_pot_factory(data: dict, receiverId: str, created_at: dateti
         )
 
         receiver, _ = await Account.objects.aget_or_create(
-            id=receiverId,
+            id=receiver_id,
         )
 
         logger.info("creating factory....")
@@ -192,12 +192,16 @@ async def handle_new_pot_factory(data: dict, receiverId: str, created_at: dateti
         logger.error(f"Failed to handle new pot Factory, Error: {e}")
 
 
-async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionOutcome):
+async def handle_new_list(
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome
+):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
     try:
 
         data = json.loads(
-            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+            base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                "utf-8"
+            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
         )
 
         logger.info(f"creating list..... {data}")
@@ -218,9 +222,9 @@ async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionO
 
         await Account.objects.aget_or_create(id=data["owner"])
 
-        await Account.objects.aget_or_create(id=signerId)
+        await Account.objects.aget_or_create(id=signer_id)
 
-        await Account.objects.aget_or_create(id=receiverId)
+        await Account.objects.aget_or_create(id=receiver_id)
 
         if data.get("admins"):
             for admin_id in data["admins"]:
@@ -234,19 +238,21 @@ async def handle_new_list(signerId: str, receiverId: str, status_obj: ExecutionO
 
 async def handle_new_list_registration(
     data: dict,
-    receiverId: str,
-    signerId: str,
+    receiver_id: str,
+    signer_id: str,
     receipt: Receipt,
     status_obj: ExecutionOutcome,
 ):
-    logger.info(f"new Project data: {data}, {receiverId}")
+    logger.info(f"new Project data: {data}, {receiver_id}")
 
     # Retrieve receipt data
     if receipt is None:
         return
 
     reg_data = json.loads(
-        base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
+        base64.b64decode(status_obj.status["SuccessValue"]).decode(
+            "utf-8"
+        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
     )
     # Prepare data for insertion
     project_list = []
@@ -272,7 +278,7 @@ async def handle_new_list_registration(
         await Account.objects.abulk_create(
             objs=[Account(**data) for data in project_list], ignore_conflicts=True
         )
-        await Account.objects.aget_or_create(id=signerId)
+        await Account.objects.aget_or_create(id=signer_id)
         logger.info("Upserted accounts/registrants(signer)")
     except Exception as e:
         logger.error(f"Encountered error trying to get create acct: {e}")
@@ -287,8 +293,8 @@ async def handle_new_list_registration(
     # Insert activity
     try:
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": datetime.fromtimestamp(insert_data[0]["submitted_at"] / 1000),
             "tx_hash": receipt.receipt_id,
         }
@@ -301,12 +307,14 @@ async def handle_new_list_registration(
 
 
 async def handle_list_registration_update(
-    data: dict, receiverId: str, status_obj: ExecutionOutcome
+    data: dict, receiver_id: str, status_obj: ExecutionOutcome
 ):
-    logger.info(f"new Project data: {data}, {receiverId}")
+    logger.info(f"new Project data: {data}, {receiver_id}")
 
     data = json.loads(
-        base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+        base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+            "utf-8"
+        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
     )
 
     # Prepare data for update
@@ -325,8 +333,8 @@ async def handle_list_registration_update(
 
 async def handle_pot_application(
     data: dict,
-    receiverId: str,
-    signerId: str,
+    receiver_id: str,
+    signer_id: str,
     receipt: Receipt,
     status_obj: ExecutionOutcome,
     created_at: datetime,
@@ -338,7 +346,9 @@ async def handle_pot_application(
         if not result:
             return
 
-        appl_data = json.loads(base64.b64decode(result).decode("utf-8"))
+        appl_data = json.loads(
+            base64.b64decode(result).decode("utf-8")
+        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
         logger.info(f"new pot application data: {data}, {appl_data}")
 
         # Update or create the account
@@ -347,7 +357,7 @@ async def handle_pot_application(
         )
 
         signer, _ = await Account.objects.aget_or_create(
-            id=signerId,
+            id=signer_id,
         )
 
         # Create the PotApplication object
@@ -362,7 +372,7 @@ async def handle_pot_application(
         application, application_created = (
             await PotApplication.objects.aupdate_or_create(
                 applicant=project,
-                pot_id=receiverId,
+                pot_id=receiver_id,
                 defaults=appl_defaults,
             )
         )
@@ -371,8 +381,8 @@ async def handle_pot_application(
         logger.info("creating activity for action....")
 
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": created_at,
             "tx_hash": receipt.receipt_id,
         }
@@ -390,18 +400,20 @@ async def handle_pot_application(
 
 async def handle_pot_application_status_change(
     data: dict,
-    receiverId: str,
-    signerId: str,
+    receiver_id: str,
+    signer_id: str,
     receipt: Receipt,
     status_obj: ExecutionOutcome,
 ):
     try:
 
-        logger.info(f"pot application update data: {data}, {receiverId}")
+        logger.info(f"pot application update data: {data}, {receiver_id}")
 
         # receipt = next(receipt for receipt in block.receipts() if receipt.receiptId == receiptId)
         update_data = json.loads(
-            base64.b64decode(status_obj.status["SuccessValue"]).decode("utf-8")
+            base64.b64decode(status_obj.status["SuccessValue"]).decode(
+                "utf-8"
+            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
         )
 
         # Retrieve the PotApplication object
@@ -427,7 +439,7 @@ async def handle_pot_application_status_change(
 
         await PotApplicationReview.objects.aupdate_or_create(
             application_id=appl.id,
-            reviewer_id=signerId,
+            reviewer_id=signer_id,
             reviewed_at=updated_at,
             defaults=defaults,
         )
@@ -443,14 +455,16 @@ async def handle_pot_application_status_change(
 
 
 async def handle_default_list_status_change(
-    data: dict, receiverId: str, status_obj: ExecutionOutcome
+    data: dict, receiver_id: str, status_obj: ExecutionOutcome
 ):
     try:
 
-        logger.info(f"update project data: {data}, {receiverId}")
+        logger.info(f"update project data: {data}, {receiver_id}")
 
         result_data = json.loads(
-            base64.b64decode(status_obj.status.get("SuccessValue")).decode("utf-8")
+            base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                "utf-8"
+            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
         )
 
         list_id = data.get("registration_id")
@@ -474,26 +488,26 @@ async def handle_default_list_status_change(
 
 
 async def handle_list_upvote(
-    data: dict, receiverId: str, signerId: str, receiptId: str
+    data: dict, receiver_id: str, signer_id: str, receiptId: str
 ):
     try:
 
-        logger.info(f"upvote list: {data}, {receiverId}")
+        logger.info(f"upvote list: {data}, {receiver_id}")
 
         acct, _ = await Account.objects.aget_or_create(
-            id=signerId,
+            id=signer_id,
         )
 
         created_at = datetime.now()
 
         await ListUpvote.objects.aupdate_or_create(
-            list_id=data.get("list_id") or receiverId,
-            account_id=signerId,
+            list_id=data.get("list_id") or receiver_id,
+            account_id=signer_id,
         )
 
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": created_at,
             "tx_hash": receiptId,
         }
@@ -509,10 +523,10 @@ async def handle_list_upvote(
         logger.error(f"Failed to upvote list, Error: {e}")
 
 
-async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
+async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
     try:
 
-        logger.info(f"set payout data: {data}, {receiverId}")
+        logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
 
         insertion_data = []
@@ -532,12 +546,12 @@ async def handle_set_payouts(data: dict, receiverId: str, receipt: Receipt):
 
 
 async def handle_transfer_payout(
-    data: dict, receiverId: str, receiptId: str, created_at: datetime
+    data: dict, receiver_id: str, receiptId: str, created_at: datetime
 ):
     try:
 
         data = data["payout"]
-        logger.info(f"fulfill payout data: {data}, {receiverId}")
+        logger.info(f"fulfill payout data: {data}, {receiver_id}")
         payout = {
             "recipient_id": data["project_id"],
             "amount": data["amount"],
@@ -552,23 +566,23 @@ async def handle_transfer_payout(
 
 
 async def handle_payout_challenge(
-    data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime
+    data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
 
-        logger.info(f"challenging payout..: {data}, {receiverId}")
+        logger.info(f"challenging payout..: {data}, {receiver_id}")
         payoutChallenge = {
             "created_at": created_at,
             "message": data["reason"],
             "tx_hash": receiptId,
         }
         await PotPayoutChallenge.objects.aupdate_or_create(
-            challenger_id=signerId, pot_id=receiverId, defaults=payoutChallenge
+            challenger_id=signer_id, pot_id=receiver_id, defaults=payoutChallenge
         )
 
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": created_at,
             "tx_hash": receiptId,
         }
@@ -581,19 +595,19 @@ async def handle_payout_challenge(
 
 
 async def handle_payout_challenge_response(
-    data: dict, receiverId: str, signerId: str, receiptId: str, created_at: datetime
+    data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
-        logger.info(f"responding to payout challenge..: {data}, {receiverId}")
+        logger.info(f"responding to payout challenge..: {data}, {receiver_id}")
         response_defaults = {
-            "admin": signerId,
+            "admin": signer_id,
             "message": data.get("notes"),
             "resolved": data.get("resolve_challenge"),
             "tx_hash": receiptId,
         }
         await PotPayoutChallengeAdminResponse.objects.aupdate_or_create(
             challenger_id=data["challenger_id"],
-            pot_id=receiverId,
+            pot_id=receiver_id,
             created_at=created_at,
             defaults=response_defaults,
         )
@@ -601,18 +615,18 @@ async def handle_payout_challenge_response(
         logger.error(f"Failed to handle admin challeneg response, Error: {e}")
 
 
-async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
+async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
     try:
 
-        logger.info(f"removing admin...: {data}, {receiverId}")
+        logger.info(f"removing admin...: {data}, {receiver_id}")
         list_obj = await List.objects.aget(id=data["list_id"])
 
         for acct in data["admins"]:
             list_obj.admins.remove({"admins_id": acct})  # maybe check
 
         activity = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": datetime.now(),
             "tx_hash": receiptId,
         }
@@ -624,83 +638,67 @@ async def handle_list_admin_removal(data, receiverId, signerId, receiptId):
         logger.error(f"Failed to remove list admin, Error: {e}")
 
 
-# TODO: Need to abstract some actions.
-async def handle_batch_donations(
-    receiverId: str,
-    signerId: str,
-    actionName: str,
-    receipt_obj: Receipt,
-    log_data: list,
-):
-    logger.info("BAtch Transaction for donation...")
-    for event_data in log_data:
-        await handle_new_donations(
-            event_data["donation"],
-            receiverId,
-            signerId,
-            actionName,
-            receipt_obj,
-            status_obj=None,
-            log_data=[event_data],
-        )
+# # TODO: Need to abstract some actions.
+# async def handle_batch_donations(
+#     receiver_id: str,
+#     signer_id: str,
+#     action_name: str,
+#     receipt_obj: Receipt,
+#     log_data: list,
+# ):
+#     logger.info("Batch Transaction for donation...")
+#     for event_data in log_data:
+#         await handle_new_donations(
+#             event_data["donation"],
+#             receiver_id,
+#             signer_id,
+#             action_name,
+#             receipt_obj,
+#             status_obj=None,
+#             log_data=[event_data],
+#         )
+
+# TODO: create handle_new_pot_donation & handle_new_direct_donation functions & share common logic with _handle_new_donation function
 
 
-async def handle_new_donations(
+async def handle_new_donation(
     data: dict,
-    receiverId: str,
-    signerId: str,
-    actionName: str,
+    receiver_id: str,
+    signer_id: str,
+    donation_type: str,  # "direct" or "pot"
     receipt_obj: Receipt,
-    status_obj: ExecutionOutcome,
-    log_data: list,
+    result: dict,  # Donation object (note that these vary between direct and pot donations - see examples of each in ./examples.txt)
 ):
-    logger.info(f"new donation data: {data}, {receiverId}")
-    donate_contract_addr = "donate." + settings.POTLOCK_TLA
+    logger.info(f"handle_new_donation data: {data}, {receiver_id}")
+    donation_data = json.loads(base64.b64decode(result).decode("utf-8"))
+    logger.info(f"decoded result: {donation_data}")
 
-    if (
-        actionName == "direct"
-    ) and receiverId == donate_contract_addr:  # early pot donations followed similarly to direct donations i.e they returned result instead of events.
-        logger.info("calling donate contract...")
-        # Handle direct donation
-
-        if not log_data:
-            return
-
-        logger.info(f"event after possible filtering: {log_data}")
-
-        event_data = log_data[0]
-        donation_data = event_data["donation"]
-        net_amount = int(donation_data["total_amount"]) - int(
-            donation_data["protocol_fee"]
-        )
-        logger.info(f"Donation data: {donation_data}, {net_amount}")
-        # insert donate contract which is the receiver id(because of activitry relationship mainly)
-        donate_contract, _ = await Account.objects.aget_or_create(id=receiverId)
-
-    else:
-        result = status_obj.status.get("SuccessValue")
-        if not result:
-            return
-        # Handle non-direct donation
-        donation_data = json.loads(base64.b64decode(result).decode("utf-8"))
-        logger.info(f"Donation data: {donation_data}")
+    if "net_amount" in donation_data:
         net_amount = int(donation_data["net_amount"])
+    else:
+        # direct donations don't have net_amount property, so have to calculate it here
+        net_amount = (
+            int(donation_data["total_amount"])
+            - int(donation_data["protocol_fee"])
+            - donation_data.get("referrer_fee", 0)
+        )
 
     donated_at = datetime.fromtimestamp(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
     )
 
     try:
-
         # Upsert donor account
         donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
         recipient = None
+        referrer = None
+        chef = None
 
-        if donation_data.get("recipient_id"):
+        if donation_data.get("recipient_id"):  # direct donations have recipient_id
             recipient, _ = await Account.objects.aget_or_create(
                 id=donation_data["recipient_id"]
             )
-        if donation_data.get("project_id"):
+        if donation_data.get("project_id"):  # pot donations have project_id
             recipient, _ = await Account.objects.aget_or_create(
                 id=donation_data["project_id"]
             )
@@ -710,6 +708,9 @@ async def handle_new_donations(
                 id=donation_data["referrer_id"]
             )
 
+        if donation_data.get("chef_id"):
+            chef, _ = await Account.objects.aget_or_create(id=donation_data["chef_id"])
+
         # Upsert token account
         token_acct, _ = await Account.objects.aget_or_create(
             id=(donation_data.get("ft_id") or "near")
@@ -717,63 +718,15 @@ async def handle_new_donations(
     except Exception as e:
         logger.error(f"Failed to create/get an account involved in donation: {e}")
 
-    # # Upsert token
-    # try:
-    #     token = await Token.objects.aget(id=token_acct)
-    # except Token.DoesNotExist:
-    #     # TODO: fetch metadata from token contract (ft_metadata) and add decimals to token record. For now adding 12 which is most common
-    #     token = await Token.objects.acreate(id=token_acct, decimals=12)
-
-    # # Fetch historical token data
-    # # late_p = await token.get_most_recent_price()
-    # try:
-    #     logger.info("fetching historical price...")
-    #     logger.info(f"donated at: {donated_at}")
-    # endpoint = f"{GECKO_URL}/coins/{donation_data.get('ft_id', 'near')}/history?date={format_date(donated_at)}&localization=false"
-    #     logger.info(f"endpoint: {endpoint}")
-    #     response = requests.get(endpoint)
-    #     logger.info(f"response: {response}")
-    #     if response.status_code == 429:
-    #         logger.error("Coingecko rate limit exceeded")
-    #     price_data = response.json()
-    # except Exception as e:
-    #     logger.error(f"Failed to fetch price data: {e}")
-    # logger.info(f"price data: {price_data}")
-    # unit_price = price_data.get("market_data", {}).get("current_price", {}).get("usd")
-    # logger.info(f"unit price: {unit_price}")
-    # if unit_price:
-    #     try:
-    #         await TokenHistoricalPrice.objects.acreate(  # need to change token model to use token as id
-    #             token=token,
-    #             price_usd=unit_price,
-    #             timestamp=donated_at,
-    #         )
-    #     except Exception as e:
-    #         logger.error(
-    #             f"Error creating TokenHistoricalPrice: {e} token: {token} unit_price: {unit_price}"
-    #         )
-    #         # historical_price = await token.get_most_recent_price() # to use model methods, we might have to use asgiref sync_to_async
-    #         historical = await TokenHistoricalPrice.objects.aget(token=token)
-    #         unit_price = historical.price_usd
-
-    # total_amount = donation_data["total_amount"]
-    # net_amount = net_amount - int(donation_data.get("referrer_fee") or 0)
-
-    # # Calculate and format amounts
-    # total_near_amount = format_to_near(total_amount)
-    # net_near_amount = format_to_near(net_amount)
-    # total_amount_usd = None if not unit_price else unit_price * total_near_amount
-    # net_amount_usd = None if not unit_price else unit_price * net_near_amount
-
     try:
 
         total_amount = donation_data["total_amount"]
 
-        logger.info(f"inserting donations... by {actionName}")
+        logger.info(f"inserting {donation_type} donation")
         default_data = {
             "donor": donor,
             "total_amount": total_amount,
-            "total_amount_usd": None,  # USD amounts will be added later (could be in pre-save hook)
+            "total_amount_usd": None,  # USD amounts will be added later
             "net_amount_usd": None,
             "net_amount": net_amount,
             "ft": token_acct,
@@ -782,15 +735,15 @@ async def handle_new_donations(
             "matching_pool": donation_data.get("matching_pool", False),
             "recipient": recipient,
             "protocol_fee": donation_data["protocol_fee"],
-            "referrer": referrer if donation_data.get("referrer_id") else None,
+            "referrer": referrer,
             "referrer_fee": donation_data.get("referrer_fee"),
+            "chef": chef,
+            "chef_fee": donation_data.get("chef_fee"),
             "tx_hash": receipt_obj.receipt_id,
         }
 
-        if actionName != "direct":
-            logger.info("selecting pot to make public donation update")
-            pot = await Pot.objects.aget(id=receiverId)
-            default_data["pot"] = pot
+        if donation_type == "pot":
+            default_data["pot"] = await Pot.objects.aget(id=receiver_id)
 
         logger.info(f"default donation data: {default_data}")
 
@@ -803,17 +756,10 @@ async def handle_new_donations(
         # fetch USD prices
         await donation.fetch_usd_prices_async()  # might not need to await this?
 
-        # # convert total_amount_usd and net_amount_usd from None
-        # if total_amount_usd is None:
-        #     total_amount_usd = 0.0
-        # if net_amount_usd is None:
-        #     net_amount_usd = 0.0
-
-        logger.info(f"Created donation? {donation_created}")
         # Insert or update activity record
         activity_type = (
             "Donate_Direct"
-            if actionName == "direct"
+            if donation_type == "direct"
             else (
                 "Donate_Pot_Matching_Pool"
                 if donation.matching_pool
@@ -821,13 +767,12 @@ async def handle_new_donations(
             )
         )
         defaults = {
-            "signer_id": signerId,
-            "receiver_id": receiverId,
+            "signer_id": signer_id,
+            "receiver_id": receiver_id,
             "timestamp": donation.donated_at,
             "tx_hash": receipt_obj.receipt_id,
         }
         try:
-
             activity, activity_created = await Activity.objects.aupdate_or_create(
                 action_result=donation_data, type=activity_type, defaults=defaults
             )
@@ -844,7 +789,7 @@ async def handle_new_donations(
     ### CAN ALWAYS ADD BACK IF DESIRED
     # if donation_created:  # only do stats updates if donation object was created
 
-    #     if actionName != "direct":
+    #     if action_name != "direct":
 
     #         potUpdate = {
     #             "total_public_donations": str(
@@ -878,7 +823,7 @@ async def handle_new_donations(
     #                 pot.public_donations_count or 0
     #             ) + 1
 
-    #         await Pot.objects.filter(id=receiverId).aupdate(**potUpdate)
+    #         await Pot.objects.filter(id=receiver_id).aupdate(**potUpdate)
 
     #     # donation_recipient = donation_data.get('project_id', donation_data['recipient_id'])
     #     logger.info(

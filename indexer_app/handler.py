@@ -10,13 +10,12 @@ from base.utils import convert_ns_to_utc
 from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import logger
-from .utils import (
-    handle_batch_donations,
+from .utils import (  # handle_batch_donations,
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
-    handle_new_donations,
+    handle_new_donation,
     handle_new_list,
     handle_new_list_registration,
     handle_new_pot,
@@ -111,6 +110,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     signer_id = receipt.receipt["Action"]["signer_id"]
                     receiver_id = receipt.receiver_id
                     predecessor_id = receipt.predecessor_id
+                    result = status_obj.status.get("SuccessValue")
                     # Assuming the decoded data is UTF-8 text
                     try:
                         decoded_text = decoded_bytes.decode("utf-8")
@@ -183,55 +183,55 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
+                        # Donation cases
+                        # SCENARIOS:
+                        # 1. Pot donations
+                        # tl;dr: only handle method calls that have a result, aka the final call in the chain. This could be "donate", "handle_protocol_fee_callback", or "sybil_callback".
+                        # - handle_protocol_fee_callback (NOT called if protocol fee is bypassed)
+                        #    - check result (will ALWAYS return DonationExternal)
+                        # - sybil_callback (NOT called if there are no sybil requirements for the Pot)
+                        #    - check result (MAY return DonationExternal)
+                        #    - if result is not None, handle donation.
+                        # - donate
+                        #    - check result (will either return `DonationExternal`, if no CC calls, or `None` if CC calls were involved)
+                        #    - if result is not None, handle donation. Otherwise ignore & listen for either handle_protocol_fee_callback or sybil_callback
+                        #    - Example with result: https://nearblocks.io/txns/9beSPiZzR9Yu1951gC6AfQVCXiGPnBRxRFQsyfxUQr3H?tab=execution
+                        #    - Example with no result: https://nearblocks.io/txns/7p9m3D2Ao3TX9BXXCKTFbBk51F2iEuSCi8r5gSesdkZ2?tab=execution
+                        # 2. Direct donations
+                        # - transfer_funds_callback
+                        #    - check result (will always return DonationExternal IF it is a DonationTransfer)
+                        #    - if result is not None, handle donation
+                        #    - NB: this method was not implemented until early 2024; for older donations, use donate method (we aren't handling at this point since these donations have already been indexed. this would only be necessary if donations are re-indexed from PotLock genesis.)
+
                         case (
-                            "handle_protocol_fee_callback"
-                        ):  # NB: It's important that this comes before the donate case
-                            logger.info(
-                                f"donations to pool incoming: {args_dict}, {receipt}, {receipt_execution_outcome}"
+                            "donate"
+                            | "handle_protocol_fee_callback"
+                            | "sybil_callback"
+                            | "transfer_funds_callback"
+                        ):
+                            pot_methods = [
+                                "handle_protocol_fee_callback",
+                                "sybil_callback",
+                                "donate",
+                            ]
+                            direct_methods = ["transfer_funds_callback"]
+                            donation_type = (
+                                "pot" if method_name in pot_methods else "direct"
                             )
-                            await handle_new_donations(
+                            logger.info(
+                                f"New {donation_type} donation ({method_name}) --- ARGS: {args_dict}, RECEIPT: {receipt}, STATUS: {status_obj}, OUTCOME: {receipt_execution_outcome}, LOGS: {log_data}"
+                            )
+                            if not result:
+                                logger.info("No result found. Skipping...")
+                                break
+                            await handle_new_donation(
                                 args_dict,
                                 receiver_id,
                                 signer_id,
-                                "pot",
+                                donation_type,
                                 receipt,
-                                status_obj,
-                                log_data,
-                            )
-                            break
-
-                        case "donate":  # TODO: donate that produces result
-                            logger.info(
-                                f"switching bazooka to knifee works!! donate his blood: {args_dict}, {receipt}, {action}, {log_data}"
-                            )
-                            if len(log_data) > 1:
-                                await handle_batch_donations(
-                                    receiver_id, signer_id, "direct", receipt, log_data
-                                )
-                            else:
-                                await handle_new_donations(
-                                    args_dict,
-                                    receiver_id,
-                                    signer_id,
-                                    "direct",
-                                    receipt,
-                                    status_obj,
-                                    log_data,
-                                )
-                            break
-
-                        case "transfer_funds_callback":
-                            logger.info(
-                                f"new version donations to pool incoming: {args_dict}, {action}"
-                            )
-                            await handle_new_donations(
-                                args_dict,
-                                receiver_id,
-                                signer_id,
-                                "direct",
-                                receipt,
-                                status_obj,
-                                log_data,
+                                result,
+                                # log_data,
                             )
                             break
 
