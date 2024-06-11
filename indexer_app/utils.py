@@ -677,12 +677,11 @@ async def handle_new_donation(
         net_amount = int(donation_data["net_amount"])
     else:
         # direct donations don't have net_amount property, so have to calculate it here
-        net_amount = (
-            int(donation_data["total_amount"])
-            - int(donation_data["protocol_fee"])
-            - donation_data["referrer_fee"]
-            or 0
-        )
+        total_amount = int(donation_data["total_amount"])
+        protocol_fee = int(donation_data["protocol_fee"])
+        referrer_fee = int(donation_data["referrer_fee"] or 0)
+
+        net_amount = total_amount - protocol_fee - referrer_fee
 
     donated_at = datetime.fromtimestamp(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
