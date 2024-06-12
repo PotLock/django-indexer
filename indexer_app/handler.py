@@ -91,8 +91,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     # consider logging failures to logging service; for now, just skip
             #     print("here we are...")
             #     continue
-            lists_contract = "lists." + settings.POTLOCK_TLA
-            donate_contract = "donate." + settings.POTLOCK_TLA
+            LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
+            DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 
             for index, action in enumerate(
                 receipt_execution_outcome.receipt.receipt["Action"]["actions"]
@@ -184,8 +184,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
-                        # Donation cases
-                        # SCENARIOS:
+                        ### Donation cases
+                        ## SCENARIOS:
                         # 1. Pot donations
                         # tl;dr: only handle method calls that have a result, aka the final call in the chain. This could be "donate", "handle_protocol_fee_callback", or "sybil_callback".
                         # - handle_protocol_fee_callback (NOT called if protocol fee is bypassed)
@@ -204,8 +204,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         # - transfer_funds_callback
                         #    - check result (will always return DonationExternal IF it is a DonationTransfer)
                         #    - if result is not None, handle donation
-                        #    - NB: this method was not implemented until early 2024; for older donations, use donate method (we aren't handling at this point since these donations have already been indexed. this would only be necessary if donations are re-indexed from PotLock genesis.)
-
+                        #    - NB: this method was not implemented until early 2024; for older donations, use donate method
                         case (
                             "donate"
                             | "handle_protocol_fee_callback"
@@ -213,7 +212,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             | "transfer_funds_callback"
                         ):
                             donation_type = (
-                                "direct" if receiver_id == donate_contract else "pot"
+                                "direct" if receiver_id == DONATE_CONTRACT else "pot"
                             )
                             logger.info(
                                 f"New {donation_type} donation ({method_name}) --- ARGS: {args_dict}, RECEIPT: {receipt}, STATUS: {status_obj}, OUTCOME: {receipt_execution_outcome}, LOGS: {log_data}"
@@ -238,7 +237,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             logger.info(
                                 f"registrations incoming: {args_dict}, {action}"
                             )
-                            if receiver_id != lists_contract:
+                            if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_new_list_registration(
                                 args_dict, receiver_id, signer_id, receipt, status_obj
@@ -312,7 +311,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             "owner_remove_admins"
                         ):  # TODO: use update_admins event instead of method call to handle all cases
                             logger.info(f"attempting to remove admins....: {args_dict}")
-                            if receiver_id != lists_contract:
+                            if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_list_admin_removal(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id
@@ -321,14 +320,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
                         case "create_list":
                             logger.info(f"creating list... {args_dict}, {action}")
-                            if receiver_id != lists_contract:
+                            if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_new_list(signer_id, receiver_id, status_obj)
                             break
 
                         case "upvote":
                             logger.info(f"up voting... {args_dict}")
-                            if receiver_id != lists_contract:
+                            if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_list_upvote(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id

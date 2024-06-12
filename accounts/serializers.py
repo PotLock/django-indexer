@@ -3,6 +3,54 @@ from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from .models import Account
 
+# near social profile data serializers (for Swagger schema)
+
+
+class NFTSerializer(serializers.Serializer):
+    media = serializers.URLField(required=False)
+    baseUri = serializers.URLField(required=False)
+    tokenId = serializers.CharField(required=False)
+    contractId = serializers.CharField(required=False)
+
+
+class ImageSerializer(serializers.Serializer):
+    url = serializers.URLField(required=False)
+    ipfs_cid = serializers.CharField(required=False)
+    nft = NFTSerializer(required=False)
+
+
+class LinktreeSerializer(serializers.Serializer):
+    github = serializers.CharField(required=False, allow_blank=True)
+    twitter = serializers.CharField(required=False, allow_blank=True)
+    website = serializers.CharField(required=False, allow_blank=True)
+    telegram = serializers.CharField(required=False, allow_blank=True)
+
+
+class NearSocialProfileDataSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False)
+    image = ImageSerializer(required=False)
+    backgroundImage = ImageSerializer(required=False)
+    description = serializers.CharField(required=False)
+    linktree = LinktreeSerializer(required=False)
+    plPublicGoodReason = serializers.CharField(required=False)
+    plCategories = serializers.CharField(
+        required=False, help_text="JSON-stringified array of category strings"
+    )
+    plGithubRepos = serializers.CharField(
+        required=False, help_text="JSON-stringified array of URLs"
+    )
+    plSmartContracts = serializers.CharField(
+        required=False,
+        help_text="JSON-stringified object with chain names as keys that map to nested objects of contract addresses",
+    )
+    plFundingSources = serializers.CharField(
+        required=False, help_text="JSON-stringified array of funding source objects"
+    )
+    plTeam = serializers.CharField(
+        required=False,
+        help_text="JSON-stringified array of team member account ID strings",
+    )
+
 
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,6 +63,18 @@ class AccountSerializer(serializers.ModelSerializer):
             "donors_count",
             "near_social_profile_data",
         ]
+
+    total_donations_in_usd = serializers.DecimalField(
+        max_digits=20, decimal_places=2, coerce_to_string=False
+    )
+    total_donations_out_usd = serializers.DecimalField(
+        max_digits=20, decimal_places=2, coerce_to_string=False
+    )
+    total_matching_pool_allocations_usd = serializers.DecimalField(
+        max_digits=20, decimal_places=2, coerce_to_string=False
+    )
+    donors_count = serializers.IntegerField()
+    near_social_profile_data = NearSocialProfileDataSerializer(required=False)
 
 
 SIMPLE_ACCOUNT_EXAMPLE = {
