@@ -748,7 +748,9 @@ async def handle_new_donation(
         logger.info(f"default donation data: {default_data}")
 
         donation, donation_created = await Donation.objects.aupdate_or_create(
-            on_chain_id=donation_data["id"], defaults=default_data
+            on_chain_id=donation_data["id"],
+            pot=default_data["pot"],
+            defaults=default_data,
         )
         logger.info(f"Created donation? {donation_created}")
         logger.info(f"donation: {donation.to_dict()}")
