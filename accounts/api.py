@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from base.logging import logger
 from donations.models import Donation
+from donations.serializers import SIMPLE_DONATION_EXAMPLE, DonationSerializer
 from pots.models import Pot, PotApplication, PotApplicationStatus
 from pots.serializers import SIMPLE_POT_EXAMPLE, PotSerializer
 
@@ -184,4 +185,84 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
             )
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
+class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=DonationSerializer(many=True),
+                description="Returns paginated donations received by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for donations received",
+                        value=SIMPLE_DONATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        donations = Donation.objects.filter(recipient=account)
+        results = self.paginate_queryset(donations, request, view=self)
+        serializer = DonationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
+class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=DonationSerializer(many=True),
+                description="Returns paginated donations sent by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for donations received",
+                        value=SIMPLE_DONATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        donations = Donation.objects.filter(donor=account)
+        results = self.paginate_queryset(donations, request, view=self)
+        serializer = DonationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
