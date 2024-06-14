@@ -3,14 +3,16 @@
   - [Steps to run:](#steps-to-run)
     - [Env vars example](#env-vars-example)
   - [API Basics](#api-basics)
-    - [Base URL](#base-url)
-    - [Authorization](#authorization)
-    - [Error Responses](#error-responses)
-    - [Pagination](#pagination)
+      - [Base URL](#base-url)
+      - [Authorization](#authorization)
+      - [Error Responses](#error-responses)
+      - [Pagination](#pagination)
   - [API Endpoints](#api-endpoints)
     - [`Account` endpoints](#account-endpoints)
       - [✅ Get all accounts: `GET /accounts` (paginated)](#-get-all-accounts-get-accounts-paginated)
       - [✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#-get-account-by-id-address-get-accountsaccount_id)
+      - [✅ Get donations received for account: `GET /accounts/{ACCOUNT_ID}/donations_received` (paginated)](#-get-donations-received-for-account-get-accountsaccount_iddonations_received-paginated)
+      - [✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)](#-get-donations-sent-for-account-get-accountsaccount_iddonations_sent-paginated)
       - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
     - [`List` endpoints](#list-endpoints)
       - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
@@ -120,6 +122,10 @@ _NB: These endpoints are what is required to integrate with BOS app & replace cu
 #### ✅ Get all accounts: `GET /accounts` (paginated)
 
 #### ✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
+
+#### ✅ Get donations received for account: `GET /accounts/{ACCOUNT_ID}/donations_received` (paginated)
+
+#### ✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)
 
 #### ✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
 
