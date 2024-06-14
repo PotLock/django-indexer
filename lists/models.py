@@ -13,10 +13,16 @@ class ListRegistrationStatus(models.TextChoices):
 
 
 class List(models.Model):
-    id = models.PositiveIntegerField(
+    id = models.AutoField(
         _("list id"),
         primary_key=True,
-        help_text=_("List id."),
+        help_text=_("List ID in DB (does not necessarily correspond to on-chain ID)."),
+    )
+    on_chain_id = models.IntegerField(
+        _("contract list ID"),
+        null=False,
+        unique=True,
+        help_text=_("List ID in contract"),
     )
     owner = models.ForeignKey(
         Account,
@@ -172,3 +178,5 @@ class ListRegistration(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["id", "status"], name="idx_list_id_status")]
+
+        unique_together = (("list", "registrant"),)

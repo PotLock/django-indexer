@@ -853,16 +853,16 @@ async def cache_block_height(
 ) -> int:
     await cache.aset(key, height)
     # the cache os the default go to for the restart block, the db is a backup if the redis server crashes.
-    if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
-        logger.info(f"saving daylight, {height}")
-        await BlockHeight.objects.aupdate_or_create(
-            id=1,
-            defaults={
-                "block_height": height,
-                "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000),
-                "updated_at": timezone.now(),
-            },
-        )  # better than ovverriding model's save method to get a singleton? we need only one entry
+    # if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
+    # logger.info(f"saving daylight, {height}")
+    await BlockHeight.objects.aupdate_or_create(
+        id=1,
+        defaults={
+            "block_height": height,
+            "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000),
+            "updated_at": timezone.now(),
+        },
+    )  # better than ovverriding model's save method to get a singleton? we need only one entry
     return height
 
 

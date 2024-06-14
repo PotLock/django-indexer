@@ -7,8 +7,12 @@ from .models import Account, List, ListRegistration, ListUpvote
 class ListAdmin(admin.ModelAdmin):
     list_display = (
         "id",
+        "on_chain_id",
         "name",
+        "description",
+        "cover_image_url",
         "owner",
+        "admin_only_registrations",
         "default_registration_status",
         "created_at",
         "updated_at",
