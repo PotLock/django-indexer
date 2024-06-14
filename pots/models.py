@@ -157,25 +157,21 @@ class Pot(models.Model):
     )
     registry_provider = models.CharField(
         _("registry provider"),
-        max_length=64,
         null=True,
         help_text=_("Registry provider."),
     )
     min_matching_pool_donation_amount = models.CharField(
         _("min matching pool donation amount"),
-        max_length=64,
         null=False,
         help_text=_("Min matching pool donation amount."),
     )
     sybil_wrapper_provider = models.CharField(
         _("sybil wrapper provider"),
-        max_length=64,
         null=True,
         help_text=_("Sybil wrapper provider."),
     )
     custom_sybil_checks = models.CharField(
         _("custom sybil checks"),
-        max_length=64,
         null=True,
         help_text=_("Custom sybil checks."),
     )
@@ -201,7 +197,6 @@ class Pot(models.Model):
     )
     total_matching_pool = models.CharField(
         _("total matching pool"),
-        max_length=64,
         null=False,
         help_text=_("Total matching pool."),
     )
@@ -214,7 +209,6 @@ class Pot(models.Model):
     )
     matching_pool_balance = models.CharField(
         _("matching pool balance"),
-        max_length=64,
         null=False,
         help_text=_("Matching pool balance."),
     )
@@ -225,7 +219,6 @@ class Pot(models.Model):
     )
     total_public_donations = models.CharField(
         _("total public donations"),
-        max_length=64,
         null=False,
         help_text=_("Total public donations."),
     )
@@ -258,7 +251,6 @@ class Pot(models.Model):
     )
     protocol_config_provider = models.CharField(
         _("protocol config provider"),
-        max_length=64,
         null=True,
         help_text=_("Protocol config provider."),
     )
@@ -326,12 +318,12 @@ class PotApplication(models.Model):
     )
     updated_at = models.DateTimeField(
         _("updated at"),
+        null=True,
         help_text=_("Application last update date."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
         help_text=_("Transaction hash."),
     )
 
@@ -384,8 +376,7 @@ class PotApplicationReview(models.Model):
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
         help_text=_("Transaction hash."),
     )
 
@@ -419,7 +410,6 @@ class PotPayout(models.Model):
     )
     amount = models.CharField(
         _("amount"),
-        max_length=64,
         null=False,
         help_text=_("Payout amount."),
     )
@@ -446,8 +436,7 @@ class PotPayout(models.Model):
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
         help_text=_("Transaction hash."),
     )
 
@@ -537,8 +526,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
         help_text=_("Transaction hash."),
     )
 

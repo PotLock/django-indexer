@@ -53,7 +53,7 @@ class Activity(models.Model):
     tx_hash = models.CharField(
         _("transaction hash"),
         max_length=64,
-        null=False,
+        null=True,
         help_text=_("Transaction hash."),
     )
     type = models.CharField(

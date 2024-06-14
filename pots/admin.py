@@ -203,7 +203,7 @@ class PotPayoutAdmin(admin.ModelAdmin):
 
 @admin.register(PotPayoutChallenge)
 class PotPayoutChallengeAdmin(admin.ModelAdmin):
-    list_display = ("id", "challenger", "pot", "created_at")
+    list_display = ("id", "challenger", "pot", "message", "created_at")
     search_fields = ("challenger__id", "pot__id")
     list_filter = ("created_at",)
 
@@ -219,7 +219,7 @@ class PotPayoutChallengeAdmin(admin.ModelAdmin):
 
 @admin.register(PotPayoutChallengeAdminResponse)
 class PotPayoutChallengeAdminResponseAdmin(admin.ModelAdmin):
-    list_display = ("id", "pot", "admin", "created_at", "resolved")
+    list_display = ("id", "pot", "admin", "message", "created_at", "resolved")
     search_fields = ("admin__id", "challenge__id")
     list_filter = ("created_at", "resolved")
 
