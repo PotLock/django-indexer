@@ -29,7 +29,6 @@ from .serializers import (
 )
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class PotsListAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -49,6 +48,7 @@ class PotsListAPI(APIView, LimitOffsetPagination):
             ),
         }
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pots = Pot.objects.all()
         results = self.paginate_queryset(pots, request, view=self)
@@ -79,6 +79,7 @@ class PotDetailAPI(APIView):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
@@ -112,6 +113,7 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
@@ -148,6 +150,7 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
@@ -184,6 +187,7 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
@@ -225,6 +229,7 @@ class PotPayoutsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:

@@ -25,7 +25,6 @@ from .serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 
 class DonorsAPI(APIView, LimitOffsetPagination):
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -52,6 +51,7 @@ class DonorsAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         # Return all donors
         donations_subquery = Donation.objects.filter(donor_id=OuterRef("pk"))
@@ -67,7 +67,6 @@ class DonorsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountsListAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -88,6 +87,7 @@ class AccountsListAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         }
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         accounts = Account.objects.all()
         results = self.paginate_queryset(accounts, request, view=self)
@@ -95,7 +95,6 @@ class AccountsListAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountDetailAPI(APIView):
 
     @extend_schema(
@@ -120,6 +119,7 @@ class AccountDetailAPI(APIView):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -132,7 +132,6 @@ class AccountDetailAPI(APIView):
         return Response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountActivePotsAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -164,6 +163,7 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -188,7 +188,6 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -213,6 +212,7 @@ class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -228,7 +228,6 @@ class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -253,6 +252,7 @@ class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:

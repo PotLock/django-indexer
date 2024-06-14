@@ -43,7 +43,6 @@ SIMPLE_LIST_REGISTRATION_EXAMPLE = {
 }
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class ListsListAPI(APIView, LimitOffsetPagination):
 
     @extend_schema(
@@ -64,6 +63,7 @@ class ListsListAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         }
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all()
         results = self.paginate_queryset(lists, request, view=self)
@@ -95,6 +95,7 @@ class ListDetailAPI(APIView):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
@@ -131,6 +132,7 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
