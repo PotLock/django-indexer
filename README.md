@@ -14,7 +14,7 @@
       - [✅ Get donations received for account: `GET /accounts/{ACCOUNT_ID}/donations_received` (paginated)](#-get-donations-received-for-account-get-accountsaccount_iddonations_received-paginated)
       - [✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)](#-get-donations-sent-for-account-get-accountsaccount_iddonations_sent-paginated)
       - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
-      - [✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-applications-for-account-get-accountsaccount_idactive_pots-paginated)
+      - [✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/pot_applications` (paginated)](#-get-applications-for-account-get-accountsaccount_idpot_applications-paginated)
     - [`List` endpoints](#list-endpoints)
       - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
       - [✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)](#-get-list-by-id-get-listslist_id-paginated)
@@ -132,7 +132,7 @@ _NB: These endpoints are what is required to integrate with BOS app & replace cu
 
 Can specify `status=live` query param to retrieve only pots that are currently active (live matching round)
 
-#### ✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
+#### ✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/pot_applications` (paginated)
 
 Can specify `status={PotApplicationStatus}` query param to retrieve applications with a given status:
 
