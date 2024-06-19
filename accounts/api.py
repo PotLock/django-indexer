@@ -17,7 +17,13 @@ from base.logging import logger
 from donations.models import Donation
 from donations.serializers import SIMPLE_DONATION_EXAMPLE, DonationSerializer
 from pots.models import Pot, PotApplication, PotApplicationStatus
-from pots.serializers import SIMPLE_POT_EXAMPLE, PotSerializer
+from pots.serializers import (
+    SIMPLE_PAYOUT_EXAMPLE,
+    SIMPLE_POT_APPLICATION_EXAMPLE,
+    SIMPLE_POT_EXAMPLE,
+    PotApplicationSerializer,
+    PotSerializer,
+)
 
 from .models import Account
 from .serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
@@ -185,6 +191,54 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
             )
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountPotApplicationsAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PotApplicationSerializer(many=True),
+                description="Returns paginated pot applications for the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pot applications",
+                        value=SIMPLE_POT_APPLICATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            400: OpenApiResponse(description="Invalid status value"),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        applications = PotApplication.objects.filter(applicant=account)
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in PotApplicationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            applications = applications.filter(status=status_param)
+        results = self.paginate_queryset(applications, request, view=self)
+        serializer = PotApplicationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
 
 
