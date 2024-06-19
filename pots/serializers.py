@@ -51,10 +51,24 @@ class PotSerializer(ModelSerializer):
 
 
 class PotApplicationSerializer(ModelSerializer):
+
     class Meta:
         model = PotApplication
-        fields = "__all__"  # TODO: potentially adjust this e.g. for formatting of datetimes, adding convenience fields etc
-        # TODO: add reviews
+        fields = [
+            "id",
+            "pot",
+            "applicant",
+            "message",
+            "status",
+            "submitted_at",
+            "updated_at",
+            "tx_hash",
+        ]
+
+    pot = SerializerMethodField()
+
+    def get_pot(self, obj):
+        return PotSerializer(obj.pot).data
 
 
 class PotPayoutSerializer(ModelSerializer):
