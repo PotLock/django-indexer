@@ -29,6 +29,13 @@ SIMPLE_LIST_EXAMPLE = {
     "admins": ["plugrel.near"],
 }
 
+PAGINATED_LIST_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_LIST_EXAMPLE],
+}
+
 SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "id": 10,
     "status": "Approved",
@@ -40,6 +47,13 @@ SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "list": 1,
     "registrant": "project.near",
     "registered_by": "project-admin.near",
+}
+
+PAGINATED_LIST_REGISTRATION_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_LIST_REGISTRATION_EXAMPLE],
 }
 
 
@@ -55,7 +69,7 @@ class ListsListAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple example",
                         description="Example response for lists",
-                        value=SIMPLE_LIST_EXAMPLE,
+                        value=PAGINATED_LIST_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -86,7 +100,7 @@ class ListDetailAPI(APIView):
                         "example-1",
                         summary="Simple list example",
                         description="Example response for list detail",
-                        value=SIMPLE_LIST_EXAMPLE,
+                        value=PAGINATED_LIST_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -123,7 +137,7 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple registration example",
                         description="Example response for list registrations",
-                        value=SIMPLE_LIST_REGISTRATION_EXAMPLE,
+                        value=PAGINATED_LIST_REGISTRATION_EXAMPLE,
                         response_only=True,
                     ),
                 ],

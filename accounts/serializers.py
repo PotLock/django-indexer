@@ -106,3 +106,10 @@ SIMPLE_ACCOUNT_EXAMPLE = {
         },
     },
 }
+
+PAGINATED_ACCOUNT_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_ACCOUNT_EXAMPLE],
+}

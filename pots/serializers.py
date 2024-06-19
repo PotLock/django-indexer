@@ -80,7 +80,7 @@ class PotPayoutSerializer(ModelSerializer):
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"
 
 SIMPLE_POT_EXAMPLE = {
-    "id": EXAMPLE_POT_ID,
+    "id": "some-pot.v1.potfactory.potlock.near",
     "deployed_at": "2024-02-16T17:45:03.600845Z",
     "source_metadata": {
         "link": "https://github.com/PotLock/core",
@@ -121,6 +121,13 @@ SIMPLE_POT_EXAMPLE = {
     "admins": [],
 }
 
+PAGINATED_POT_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_POT_EXAMPLE],
+}
+
 SIMPLE_POT_APPLICATION_EXAMPLE = {
     "id": 2,
     "message": "Hi, I'm a great project and I'd like to apply for this pot.",
@@ -128,8 +135,20 @@ SIMPLE_POT_APPLICATION_EXAMPLE = {
     "submitted_at": "2024-06-05T18:06:45.519Z",
     "updated_at": "2024-06-05T18:06:45.519Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": EXAMPLE_POT_ID,
+    "pot": {
+        "id": "some-pot.v1.potfactory.potlock.near",
+        "name": "My Pot Name",
+        "description": "To support impactful open source software projects.",
+        "owner": "ossround.near",
+    },
     "applicant": "applicant.near",
+}
+
+PAGINATED_POT_APPLICATION_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_POT_APPLICATION_EXAMPLE],
 }
 
 SIMPLE_PAYOUT_EXAMPLE = {
@@ -138,7 +157,19 @@ SIMPLE_PAYOUT_EXAMPLE = {
     "amount_paid_usd": "1.27",
     "paid_at": "2024-06-05T18:12:39.014Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": EXAMPLE_POT_ID,
+    "pot": {
+        "id": "some-pot.v1.potfactory.potlock.near",
+        "name": "My Pot Name",
+        "description": "To support impactful open source software projects.",
+        "owner": "ossround.near",
+    },
     "recipient": "someproject.near",
     "ft": "near",
+}
+
+PAGINATED_PAYOUT_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_PAYOUT_EXAMPLE],
 }

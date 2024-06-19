@@ -14,15 +14,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
-from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from accounts.serializers import PAGINATED_ACCOUNT_EXAMPLE, AccountSerializer
 from donations.models import Donation
-from donations.serializers import SIMPLE_DONATION_EXAMPLE, DonationSerializer
+from donations.serializers import PAGINATED_DONATION_EXAMPLE, DonationSerializer
 
 from .models import Pot, PotApplication, PotApplicationStatus
 from .serializers import (
-    SIMPLE_PAYOUT_EXAMPLE,
-    SIMPLE_POT_APPLICATION_EXAMPLE,
-    SIMPLE_POT_EXAMPLE,
+    PAGINATED_PAYOUT_EXAMPLE,
+    PAGINATED_POT_APPLICATION_EXAMPLE,
+    PAGINATED_POT_EXAMPLE,
     PotApplicationSerializer,
     PotPayoutSerializer,
     PotSerializer,
@@ -41,7 +41,7 @@ class PotsListAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple example",
                         description="Example response for pots",
-                        value=SIMPLE_POT_EXAMPLE,
+                        value=PAGINATED_POT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -71,7 +71,7 @@ class PotDetailAPI(APIView):
                         "example-1",
                         summary="Simple pot example",
                         description="Example response for pot detail",
-                        value=SIMPLE_POT_EXAMPLE,
+                        value=PAGINATED_POT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -105,7 +105,7 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple example",
                         description="Example response for pot applications",
-                        value=SIMPLE_POT_APPLICATION_EXAMPLE,
+                        value=PAGINATED_POT_APPLICATION_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -142,7 +142,7 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple example",
                         description="Example response for donations",
-                        value=SIMPLE_DONATION_EXAMPLE,
+                        value=PAGINATED_DONATION_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -179,7 +179,7 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="user.near",
                         description="Example response for sponsors",
-                        value=SIMPLE_ACCOUNT_EXAMPLE,
+                        value=PAGINATED_ACCOUNT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -221,7 +221,7 @@ class PotPayoutsAPI(APIView, LimitOffsetPagination):
                         "example-1",
                         summary="Simple example",
                         description="Example response for payouts",
-                        value=SIMPLE_PAYOUT_EXAMPLE,
+                        value=PAGINATED_PAYOUT_EXAMPLE,
                         response_only=True,
                     ),
                 ],

@@ -30,8 +30,15 @@ SIMPLE_DONATION_EXAMPLE = {
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
     "donor": "donor.near",
     "ft": "near",
-    "pot": EXAMPLE_POT_ID,
+    "pot": "some-pot.v1.potfactory.potlock.near",
     "recipient": "someproject.near",
     "referrer": "somereferrer.near",
     "chef": "chef.near",
+}
+
+PAGINATED_DONATION_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_DONATION_EXAMPLE],
 }
