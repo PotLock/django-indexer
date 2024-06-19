@@ -26,7 +26,11 @@ from pots.serializers import (
 )
 
 from .models import Account
-from .serializers import PAGINATED_ACCOUNT_EXAMPLE, AccountSerializer
+from .serializers import (
+    PAGINATED_ACCOUNT_EXAMPLE,
+    SIMPLE_ACCOUNT_EXAMPLE,
+    AccountSerializer,
+)
 
 
 class DonorsAPI(APIView, LimitOffsetPagination):
@@ -43,7 +47,7 @@ class DonorsAPI(APIView, LimitOffsetPagination):
         responses={
             200: OpenApiResponse(
                 response=AccountSerializer(many=True),
-                description="Returns a list of donor accounts",
+                description="Returns a paginated list of donor accounts",
                 examples=[
                     OpenApiExample(
                         "example-1",
@@ -79,7 +83,7 @@ class AccountsListAPI(APIView, LimitOffsetPagination):
         responses={
             200: OpenApiResponse(
                 response=AccountSerializer(many=True),
-                description="Returns a list of accounts",
+                description="Returns a paginated list of accounts",
                 examples=[
                     OpenApiExample(
                         "example-1",
@@ -116,7 +120,7 @@ class AccountDetailAPI(APIView):
                         "example-1",
                         summary="user.near",
                         description="Example response for account detail",
-                        value=PAGINATED_ACCOUNT_EXAMPLE,
+                        value=SIMPLE_ACCOUNT_EXAMPLE,
                         response_only=True,
                     ),
                 ],

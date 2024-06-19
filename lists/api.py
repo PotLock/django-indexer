@@ -63,7 +63,7 @@ class ListsListAPI(APIView, LimitOffsetPagination):
         responses={
             200: OpenApiResponse(
                 response=ListSerializer(many=True),
-                description="Returns a list of lists",
+                description="Returns a paginated list of lists",
                 examples=[
                     OpenApiExample(
                         "example-1",
@@ -100,7 +100,7 @@ class ListDetailAPI(APIView):
                         "example-1",
                         summary="Simple list example",
                         description="Example response for list detail",
-                        value=PAGINATED_LIST_EXAMPLE,
+                        value=SIMPLE_LIST_EXAMPLE,
                         response_only=True,
                     ),
                 ],

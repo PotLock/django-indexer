@@ -23,6 +23,7 @@ from .serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
     PAGINATED_POT_APPLICATION_EXAMPLE,
     PAGINATED_POT_EXAMPLE,
+    SIMPLE_POT_EXAMPLE,
     PotApplicationSerializer,
     PotPayoutSerializer,
     PotSerializer,
@@ -35,7 +36,7 @@ class PotsListAPI(APIView, LimitOffsetPagination):
         responses={
             200: OpenApiResponse(
                 response=PotSerializer(many=True),
-                description="Returns a list of pots",
+                description="Returns a paginated list of pots",
                 examples=[
                     OpenApiExample(
                         "example-1",
@@ -71,7 +72,7 @@ class PotDetailAPI(APIView):
                         "example-1",
                         summary="Simple pot example",
                         description="Example response for pot detail",
-                        value=PAGINATED_POT_EXAMPLE,
+                        value=SIMPLE_POT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
