@@ -122,6 +122,18 @@ def fetch_usd_prices():
             )
     jobs_logger.info(f"USD prices fetched for {donations_count} donations.")
 
+    # payouts
+    payouts = PotPayout.objects.filter(amount_paid_usd__isnull=True)
+    payouts_count = payouts.count()
+    jobs_logger.info(f"Fetching USD prices for {payouts_count} payouts...")
+    for payout in payouts:
+        try:
+            payout.fetch_usd_prices()
+        except Exception as e:
+            jobs_logger.error(f"Failed to fetch USD prices for payout {payout.id}: {e}")
+
+    jobs_logger.info(f"USD prices fetched for {payouts_count} payouts.")
+
 
 @shared_task
 def update_pot_statistics():

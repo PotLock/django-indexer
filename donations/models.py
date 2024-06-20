@@ -195,6 +195,7 @@ class Donation(models.Model):
 
     ### Fetches USD prices for the Donation record and saves USD totals
     def fetch_usd_prices(self):
+        # TODO: remove duplicate logic with PotPayout.fetch_usd_prices
         # get existing values for stats adjustments later
         existing_total_amount_usd = self.total_amount_usd
         existing_net_amount_usd = self.net_amount_usd
