@@ -189,16 +189,6 @@ class Donation(models.Model):
     def to_dict(self):
         return model_to_dict(self)
 
-    def get_ft_token(self):
-        token, created = Token.objects.get_or_create(
-            id=self.ft,
-            defaults={"decimals": 12},  # Default values for new Token creation
-        )
-        if created:
-            # TODO: fetch token metadata and add correct decimals, possibly other metadata
-            pass
-        return token
-
     async def fetch_usd_prices_async(self):
         fetch_prices = sync_to_async(self.fetch_usd_prices)
         await fetch_prices()
@@ -212,7 +202,7 @@ class Donation(models.Model):
         existing_referrer_fee_usd = self.referrer_fee_usd
         existing_chef_fee_usd = self.chef_fee_usd
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.donated_at
-        token = self.get_ft_token()
+        token = self.token
         time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
         token_prices = TokenHistoricalPrice.objects.filter(
             token=token,
@@ -253,7 +243,7 @@ class Donation(models.Model):
                 logger.info(
                     "No existing price within acceptable time period; fetching historical price..."
                 )
-                endpoint = f"{settings.COINGECKO_URL}/coins/{self.ft.id}/history?date={format_date(self.donated_at)}&localization=false"
+                endpoint = f"{settings.COINGECKO_URL}/coins/{self.token.id.id}/history?date={format_date(self.donated_at)}&localization=false"
                 if settings.COINGECKO_API_KEY:
                     endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
                 logger.info(f"coingecko endpoint: {endpoint}")
