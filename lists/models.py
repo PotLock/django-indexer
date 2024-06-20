@@ -31,6 +31,11 @@ class List(models.Model):
         null=False,
         help_text=_("List owner."),
     )
+    admins = models.ManyToManyField(
+        Account,
+        related_name="admin_lists",
+        help_text=_("List admins."),
+    )
     name = models.CharField(
         _("name"),
         max_length=64,
@@ -68,11 +73,6 @@ class List(models.Model):
     updated_at = models.DateTimeField(
         _("updated at"),
         help_text=_("List last update date."),
-    )
-    admins = models.ManyToManyField(
-        Account,
-        related_name="admin_lists",
-        help_text=_("List admins."),
     )
 
     class Meta:

@@ -14,47 +14,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import List
-from .serializers import ListRegistrationSerializer, ListSerializer
-
-SIMPLE_LIST_EXAMPLE = {
-    "id": 1,
-    "name": "PotLock Public Goods Registry",
-    "description": "The official registry of public goods on NEAR Protocol",
-    "cover_image_url": "https://images.unsplash.com/photo-1593642532973-d31b6557fa68",
-    "admin_only_registrations": True,
-    "default_registration_status": "Approved",
-    "created_at": "2024-06-05T17:55:14.030Z",
-    "updated_at": "2024-06-05T17:55:14.030Z",
-    "owner": "potlock.near",
-    "admins": ["plugrel.near"],
-}
-
-PAGINATED_LIST_EXAMPLE = {
-    "count": 1,
-    "next": None,
-    "previous": None,
-    "results": [SIMPLE_LIST_EXAMPLE],
-}
-
-SIMPLE_LIST_REGISTRATION_EXAMPLE = {
-    "id": 10,
-    "status": "Approved",
-    "submitted_at": "2024-06-05T18:01:02.319Z",
-    "updated_at": "2024-06-05T18:01:02.319Z",
-    "registrant_notes": "I'm excited to apply for this list",
-    "admin_notes": "This is a great project that I want on my list.",
-    "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "list": 1,
-    "registrant": "project.near",
-    "registered_by": "project-admin.near",
-}
-
-PAGINATED_LIST_REGISTRATION_EXAMPLE = {
-    "count": 1,
-    "next": None,
-    "previous": None,
-    "results": [SIMPLE_LIST_REGISTRATION_EXAMPLE],
-}
+from .serializers import (
+    PAGINATED_LIST_EXAMPLE,
+    PAGINATED_LIST_REGISTRATION_EXAMPLE,
+    SIMPLE_LIST_EXAMPLE,
+    ListRegistrationSerializer,
+    ListSerializer,
+)
 
 
 class ListsListAPI(APIView, LimitOffsetPagination):

@@ -1,7 +1,8 @@
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
+from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from base.serializers import TwoDecimalStringField
-from tokens.serializers import SIMPLE_TOKEN_EXAMPLE
+from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
 from .models import Pot, PotApplication, PotPayout
 
@@ -50,6 +51,24 @@ class PotSerializer(ModelSerializer):
             "protocol_config_provider",
         ]
 
+    deployer = SerializerMethodField()
+    owner = SerializerMethodField()
+    admins = SerializerMethodField()
+    chef = SerializerMethodField()
+
+    def get_deployer(self, obj):
+        return AccountSerializer(obj.deployer).data
+
+    def get_owner(self, obj):
+        return AccountSerializer(obj.owner).data
+
+    def get_admins(self, obj):
+        return AccountSerializer(obj.admins.all(), many=True).data
+
+    def get_chef(self, obj):
+        if obj.chef:
+            return AccountSerializer(obj.chef).data
+
 
 class PotApplicationSerializer(ModelSerializer):
 
@@ -67,15 +86,41 @@ class PotApplicationSerializer(ModelSerializer):
         ]
 
     pot = SerializerMethodField()
+    applicant = SerializerMethodField()
 
     def get_pot(self, obj):
         return PotSerializer(obj.pot).data
+
+    def get_applicant(self, obj):
+        return AccountSerializer(obj.applicant).data
 
 
 class PotPayoutSerializer(ModelSerializer):
     class Meta:
         model = PotPayout
-        fields = "__all__"  # TODO: potentially adjust this e.g. for formatting of datetimes, adding convenience fields etc
+        fields = [
+            "id",
+            "pot",
+            "recipient",
+            "amount",
+            "amount_paid_usd",
+            "token",
+            "paid_at",
+            "tx_hash",
+        ]
+
+    pot = SerializerMethodField()
+    recipient = SerializerMethodField()
+    token = SerializerMethodField()
+
+    def get_pot(self, obj):
+        return PotSerializer(obj.pot).data
+
+    def get_recipient(self, obj):
+        return AccountSerializer(obj.recipient).data
+
+    def get_token(self, obj):
+        return TokenSerializer(obj.token).data
 
 
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"
@@ -116,10 +161,10 @@ SIMPLE_POT_EXAMPLE = {
     "all_paid_out": False,
     "protocol_config_provider": "v1.potfactory.potlock.near:get_protocol_config",
     "pot_factory": "v1.potfactory.potlock.near",
-    "deployer": "ossround.near",
-    "owner": "ossround.near",
-    "chef": "plugrel.near",
-    "admins": [],
+    "deployer": SIMPLE_ACCOUNT_EXAMPLE,
+    "owner": SIMPLE_ACCOUNT_EXAMPLE,
+    "chef": SIMPLE_ACCOUNT_EXAMPLE,
+    "admins": [SIMPLE_ACCOUNT_EXAMPLE],
 }
 
 PAGINATED_POT_EXAMPLE = {
@@ -137,7 +182,7 @@ SIMPLE_POT_APPLICATION_EXAMPLE = {
     "updated_at": "2024-06-05T18:06:45.519Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
     "pot": SIMPLE_POT_EXAMPLE,
-    "applicant": "applicant.near",
+    "applicant": SIMPLE_ACCOUNT_EXAMPLE,
 }
 
 PAGINATED_POT_APPLICATION_EXAMPLE = {
