@@ -2,18 +2,20 @@ import asyncio
 import logging
 from pathlib import Path
 
+import requests
 from billiard.exceptions import WorkerLostError
 from celery import shared_task
 from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, DecimalField, Q, Sum, Value
+from django.db.models.functions import Cast, NullIf
 from near_lake_framework import LakeConfig, streamer
 
 from accounts.models import Account
 from donations.models import Donation
 from indexer_app.handler import handle_streamer_message
-from pots.models import PotPayout
+from pots.models import Pot, PotPayout
 
 from .logging import logger
 from .utils import cache_block_height, get_block_height
@@ -119,6 +121,91 @@ def fetch_usd_prices():
                 f"Failed to fetch USD prices for donation {donation.id}: {e}"
             )
     jobs_logger.info(f"USD prices fetched for {donations_count} donations.")
+
+
+@shared_task
+def update_pot_statistics():
+    pots = Pot.objects.all()
+    pots_count = pots.count()
+    jobs_logger.info(f"Updating statistics for {pots_count} pots...")
+    for pot in pots:
+        matching_pool_donations = Donation.objects.filter(pot=pot, matching_pool=True)
+        public_donations = Donation.objects.filter(pot=pot, matching_pool=False)
+        try:
+            print(f"Processing pot: {pot.id}")
+
+            # total matching pool
+            pot.total_matching_pool = sum(
+                int(donation.total_amount)
+                for donation in matching_pool_donations
+                if donation.total_amount.isdigit()
+            )
+            jobs_logger.info(f"Total matching pool: {pot.total_matching_pool}")
+
+            # total matching pool usd
+            pot.total_matching_pool_usd = sum(
+                donation.total_amount_usd
+                for donation in matching_pool_donations
+                if donation.total_amount_usd
+            )
+            jobs_logger.info(f"Total matching pool USD: {pot.total_matching_pool_usd}")
+
+            # matching pool balance (get from contract)
+            url = f"{settings.FASTNEAR_RPC_URL}/account/{pot.id.id}/view/get_config"
+            response = requests.get(url)
+            if response.status_code != 200:
+                jobs_logger.error(
+                    f"Failed to get matching pool balance for pot {pot.id}: {response.text}"
+                )
+            else:
+                data = response.json()
+                pot.matching_pool_balance = data["matching_pool_balance"]
+                jobs_logger.info(
+                    f"Matching pool balance for pot {pot.id}: {pot.matching_pool_balance}"
+                )
+
+            # matching pool donations count
+            pot.matching_pool_donations_count = matching_pool_donations.count()
+            jobs_logger.info(
+                f"Matching pool donations count: {pot.matching_pool_donations_count}"
+            )
+
+            # total public donations
+            pot.total_public_donations = sum(
+                int(donation.total_amount)
+                for donation in public_donations
+                if donation.total_amount.isdigit()
+            )
+            jobs_logger.info(f"Total public donations: {pot.total_public_donations}")
+
+            # total public donations usd
+            pot.total_public_donations_usd = sum(
+                donation.total_amount_usd
+                for donation in public_donations
+                if donation.total_amount_usd
+            )
+            jobs_logger.info(
+                f"Total public donations USD: {pot.total_public_donations_usd}"
+            )
+
+            # public donations count
+            pot.public_donations_count = public_donations.count()
+            jobs_logger.info(f"Public donations count: {pot.public_donations_count}")
+
+            # Save changes
+            pot.save(
+                update_fields=[
+                    "total_matching_pool",
+                    "total_matching_pool_usd",
+                    "matching_pool_balance",
+                    "matching_pool_donations_count",
+                    "total_public_donations",
+                    "total_public_donations_usd",
+                    "public_donations_count",
+                ]
+            )
+        except Exception as e:
+            jobs_logger.error(f"Failed to update statistics for pot {pot.id}: {e}")
 
 
 @shared_task

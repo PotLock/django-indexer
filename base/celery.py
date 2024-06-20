@@ -35,9 +35,15 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
         "options": {"queue": "beat_tasks"},
     },
+    "update_pot_statistics_every_5_minutes": {
+        "task": "indexer_app.tasks.update_pot_statistics",
+        "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+        "options": {"queue": "beat_tasks"},
+    },
 }
 
 app.conf.task_routes = {
     "indexer_app.tasks.update_account_statistics": {"queue": "beat_tasks"},
     "indexer_app.tasks.fetch_usd_prices": {"queue": "beat_tasks"},
+    "indexer_app.tasks.update_pot_statistics": {"queue": "beat_tasks"},
 }
