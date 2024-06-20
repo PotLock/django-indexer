@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
+from tokens.models import Token
 
 
 class PotFactory(models.Model):
@@ -420,13 +421,12 @@ class PotPayout(models.Model):
         null=True,
         help_text=_("Payout amount in USD."),
     )
-    ft = models.ForeignKey(
-        Account,
+    token = models.ForeignKey(
+        Token,
         on_delete=models.CASCADE,
-        related_name="ft_pot_payouts",
+        related_name="pot_payouts",
         null=False,
-        help_text=_("Payout FT."),
-        db_index=True,
+        help_text=_("Payout token."),
     )
     paid_at = models.DateTimeField(
         _("paid at"),

@@ -1,6 +1,7 @@
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from base.serializers import TwoDecimalStringField
+from tokens.serializers import SIMPLE_TOKEN_EXAMPLE
 
 from .models import Pot, PotApplication, PotPayout
 
@@ -135,12 +136,7 @@ SIMPLE_POT_APPLICATION_EXAMPLE = {
     "submitted_at": "2024-06-05T18:06:45.519Z",
     "updated_at": "2024-06-05T18:06:45.519Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": {
-        "id": "some-pot.v1.potfactory.potlock.near",
-        "name": "My Pot Name",
-        "description": "To support impactful open source software projects.",
-        "owner": "ossround.near",
-    },
+    "pot": SIMPLE_POT_EXAMPLE,
     "applicant": "applicant.near",
 }
 
@@ -157,14 +153,9 @@ SIMPLE_PAYOUT_EXAMPLE = {
     "amount_paid_usd": "1.27",
     "paid_at": "2024-06-05T18:12:39.014Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": {
-        "id": "some-pot.v1.potfactory.potlock.near",
-        "name": "My Pot Name",
-        "description": "To support impactful open source software projects.",
-        "owner": "ossround.near",
-    },
+    "pot": SIMPLE_POT_EXAMPLE,
     "recipient": "someproject.near",
-    "ft": "near",
+    "token": SIMPLE_TOKEN_EXAMPLE,
 }
 
 PAGINATED_PAYOUT_EXAMPLE = {

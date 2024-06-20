@@ -1,4 +1,5 @@
 from decimal import Decimal
+from os import name
 
 from django.db import models
 from django.utils import timezone
@@ -13,6 +14,23 @@ class Token(models.Model):
         on_delete=models.CASCADE,
         primary_key=True,
         help_text=_("Token ID (address)."),
+    )
+    name = models.CharField(
+        _("name"),
+        max_length=255,
+        null=True,
+        help_text=_("Token name."),
+    )
+    symbol = models.CharField(
+        _("symbol"),
+        max_length=255,
+        null=True,
+        help_text=_("Token symbol."),
+    )
+    icon = models.TextField(
+        _("icon"),
+        null=True,
+        help_text=_("Token icon (base64 data URL)."),
     )
     decimals = models.PositiveIntegerField(
         _("decimals"),

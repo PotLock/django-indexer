@@ -23,6 +23,7 @@ from pots.models import (
     PotPayoutChallenge,
     PotPayoutChallengeAdminResponse,
 )
+from tokens.models import Token
 
 from .logging import logger
 
@@ -712,9 +713,34 @@ async def handle_new_donation(
             chef, _ = await Account.objects.aget_or_create(id=donation_data["chef_id"])
 
         # Upsert token account
-        token_acct, _ = await Account.objects.aget_or_create(
-            id=(donation_data.get("ft_id") or "near")
+        ft_id = donation_data.get("ft_id") or "near"
+        token_acct, token_acct_created = await Account.objects.aget_or_create(id=ft_id)
+        token_defaults = {
+            "decimals": 24,
+        }
+        if token_acct_created:
+            logger.info(f"Created new token account: {token_acct}")
+            if ft_id != "near":
+                url = f"{settings.FASTNEAR_RPC_URL}/account/{ft_id}/view/ft_metadata"
+                ft_metadata = requests.get(url)
+                if ft_metadata.status_code != 200:
+                    logger.error(
+                        f"Request for ft_metadata failed ({ft_metadata.status_code}) with message: {ft_metadata.text}"
+                    )
+                else:
+                    ft_metadata = ft_metadata.json()
+                    if "name" in ft_metadata:
+                        token_defaults["name"] = ft_metadata["name"]
+                    if "symbol" in ft_metadata:
+                        token_defaults["symbol"] = ft_metadata["symbol"]
+                    if "icon" in ft_metadata:
+                        token_defaults["icon"] = ft_metadata["icon"]
+                    if "decimals" in ft_metadata:
+                        token_defaults["decimals"] = ft_metadata["decimals"]
+        token, _ = await Token.objects.aupdate_or_create(
+            id=token_acct, defaults=token_defaults
         )
+
     except Exception as e:
         logger.error(f"Failed to create/get an account involved in donation: {e}")
 
@@ -729,7 +755,7 @@ async def handle_new_donation(
             "total_amount_usd": None,  # USD amounts will be added later
             "net_amount_usd": None,
             "net_amount": net_amount,
-            "ft": token_acct,
+            "token": token,
             "message": donation_data.get("message"),
             "donated_at": donated_at,
             "matching_pool": donation_data.get("matching_pool", False),

@@ -1,3 +1,4 @@
+import token
 from datetime import timedelta
 from decimal import Decimal
 
@@ -62,12 +63,20 @@ class Donation(models.Model):
         null=True,
         help_text=_("Net amount in USD."),
     )
-    ft = models.ForeignKey(
-        Account,  # should probably be Token
+    # ft = models.ForeignKey(
+    #     Account,  # should probably be Token
+    #     on_delete=models.CASCADE,
+    #     related_name="ft_donations",
+    #     null=False,
+    #     help_text=_("Donation FT."),
+    # )
+    token = models.ForeignKey(
+        Token,
         on_delete=models.CASCADE,
-        related_name="ft_donations",
+        related_name="donations",
         null=False,
-        help_text=_("Donation FT."),
+        help_text=_("Donation token."),
+        db_index=True,
     )
     pot = models.ForeignKey(
         Pot,

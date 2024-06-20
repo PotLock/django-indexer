@@ -10,6 +10,7 @@ from accounts.api import (
     AccountDetailAPI,
     AccountDonationsReceivedAPI,
     AccountDonationsSentAPI,
+    AccountPayoutsReceivedAPI,
     AccountPotApplicationsAPI,
     AccountsListAPI,
     DonorsAPI,
@@ -62,6 +63,11 @@ urlpatterns = [
         "v1/accounts/<str:account_id>/donations_sent",
         AccountDonationsSentAPI.as_view(),
         name="accounts_api_by_id_donations_sent",
+    ),
+    path(
+        "v1/accounts/<str:account_id>/payouts_received",
+        AccountPayoutsReceivedAPI.as_view(),
+        name="accounts_api_by_id_payouts_received",
     ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),

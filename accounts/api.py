@@ -16,12 +16,13 @@ from rest_framework.views import APIView
 from base.logging import logger
 from donations.models import Donation
 from donations.serializers import PAGINATED_DONATION_EXAMPLE, DonationSerializer
-from pots.models import Pot, PotApplication, PotApplicationStatus
+from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 from pots.serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
     PAGINATED_POT_APPLICATION_EXAMPLE,
     PAGINATED_POT_EXAMPLE,
     PotApplicationSerializer,
+    PotPayoutSerializer,
     PotSerializer,
 )
 
@@ -323,4 +324,44 @@ class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
         donations = Donation.objects.filter(donor=account)
         results = self.paginate_queryset(donations, request, view=self)
         serializer = DonationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountPayoutsReceivedAPI(APIView, LimitOffsetPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=DonationSerializer(many=True),
+                description="Returns paginated payouts received by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for payouts received",
+                        value=PAGINATED_PAYOUT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        payouts = PotPayout.objects.filter(recipient=account)
+        results = self.paginate_queryset(payouts, request, view=self)
+        serializer = PotPayoutSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
