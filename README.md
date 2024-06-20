@@ -19,6 +19,8 @@
       - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
       - [✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)](#-get-list-by-id-get-listslist_id-paginated)
       - [✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#-get-registrations-for-list-get-listslist_idregistrations-paginated)
+    - [Donate Contract Config endpoint](#donate-contract-config-endpoint)
+      - [✅ Get donate contract config: `GET /donate_contract_config`](#-get-donate-contract-config-get-donate_contract_config)
     - [`Donors` endpoints](#donors-endpoints)
       - [✅ Get all donors: `GET /donors` (paginated)](#-get-all-donors-get-donors-paginated)
     - [`Pots` endpoints](#pots-endpoints)
@@ -154,6 +156,10 @@ enum PotApplicationStatus {
 #### ✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
 
 Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
+
+### Donate Contract Config endpoint
+
+#### ✅ Get donate contract config: `GET /donate_contract_config`
 
 ### `Donors` endpoints
 

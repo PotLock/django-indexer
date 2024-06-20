@@ -1,4 +1,9 @@
-from rest_framework.serializers import ModelSerializer, SerializerMethodField
+from rest_framework import serializers
+from rest_framework.serializers import (
+    ModelSerializer,
+    Serializer,
+    SerializerMethodField,
+)
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from pots.serializers import EXAMPLE_POT_ID, SIMPLE_POT_EXAMPLE, PotSerializer
@@ -97,3 +102,10 @@ PAGINATED_DONATION_EXAMPLE = {
     "previous": None,
     "results": [SIMPLE_DONATION_EXAMPLE],
 }
+
+
+class DonationContractConfigSerializer(Serializer):
+    owner = serializers.CharField()
+    protocol_fee_basis_points = serializers.IntegerField()
+    referral_fee_basis_points = serializers.IntegerField()
+    protocol_fee_recipient_account = serializers.CharField()

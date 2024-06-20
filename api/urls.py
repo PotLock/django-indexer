@@ -16,6 +16,7 @@ from accounts.api import (
     DonorsAPI,
 )
 from base.api import StatsAPI
+from donations.api import DonationContractConfigAPI
 from lists.api import ListDetailAPI, ListRegistrationsAPI, ListsListAPI
 from pots.api import (
     PotApplicationsAPI,
@@ -68,6 +69,12 @@ urlpatterns = [
         "v1/accounts/<str:account_id>/payouts_received",
         AccountPayoutsReceivedAPI.as_view(),
         name="accounts_api_by_id_payouts_received",
+    ),
+    # donate contract config
+    path(
+        "v1/donate_contract_config",
+        DonationContractConfigAPI.as_view(),
+        name="donate_contract_config_api",
     ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
