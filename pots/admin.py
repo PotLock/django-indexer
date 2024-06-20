@@ -187,7 +187,7 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
 
 @admin.register(PotPayout)
 class PotPayoutAdmin(admin.ModelAdmin):
-    list_display = ("id", "pot", "recipient", "amount", "paid_at")
+    list_display = ("id", "pot", "recipient", "amount", "amount_paid_usd", "paid_at")
     search_fields = ("pot__id", "recipient__id")
     list_filter = ("paid_at",)
 
