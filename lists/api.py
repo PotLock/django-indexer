@@ -20,6 +20,8 @@ from .serializers import (
     SIMPLE_LIST_EXAMPLE,
     ListRegistrationSerializer,
     ListSerializer,
+    PaginatedListRegistrationsResponseSerializer,
+    PaginatedListsResponseSerializer,
 )
 
 
@@ -28,7 +30,7 @@ class ListsListAPI(APIView, LimitOffsetPagination):
     @extend_schema(
         responses={
             200: OpenApiResponse(
-                response=ListSerializer(many=True),
+                response=PaginatedListsResponseSerializer,
                 description="Returns a paginated list of lists",
                 examples=[
                     OpenApiExample(
@@ -96,7 +98,7 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=ListRegistrationSerializer(many=True),
+                response=PaginatedListRegistrationsResponseSerializer,
                 description="Returns registrations for the list",
                 examples=[
                     OpenApiExample(

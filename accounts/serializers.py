@@ -113,3 +113,10 @@ PAGINATED_ACCOUNT_EXAMPLE = {
     "previous": None,
     "results": [SIMPLE_ACCOUNT_EXAMPLE],
 }
+
+
+class PaginatedAccountsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = AccountSerializer(many=True)

@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
@@ -84,6 +85,13 @@ PAGINATED_LIST_EXAMPLE = {
 }
 
 
+class PaginatedListsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = ListSerializer(many=True)
+
+
 SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "id": 10,
     "status": "Approved",
@@ -103,3 +111,10 @@ PAGINATED_LIST_REGISTRATION_EXAMPLE = {
     "previous": None,
     "results": [SIMPLE_LIST_REGISTRATION_EXAMPLE],
 }
+
+
+class PaginatedListRegistrationsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = ListRegistrationSerializer(many=True)

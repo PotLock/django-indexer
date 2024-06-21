@@ -14,9 +14,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
-from accounts.serializers import PAGINATED_ACCOUNT_EXAMPLE, AccountSerializer
+from accounts.serializers import (
+    PAGINATED_ACCOUNT_EXAMPLE,
+    AccountSerializer,
+    PaginatedAccountsResponseSerializer,
+)
 from donations.models import Donation
-from donations.serializers import PAGINATED_DONATION_EXAMPLE, DonationSerializer
+from donations.serializers import (
+    PAGINATED_DONATION_EXAMPLE,
+    DonationSerializer,
+    PaginatedDonationsResponseSerializer,
+)
 
 from .models import Pot, PotApplication, PotApplicationStatus
 from .serializers import (
@@ -24,6 +32,9 @@ from .serializers import (
     PAGINATED_POT_APPLICATION_EXAMPLE,
     PAGINATED_POT_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
+    PaginatedPotApplicationsResponseSerializer,
+    PaginatedPotPayoutsResponseSerializer,
+    PaginatedPotsResponseSerializer,
     PotApplicationSerializer,
     PotPayoutSerializer,
     PotSerializer,
@@ -35,7 +46,7 @@ class PotsListAPI(APIView, LimitOffsetPagination):
     @extend_schema(
         responses={
             200: OpenApiResponse(
-                response=PotSerializer(many=True),
+                response=PaginatedPotsResponseSerializer,
                 description="Returns a paginated list of pots",
                 examples=[
                     OpenApiExample(
@@ -99,7 +110,7 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=PotApplicationSerializer(many=True),
+                response=PaginatedPotApplicationsResponseSerializer,
                 description="Returns applications for the pot",
                 examples=[
                     OpenApiExample(
@@ -136,7 +147,7 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=DonationSerializer(many=True),
+                response=PaginatedDonationsResponseSerializer,
                 description="Returns donations for the pot",
                 examples=[
                     OpenApiExample(
@@ -173,7 +184,7 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=AccountSerializer(many=True),
+                response=PaginatedAccountsResponseSerializer,
                 description="Returns sponsors for the pot",
                 examples=[
                     OpenApiExample(
@@ -215,7 +226,7 @@ class PotPayoutsAPI(APIView, LimitOffsetPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=PotPayoutSerializer(many=True),
+                response=PaginatedPotPayoutsResponseSerializer,
                 description="Returns payouts for the pot",
                 examples=[
                     OpenApiExample(

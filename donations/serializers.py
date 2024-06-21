@@ -104,6 +104,13 @@ PAGINATED_DONATION_EXAMPLE = {
 }
 
 
+class PaginatedDonationsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = DonationSerializer(many=True)
+
+
 class DonationContractConfigSerializer(Serializer):
     owner = serializers.CharField()
     protocol_fee_basis_points = serializers.IntegerField()

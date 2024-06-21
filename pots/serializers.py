@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
@@ -174,6 +175,14 @@ PAGINATED_POT_EXAMPLE = {
     "results": [SIMPLE_POT_EXAMPLE],
 }
 
+
+class PaginatedPotsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotSerializer(many=True)
+
+
 SIMPLE_POT_APPLICATION_EXAMPLE = {
     "id": 2,
     "message": "Hi, I'm a great project and I'd like to apply for this pot.",
@@ -192,6 +201,14 @@ PAGINATED_POT_APPLICATION_EXAMPLE = {
     "results": [SIMPLE_POT_APPLICATION_EXAMPLE],
 }
 
+
+class PaginatedPotApplicationsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotApplicationSerializer(many=True)
+
+
 SIMPLE_PAYOUT_EXAMPLE = {
     "id": 4,
     "amount": "1000000000000000000000000",
@@ -209,3 +226,10 @@ PAGINATED_PAYOUT_EXAMPLE = {
     "previous": None,
     "results": [SIMPLE_PAYOUT_EXAMPLE],
 }
+
+
+class PaginatedPotPayoutsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotPayoutSerializer(many=True)
