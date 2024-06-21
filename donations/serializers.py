@@ -41,34 +41,12 @@ class DonationSerializer(ModelSerializer):
             "chef",
         ]
 
-    donor = SerializerMethodField()
-    token = SerializerMethodField()
-    pot = SerializerMethodField()
-    recipient = SerializerMethodField()
-    referrer = SerializerMethodField()
-    chef = SerializerMethodField()
-
-    def get_donor(self, obj):
-        return AccountSerializer(obj.donor).data
-
-    def get_token(self, obj):
-        return TokenSerializer(obj.token).data
-
-    def get_pot(self, obj):
-        if obj.pot:
-            return PotSerializer(obj.pot).data
-
-    def get_recipient(self, obj):
-        if obj.recipient:
-            return AccountSerializer(obj.recipient).data
-
-    def get_referrer(self, obj):
-        if obj.referrer:
-            return AccountSerializer(obj.referrer).data
-
-    def get_chef(self, obj):
-        if obj.chef:
-            return AccountSerializer(obj.chef).data
+    donor = AccountSerializer()
+    token = TokenSerializer()
+    pot = PotSerializer()
+    recipient = AccountSerializer()
+    referrer = AccountSerializer()
+    chef = AccountSerializer()
 
 
 SIMPLE_DONATION_EXAMPLE = {

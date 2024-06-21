@@ -52,23 +52,10 @@ class PotSerializer(ModelSerializer):
             "protocol_config_provider",
         ]
 
-    deployer = SerializerMethodField()
-    owner = SerializerMethodField()
-    admins = SerializerMethodField()
-    chef = SerializerMethodField()
-
-    def get_deployer(self, obj):
-        return AccountSerializer(obj.deployer).data
-
-    def get_owner(self, obj):
-        return AccountSerializer(obj.owner).data
-
-    def get_admins(self, obj):
-        return AccountSerializer(obj.admins.all(), many=True).data
-
-    def get_chef(self, obj):
-        if obj.chef:
-            return AccountSerializer(obj.chef).data
+    deployer = AccountSerializer()
+    owner = AccountSerializer()
+    admins = AccountSerializer(many=True)
+    chef = AccountSerializer()
 
 
 class PotApplicationSerializer(ModelSerializer):
@@ -86,14 +73,8 @@ class PotApplicationSerializer(ModelSerializer):
             "tx_hash",
         ]
 
-    pot = SerializerMethodField()
-    applicant = SerializerMethodField()
-
-    def get_pot(self, obj):
-        return PotSerializer(obj.pot).data
-
-    def get_applicant(self, obj):
-        return AccountSerializer(obj.applicant).data
+    pot = PotSerializer()
+    applicant = AccountSerializer()
 
 
 class PotPayoutSerializer(ModelSerializer):
@@ -110,18 +91,9 @@ class PotPayoutSerializer(ModelSerializer):
             "tx_hash",
         ]
 
-    pot = SerializerMethodField()
-    recipient = SerializerMethodField()
-    token = SerializerMethodField()
-
-    def get_pot(self, obj):
-        return PotSerializer(obj.pot).data
-
-    def get_recipient(self, obj):
-        return AccountSerializer(obj.recipient).data
-
-    def get_token(self, obj):
-        return TokenSerializer(obj.token).data
+    pot = PotSerializer()
+    recipient = AccountSerializer()
+    token = TokenSerializer()
 
 
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"

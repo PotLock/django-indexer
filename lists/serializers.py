@@ -23,14 +23,14 @@ class ListSerializer(ModelSerializer):
             "updated_at",
         ]
 
-    owner = SerializerMethodField()
-    admins = SerializerMethodField()
+    owner = AccountSerializer()
+    admins = AccountSerializer(many=True)
 
-    def get_owner(self, obj):
-        return AccountSerializer(obj.owner).data
+    # def get_owner(self, obj):
+    #     return AccountSerializer(obj.owner).data
 
-    def get_admins(self, obj):
-        return AccountSerializer(obj.admins.all(), many=True).data
+    # def get_admins(self, obj):
+    #     return AccountSerializer(obj.admins.all(), many=True).data
 
 
 class ListRegistrationSerializer(ModelSerializer):
@@ -49,18 +49,9 @@ class ListRegistrationSerializer(ModelSerializer):
             "tx_hash",
         ]
 
-    list = SerializerMethodField()
-    registrant = SerializerMethodField()
-    registered_by = SerializerMethodField()
-
-    def get_list(self, obj):
-        return ListSerializer(obj.list).data
-
-    def get_registrant(self, obj):
-        return AccountSerializer(obj.registrant).data
-
-    def get_registered_by(self, obj):
-        return AccountSerializer(obj.registered_by).data
+    list = ListSerializer()
+    registrant = AccountSerializer()
+    registered_by = AccountSerializer()
 
 
 SIMPLE_LIST_EXAMPLE = {
