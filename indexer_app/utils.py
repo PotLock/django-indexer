@@ -753,6 +753,7 @@ async def handle_new_donation(
         logger.info(f"inserting {donation_type} donation")
         default_data = {
             "donor": donor,
+            "pot": None,
             "total_amount": total_amount,
             "total_amount_usd": None,  # USD amounts will be added later
             "net_amount_usd": None,
