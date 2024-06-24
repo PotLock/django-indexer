@@ -259,6 +259,7 @@ async def handle_new_list_registration(
     project_list = []
     insert_data = []
     for dt in reg_data:
+        logger.info(f"dt: {dt}")
         project_list.append({"id": dt["registrant_id"]})
         insert_data.append(
             {
@@ -274,6 +275,7 @@ async def handle_new_list_registration(
                 "tx_hash": receipt.receipt_id,
             }
         )
+    logger.info(f"insert_data: {insert_data}")
 
     try:
         await Account.objects.abulk_create(
