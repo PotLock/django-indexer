@@ -213,6 +213,12 @@ class AccountPotApplicationsAPI(APIView, LimitOffsetPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter pot applications by status",
+            ),
         ],
         responses={
             200: OpenApiResponse(

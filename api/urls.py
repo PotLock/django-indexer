@@ -17,7 +17,12 @@ from accounts.api import (
 )
 from base.api import StatsAPI
 from donations.api import DonationContractConfigAPI
-from lists.api import ListDetailAPI, ListRegistrationsAPI, ListsListAPI
+from lists.api import (
+    ListDetailAPI,
+    ListRandomRegistrationAPI,
+    ListRegistrationsAPI,
+    ListsListAPI,
+)
 from pots.api import (
     PotApplicationsAPI,
     PotDetailAPI,
@@ -84,6 +89,11 @@ urlpatterns = [
     path(
         "v1/lists/<int:list_id>/registrations",
         ListRegistrationsAPI.as_view(),
+        name="lists_api_by_id_registrations",
+    ),
+    path(
+        "v1/lists/<int:list_id>/random_registration",
+        ListRandomRegistrationAPI.as_view(),
         name="lists_api_by_id_registrations",
     ),
     # pots

@@ -92,8 +92,8 @@ SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "admin_notes": "This is a great project that I want on my list.",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
     "list": SIMPLE_LIST_EXAMPLE,
-    "registrant": "project.near",
-    "registered_by": "project-admin.near",
+    "registrant": SIMPLE_ACCOUNT_EXAMPLE,
+    "registered_by": SIMPLE_ACCOUNT_EXAMPLE,
 }
 
 PAGINATED_LIST_REGISTRATION_EXAMPLE = {
