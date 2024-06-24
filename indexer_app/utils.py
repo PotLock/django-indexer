@@ -671,11 +671,10 @@ async def handle_new_donation(
     signer_id: str,
     donation_type: str,  # "direct" or "pot"
     receipt_obj: Receipt,
-    result: dict,  # Donation object (note that these vary between direct and pot donations - see examples of each in ./examples.txt)
+    donation_data: dict,  # Donation object (note that these vary between direct and pot donations - see examples of each in ./examples.txt)
 ):
-    logger.info(f"handle_new_donation data: {data}, {receiver_id}")
-    donation_data = json.loads(base64.b64decode(result).decode("utf-8"))
-    logger.info(f"decoded result: {donation_data}")
+    logger.info(f"handle_new_donation args data: {data}, {receiver_id}")
+    logger.info(f"donation data: {donation_data}")
 
     if "net_amount" in donation_data:
         net_amount = int(donation_data["net_amount"])

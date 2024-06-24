@@ -220,14 +220,28 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             if not result:
                                 logger.info("No result found. Skipping...")
                                 break
+                            decoded_success_val = base64.b64decode(result).decode(
+                                "utf-8"
+                            )
+                            logger.info(f"Decoded success value: {decoded_success_val}")
+                            if (
+                                decoded_success_val == "null"
+                            ):  # weird edge case that sometimes occurs where the response is a literal string "null"
+                                logger.info("Result is null. Skipping...")
+                            try:
+                                donation_data = json.loads(decoded_success_val)
+                            except json.JSONDecodeError:
+                                logger.error(
+                                    f"Error decoding result to JSON: {decoded_success_val}"
+                                )
+                                donation_data = {}
                             await handle_new_donation(
                                 args_dict,
                                 receiver_id,
                                 signer_id,
                                 donation_type,
                                 receipt,
-                                result,
-                                # log_data,
+                                donation_data,
                             )
                             break
 
