@@ -240,6 +240,7 @@ class Donation(models.Model):
             # TODO: update totals for relevant accounts
         else:
             # no existing price within acceptable time period; fetch from coingecko
+            price_data = {}
             try:
                 logger.info(
                     "No existing price within acceptable time period; fetching historical price..."
