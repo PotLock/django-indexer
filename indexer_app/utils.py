@@ -354,9 +354,10 @@ async def handle_pot_application(
 
         # Update or create the account
         project, _ = await Account.objects.aget_or_create(
-            id=data["project_id"],
+            id=appl_data["project_id"],
         )
 
+        # TODO: wouldn't this be the same as the project_id? should inspect
         signer, _ = await Account.objects.aget_or_create(
             id=signer_id,
         )
