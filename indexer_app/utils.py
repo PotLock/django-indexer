@@ -552,7 +552,7 @@ async def handle_transfer_payout(
     try:
 
         data = data["payout"]
-        logger.info(f"fulfill payout data: {data}, {receiver_id}")
+        logger.info(f"fulfill payout data: {data}, {receiver_id}, {created_at}")
         payout = {
             "recipient_id": data["project_id"],
             "amount": data["amount"],
