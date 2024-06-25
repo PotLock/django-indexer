@@ -226,8 +226,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             logger.info(f"Decoded success value: {decoded_success_val}")
                             if (
                                 decoded_success_val == "null"
-                            ):  # weird edge case that sometimes occurs where the response is a literal string "null"
+                            ):  # edge case that sometimes occurs where the response is a literal string "null", appears to be due to transfer_funds_callback returning None e.g. in the case of a ProtocolFeeCallback (see https://pikespeak.ai/transaction-viewer/78M3HCiBCeCu7jEk6KiVSJGr4utnV2aze8S5ZdEu16t8/detailed for example)
                                 logger.info("Result is null. Skipping...")
+                                break
                             try:
                                 donation_data = json.loads(decoded_success_val)
                             except json.JSONDecodeError:
