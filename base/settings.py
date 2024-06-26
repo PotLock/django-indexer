@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
-    "alpha.potlock.io",
+    # "alpha.potlock.io",
 ]
 
 # Env vars
@@ -161,6 +161,7 @@ WSGI_APPLICATION = "base.wsgi.application"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://alpha.potlock.io",
 ]
 
 # REDIS / CACHE CONFIGS
