@@ -47,3 +47,5 @@ app.conf.task_routes = {
     "indexer_app.tasks.fetch_usd_prices": {"queue": "beat_tasks"},
     "indexer_app.tasks.update_pot_statistics": {"queue": "beat_tasks"},
 }
+
+SPOT_INDEXER_QUEUE_NAME = "spot_indexing"

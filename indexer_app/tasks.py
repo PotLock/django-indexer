@@ -13,6 +13,7 @@ from django.db.models.functions import Cast, NullIf
 from near_lake_framework import LakeConfig, streamer
 
 from accounts.models import Account
+from base.celery import SPOT_INDEXER_QUEUE_NAME
 from donations.models import Donation
 from indexer_app.handler import handle_streamer_message
 from pots.models import Pot, PotPayout
@@ -71,6 +72,21 @@ def listen_to_near_events():
         start_block = get_block_height("current_block_height")
         # start_block = 112959664
         logger.info(f"what's the start block, pray tell? {start_block-1}")
+        loop.run_until_complete(indexer(start_block - 1, None))
+    except WorkerLostError:
+        pass  # don't log to Sentry
+    finally:
+        loop.close()
+
+
+@shared_task(queue=SPOT_INDEXER_QUEUE_NAME)
+def spot_index_near_events(start_block):
+    logger.info("Spot indexing NEAR events...")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        logger.info(f"Spot index start block: {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
         pass  # don't log to Sentry
