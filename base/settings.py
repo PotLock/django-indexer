@@ -35,6 +35,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
+    "alpha.potlock.io",
 ]
 
 # Env vars
