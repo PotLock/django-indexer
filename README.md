@@ -91,7 +91,7 @@ export PL_SENTRY_DSN=
 
 This is a public, read-only API and as such does not currently implement authentication or authorization.
 
-Rate limits of 100 requests/min are enforced to ensure service for all users.
+Rate limits of 500 requests/min are enforced to ensure service for all users.
 
 #### Error Responses
 
