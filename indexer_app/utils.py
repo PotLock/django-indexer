@@ -145,6 +145,61 @@ async def handle_new_pot(
         logger.error(f"Failed to handle new pot, Error: {e}")
 
 
+
+async def handle_pot_config_update(
+        receiver_id: str,
+        log_data: list
+):
+        try:
+                data = log_data[0]
+                logger.info(f"building updated config for pot {receiver_id}")
+                pot_config = {
+                    "deployer": data["deployed_by"],
+                    "source_metadata": data["source_metadata"],
+                    "owner_id": data["owner"],
+                    "chef_id": data.get("chef"),
+                    "name": data["pot_name"],
+                    "description": data["pot_description"],
+                    "max_approved_applicants": data["max_projects"],
+                    "base_currency": data["base_currency"],
+                    "application_start": datetime.fromtimestamp(
+                        data["application_start_ms"] / 1000
+                    ),
+                    "application_end": datetime.fromtimestamp(
+                        data["application_end_ms"] / 1000
+                    ),
+                    "matching_round_start": datetime.fromtimestamp(
+                        data["public_round_start_ms"] / 1000
+                    ),
+                    "matching_round_end": datetime.fromtimestamp(
+                        data["public_round_end_ms"] / 1000
+                    ),
+                    "registry_provider": data["registry_provider"],
+                    "min_matching_pool_donation_amount": data[
+                        "min_matching_pool_donation_amount"
+                    ],
+                    "sybil_wrapper_provider": data["sybil_wrapper_provider"],
+                    "custom_sybil_checks": data.get("custom_sybil_checks"),
+                    "custom_min_threshold_score": data.get("custom_min_threshold_score"),
+                    "referral_fee_matching_pool_basis_points": data[
+                        "referral_fee_matching_pool_basis_points"
+                    ],
+                    "referral_fee_public_round_basis_points": data[
+                        "referral_fee_public_round_basis_points"
+                    ],
+                    "chef_fee_basis_points": data["chef_fee_basis_points"],
+                    "matching_pool_balance": data["matching_pool_balance"],
+                    "total_public_donations": data["total_public_donations"],
+                    "public_donations_count": data["public_donations_count"],
+                    "cooldown_period_ms": data["cooldown_end_ms"],
+                    "all_paid_out": data["all_paid_out"],
+                    "protocol_config_provider": data["protocol_config_provider"],
+                }
+                await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
+        except Exception as e:
+                logger.error(f"Failed to update Pot config, Error: {e}")
+
+
 async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datetime):
     try:
 
