@@ -98,6 +98,12 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("list_id", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by status",
+            ),
         ],
         responses={
             200: OpenApiResponse(
@@ -128,6 +134,13 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
             )
 
         registrations = list_obj.registrations.all()
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in ListRegistrationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            registrations = registrations.filter(status=status_param)
         results = self.paginate_queryset(registrations, request, view=self)
         serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
