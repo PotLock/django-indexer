@@ -157,6 +157,7 @@ enum PotApplicationStatus {
 #### ✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
 
 Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
+Can also specify project category to filter by using `category` query param if desired, e.g. `category=Education`
 
 #### ✅ Get random registration for list: `GET /lists/{LIST_ID}/random_registration`
 

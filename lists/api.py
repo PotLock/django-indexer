@@ -135,12 +135,18 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
 
         registrations = list_obj.registrations.all()
         status_param = request.query_params.get("status")
+        category_param = request.query_params.get("category")
         if status_param:
             if status_param not in ListRegistrationStatus.values:
                 return Response(
                     {"message": f"Invalid status value: {status_param}"}, status=400
                 )
             registrations = registrations.filter(status=status_param)
+        if category_param:
+                category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
+                registrations = registrations.filter(
+                        registrant__near_social_profile_data__plCategories__iregex = category_regex_pattern
+                )
         results = self.paginate_queryset(registrations, request, view=self)
         serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
