@@ -104,6 +104,12 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
                 OpenApiParameter.QUERY,
                 description="Filter registrations by status",
             ),
+            OpenApiParameter(
+                "category",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by category",
+            ),
         ],
         responses={
             200: OpenApiResponse(
