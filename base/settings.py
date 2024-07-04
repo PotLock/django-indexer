@@ -162,6 +162,9 @@ WSGI_APPLICATION = "base.wsgi.application"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://alpha.potlock.io",
+    "https://alpha.potlock.org",
+    "https://alpha.potlock.xyz",
+    "https://alpha.potlock.app", # regex matching might not be advisable.
 ]
 
 # REDIS / CACHE CONFIGS
