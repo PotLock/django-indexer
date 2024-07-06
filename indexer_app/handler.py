@@ -19,6 +19,7 @@ from .utils import (  # handle_batch_donations,
     handle_nadabot_admin_add,
     handle_nadabot_registry,
     handle_new_donation,
+    handle_new_group,
     handle_new_list,
     handle_new_list_registration,
     handle_new_pot,
@@ -63,7 +64,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             receiver_id = receipt_execution_outcome.receipt.receiver_id
             if (
                 receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
-                and not receiver_id.endswith(settings.POTLOCK_TLA)
+                and not receiver_id.endswith((settings.POTLOCK_TLA, settings.NADABOT_TLA))
             ):
                 continue
             # 1. HANDLE LOGS
@@ -73,6 +74,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             for log_index, log in enumerate(
                 receipt_execution_outcome.execution_outcome.outcome.logs, start=1
             ):
+                logger.info(f"didier drigba..: {log}")
                 if not log.startswith("EVENT_JSON:"):
                     continue
                 try:
@@ -88,6 +90,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         await handle_add_stamp(parsed_log.get("data")[0], receipt.receiver_id, receipt.receipt["Action"]["signer_id"])
                     elif event_name == "update_default_human_threshold":
                         await handle_update_default_human_threshold(parsed_log.get("data")[0], receipt.receiver_id)
+                    if event_name == "add_or_update_group":
+                            await handle_new_group(parsed_log.get("data")[0], datetime.fromtimestamp(block_timestamp / 1000000000))
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
