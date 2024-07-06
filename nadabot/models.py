@@ -124,6 +124,7 @@ class Provider(models.Model):
     )
     submitted_by = models.ForeignKey(
         Account,
+        on_delete=models.CASCADE,
         verbose_name=_("submitted by"),
         max_length=100,
         null=False,
@@ -179,4 +180,55 @@ class Stamp(models.Model):
         _("verification date"),
         auto_now_add=True,
         help_text=_("The date of verification.")
+    )
+
+class Rule(models.Model):
+    id = models.AutoField(
+        _("rule id"),
+        primary_key=True,
+        help_text=_("rule id for group rules"),
+    )
+    rule = models.CharField(
+        _("rule enum choice"),
+        max_length=50,
+        null=False,
+        help_text=_("particular rule choice from the rule enum")
+    )
+    value = models.PositiveIntegerField(
+        _("rule value"),
+        null=True,
+        help_text=_("An optional value that rule choices might carry."),
+    )
+
+class Group(models.Model):
+    id = models.PositiveIntegerField(
+        _("group id"),
+        primary_key=True,
+        help_text=_("Group id."),
+    )
+    name = models.CharField(
+        _("group name"),
+        max_length=100,
+        null=False,
+        help_text=_("name given to the group")
+    )
+    group_rule = models.ForeignKey(
+        Rule,
+        on_delete=models.CASCADE,
+        verbose_name=_("rule"),
+        help_text=_("The rule this group uses.")
+    )
+    providers = models.ManyToManyField(
+        Provider,
+        related_name="group_provider",
+        help_text=_("group providers."),
+    )
+    created_at = models.DateTimeField(
+        _("created at"),
+        null=False,
+        help_text=_("Group creation date."),
+    )
+    updated_at = models.DateTimeField(
+        _("updated at"),
+        help_text=_("Group last update date."),
     )

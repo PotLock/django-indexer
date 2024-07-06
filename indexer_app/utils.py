@@ -14,7 +14,7 @@ from activities.models import Activity
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
-from nadabot.models import NadabotRegistry, Provider, Stamp
+from nadabot.models import Group, NadabotRegistry, Provider, Rule, Stamp
 from pots.models import (
     Pot,
     PotApplication,
@@ -672,7 +672,8 @@ async def handle_nadabot_admin_add(data, receiverId):
     obj = await NadabotRegistry.objects.aget(id=receiverId)
 
     for acct in data["account_ids"]:
-        await obj.admins.aadd({"admins_id": acct})  # ??
+        user, _ = await Account.objects.aget_or_create(id=acct)
+        await obj.admins.aadd(user)
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
@@ -932,35 +933,37 @@ async def handle_new_provider(
         f"upserting accounts involved, {data['submitted_by']}"
     )
 
-    # Upsert donor account
-    submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
+    try:
+        submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
 
-    provider_id = data["id"]
+        provider_id = data["id"]
 
-    if provider_id == 13:
-        provider_id = await cache.aget("last_id", 1)
-        await cache.aset("last_id", provider_id+1)
+        if provider_id == 13:
+                provider_id = await cache.aget("last_id", 1)
+                await cache.aset("last_id", provider_id+1)
 
-    provider = await Provider.objects.acreate(
-        id=provider_id,
-        contract_id=data["contract_id"],
-        method_name=data["method_name"],
-        provider_name=data["provider_name"],
-        description=data.get("description"),
-        status=data["status"],
-        admin_notes=data.get("admin_notes"),
-        default_weight=data["default_weight"],
-        gas=data.get("gas"),
-        tags=data.get("tags"),
-        icon_url=data.get("icon_url"),
-        external_url=data.get("external_url"),
-        submitted_by=data["submitted_by"],
-        submitted_at_ms = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
-        stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
-        account_id_arg_name = data["account_id_arg_name"],
-        custom_args = data.get("custom_args"),
-        registry_id=receiverId
-    )
+        provider = await Provider.objects.aupdate_or_create(
+                id=provider_id,
+                contract_id=data["contract_id"],
+                method_name=data["method_name"],
+                provider_name=data["provider_name"],
+                description=data.get("description"),
+                status=data["status"],
+                admin_notes=data.get("admin_notes"),
+                default_weight=data["default_weight"],
+                gas=data.get("gas"),
+                tags=data.get("tags"),
+                icon_url=data.get("icon_url"),
+                external_url=data.get("external_url"),
+                submitted_by_id=data["submitted_by"],
+                submitted_at_ms = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
+                stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
+                account_id_arg_name = data["account_id_arg_name"],
+                custom_args = data.get("custom_args"),
+                registry_id=receiverId
+        )
+    except Exception as e:
+        logger.error(f"Failed to add new stamp provider: {e}")
 
 
 async def handle_add_stamp(
@@ -968,19 +971,56 @@ async def handle_add_stamp(
         receiverId: str,
         signerId: str
 ):
-    logger.info(f"new stamp data: {data}, {receiverId} ")
+    logger.info(f"new stamp data: {data}, {receiverId}")
     data = data["stamp"]
 
-    logger.info(f"upserting accounts involved, {data["user_id"]} ")
+    logger.info(f"upserting accounts involved, {data['user_id']}")
 
-    # Upsert donor account
     user, _ = await Account.objects.aget_or_create(id=data["user_id"])
 
-    stamp = await Stamp.objects.acreate(
-        user=user,
-        provider_id=data["provider_id"],
-        verification_date = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
-    )
+    try:
+        stamp = await Stamp.objects.aupdate_or_create(
+            user=user,
+            provider_id=data["provider_id"],
+            verification_date = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+        )
+    except Exception as e:
+        logger.error(f"Failed to create stamp: {e}")
+
+
+
+async def handle_new_group(
+    data: dict,
+    created_at: datetime
+):
+    logger.info(f"new group data: {data}")
+    group_data = data.get('group', {})
+    try:
+        rule = group_data['rule']
+        rule_key = rule
+        rule_val = None
+        if type(rule) == dict:
+            rule_key = next(iter(rule))
+            rule_val = rule.get(rule_key)
+
+        rule_obj, _ = await Rule.objects.aget_or_create(
+            rule = rule_key,
+            value = rule_val
+        )
+        group = await Group.objects.acreate(
+            id=group_data["id"],
+            name=group_data["name"],
+            created_at=created_at,
+            updated_at=created_at,
+            group_rule = rule_obj
+        )
+
+        logger.info(f"addding provider.... : {group_data['providers']}")
+        if group_data.get("providers"):
+            for provider_id in group_data["providers"]:
+                await group.providers.aadd(provider_id)
+    except Exception as e:
+        logger.error(f"Failed to create group, because: {e}")
 
 async def cache_block_height(
     key: str, height: int, block_count: int, block_timestamp: int
