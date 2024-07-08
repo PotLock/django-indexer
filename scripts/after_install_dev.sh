@@ -56,14 +56,8 @@ if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
 
     echo 'Applying migrations...' >> "$LOG_FILE"
     poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
-
-    # echo 'Starting services...' >> "$LOG_FILE"
-    # sudo systemctl start gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 else
-    # echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     echo 'No migrations found.' >> "$LOG_FILE"
-    # poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
-    # sudo systemctl restart gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 fi
 
 # Collect static
