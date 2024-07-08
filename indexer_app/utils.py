@@ -552,7 +552,6 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
             )
             insertion_data.append(pot_payout)
 
-        logger.info(f"pot payouts insertion data: {insertion_data}")
         await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
     except Exception as e:
         logger.error(f"Failed to set payouts, Error: {e}")
