@@ -1,6 +1,7 @@
 import base64
 import json
 from datetime import datetime
+from math import log
 
 import requests
 from django.conf import settings
@@ -533,8 +534,8 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
         pot = await Pot.objects.aget(id=receiver_id)
-        near_acct, _ = Account.objects.get_or_create(id="near")
-        near_token, _ = Token.objects.get_or_create(
+        near_acct, _ = Account.objects.aget_or_create(id="near")
+        near_token, _ = Token.objects.aget_or_create(
             id=near_acct
         )  # Pots only support native NEAR
 
@@ -551,6 +552,7 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
             )
             insertion_data.append(pot_payout)
 
+        logger.info(f"pot payouts insertion data: {insertion_data}")
         await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
     except Exception as e:
         logger.error(f"Failed to set payouts, Error: {e}")
