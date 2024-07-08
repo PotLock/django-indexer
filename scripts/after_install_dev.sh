@@ -51,8 +51,9 @@ poetry run python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full o
 PENDING_MIGRATIONS=$(poetry run python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
 
 if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
-    echo "Migrations found; stopping services..." >> "$LOG_FILE"
-    sudo systemctl stop gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
+    # COMMENTING OUT FOR NOW AS I BELIEVE STOPPING SERVICES CREATES UNNECESSARY DOWNTIME
+    # echo "Migrations found; stopping services..." >> "$LOG_FILE"
+    # sudo systemctl stop gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 
     echo 'Applying migrations...' >> "$LOG_FILE"
     poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
