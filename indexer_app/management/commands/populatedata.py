@@ -464,8 +464,11 @@ class Command(BaseCommand):
                     break
             if "payouts" in config:
                 for payout in config["payouts"]:
-                    if not payout["paid_at"]:
-                        continue
+                    paid_at = (
+                        None
+                        if "paid_at" not in payout
+                        else datetime.fromtimestamp(payout["paid_at"] / 1000)
+                    )
                     recipient, _ = Account.objects.get_or_create(
                         id=payout["project_id"]
                     )
@@ -476,7 +479,7 @@ class Command(BaseCommand):
                         "amount": payout["amount"],
                         "amount_paid_usd": None,
                         "token": near_token,  # pots only support native NEAR
-                        "paid_at": datetime.fromtimestamp(payout["paid_at"] / 1000),
+                        "paid_at": paid_at,
                         "tx_hash": None,
                     }
                     payout, _ = PotPayout.objects.update_or_create(

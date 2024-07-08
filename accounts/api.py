@@ -376,7 +376,7 @@ class AccountPayoutsReceivedAPI(APIView, LimitOffsetPagination):
                 {"message": f"Account with ID {account_id} not found."}, status=404
             )
 
-        payouts = PotPayout.objects.filter(recipient=account)
+        payouts = PotPayout.objects.filter(recipient=account, paid_at__isnull=False)
         results = self.paginate_queryset(payouts, request, view=self)
         serializer = PotPayoutSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

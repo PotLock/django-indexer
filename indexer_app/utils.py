@@ -532,14 +532,21 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
 
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
+        pot = await Pot.objects.aget(id=receiver_id)
+        near_acct, _ = Account.objects.get_or_create(id="near")
+        near_token, _ = Token.objects.get_or_create(
+            id=near_acct
+        )  # Pots only support native NEAR
 
         insertion_data = []
         for payout in payouts:
             # General question: should we register projects as accounts?
             pot_payout = PotPayout(
+                pot=pot,
                 recipient_id=payout.get("project_id"),
                 amount=payout.get("amount"),
-                ft_id=payout.get("ft_id", "near"),
+                token=near_token,
+                paid_at=None,
                 tx_hash=receipt.receipt_id,
             )
             insertion_data.append(pot_payout)

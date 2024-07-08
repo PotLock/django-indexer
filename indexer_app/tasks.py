@@ -139,7 +139,9 @@ def fetch_usd_prices():
     jobs_logger.info(f"USD prices fetched for {donations_count} donations.")
 
     # payouts
-    payouts = PotPayout.objects.filter(amount_paid_usd__isnull=True)
+    payouts = PotPayout.objects.filter(
+        amount_paid_usd__isnull=True, paid_at__isnull=False
+    )
     payouts_count = payouts.count()
     jobs_logger.info(f"Fetching USD prices for {payouts_count} payouts...")
     for payout in payouts:

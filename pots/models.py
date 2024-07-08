@@ -437,7 +437,7 @@ class PotPayout(models.Model):
     )
     paid_at = models.DateTimeField(
         _("paid at"),
-        null=False,
+        null=True,
         help_text=_("Payout date."),
         db_index=True,
     )
