@@ -536,13 +536,13 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
         insertion_data = []
         for payout in payouts:
             # General question: should we register projects as accounts?
-            potPayout = {
-                "recipient_id": payout.get("project_id"),
-                "amount": payout.get("amount"),
-                "ft_id": payout.get("ft_id", "near"),
-                "tx_hash": receipt.receipt_id,
-            }
-            insertion_data.append(potPayout)
+            pot_payout = PotPayout(
+                recipient_id=payout.get("project_id"),
+                amount=payout.get("amount"),
+                ft_id=payout.get("ft_id", "near"),
+                tx_hash=receipt.receipt_id,
+            )
+            insertion_data.append(pot_payout)
 
         await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
     except Exception as e:
