@@ -164,7 +164,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://alpha.potlock.io",
     "https://alpha.potlock.org",
     "https://alpha.potlock.xyz",
-    "https://alpha.potlock.app", # regex matching might not be advisable.
+    "https://alpha.potlock.app",  # regex matching might not be advisable.
+    "http://dev.local",
 ]
 
 # REDIS / CACHE CONFIGS
