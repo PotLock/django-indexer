@@ -57,12 +57,20 @@ if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
     echo 'Applying migrations...' >> "$LOG_FILE"
     poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
 
-    echo 'Starting services...' >> "$LOG_FILE"
-    sudo systemctl start gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
+    # echo 'Starting services...' >> "$LOG_FILE"
+    # sudo systemctl start gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 else
-    echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+    # echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+    echo 'No migrations found.' >> "$LOG_FILE"
     poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
-    sudo systemctl restart gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
+    # sudo systemctl restart gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 fi
+
+# Gracefully reload Gunicorn to apply the changes without downtime
+echo 'Reloading Gunicorn...' >> "$LOG_FILE"
+sudo systemctl kill --signal=HUP gunicorn-dev
+
+echo 'Restarting services...' >> "$LOG_FILE"
+sudo systemctl restart celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install_dev.sh completed" >> "$LOG_FILE"
