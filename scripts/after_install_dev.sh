@@ -62,9 +62,13 @@ if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
 else
     # echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
     echo 'No migrations found.' >> "$LOG_FILE"
-    poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
+    # poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
     # sudo systemctl restart gunicorn-dev celery-indexer-worker-dev celery-beat-worker-dev celery-beat-dev
 fi
+
+# Collect static
+echo 'Running collectstatic...' >> "$LOG_FILE"
+poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
 
 # Gracefully reload Gunicorn to apply the changes without downtime
 echo 'Reloading Gunicorn...' >> "$LOG_FILE"
