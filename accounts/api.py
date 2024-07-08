@@ -71,7 +71,7 @@ class DonorsAPI(APIView, PageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    # @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         # Return all donors
         donations_subquery = Donation.objects.filter(donor_id=OuterRef("pk"))
@@ -107,7 +107,7 @@ class AccountsListAPI(APIView, PageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         }
     )
-    # @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         accounts = Account.objects.all()
         results = self.paginate_queryset(accounts, request, view=self)
