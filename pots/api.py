@@ -8,7 +8,7 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,7 +41,7 @@ from .serializers import (
 )
 
 
-class PotsListAPI(APIView, LimitOffsetPagination):
+class PotsListAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         responses={
@@ -102,7 +102,7 @@ class PotDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class PotApplicationsAPI(APIView, LimitOffsetPagination):
+class PotApplicationsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -139,7 +139,7 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotDonationsAPI(APIView, LimitOffsetPagination):
+class PotDonationsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -176,7 +176,7 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotSponsorsAPI(APIView, LimitOffsetPagination):
+class PotSponsorsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -218,7 +218,7 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotPayoutsAPI(APIView, LimitOffsetPagination):
+class PotPayoutsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
