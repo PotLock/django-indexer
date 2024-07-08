@@ -9,7 +9,7 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,7 +43,7 @@ from .serializers import (
 )
 
 
-class DonorsAPI(APIView, LimitOffsetPagination):
+class DonorsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -87,7 +87,7 @@ class DonorsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountsListAPI(APIView, LimitOffsetPagination):
+class AccountsListAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         responses={
@@ -152,7 +152,7 @@ class AccountDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class AccountActivePotsAPI(APIView, LimitOffsetPagination):
+class AccountActivePotsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -208,7 +208,7 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountPotApplicationsAPI(APIView, LimitOffsetPagination):
+class AccountPotApplicationsAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -262,7 +262,7 @@ class AccountPotApplicationsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
+class AccountDonationsReceivedAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -302,7 +302,7 @@ class AccountDonationsReceivedAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
+class AccountDonationsSentAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -342,7 +342,7 @@ class AccountDonationsSentAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountPayoutsReceivedAPI(APIView, LimitOffsetPagination):
+class AccountPayoutsReceivedAPI(APIView, PageNumberPagination):
 
     @extend_schema(
         parameters=[

@@ -50,6 +50,9 @@ class Account(models.Model):
         help_text=_("NEAR social data contained under 'profile' key."),
     )
 
+    class Meta:
+        ordering = ["id"]
+
     async def fetch_near_social_profile_data_async(self):
         fetch_profile_data = sync_to_async(self.fetch_near_social_profile_data)
         await fetch_profile_data()
