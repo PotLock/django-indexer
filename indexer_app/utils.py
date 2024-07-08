@@ -534,8 +534,8 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
         pot = await Pot.objects.aget(id=receiver_id)
-        near_acct, _ = Account.objects.aget_or_create(id="near")
-        near_token, _ = Token.objects.aget_or_create(
+        near_acct, _ = await Account.objects.aget_or_create(id="near")
+        near_token, _ = await Token.objects.aget_or_create(
             id=near_acct
         )  # Pots only support native NEAR
 
