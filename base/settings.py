@@ -107,7 +107,7 @@ INSTALLED_APPS = [
 DEFAULT_PAGE_SIZE = 30
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "api.pagination.ResultPagination",
     "PAGE_SIZE": DEFAULT_PAGE_SIZE,
     "DEFAULT_THROTTLE_CLASSES": [
         # "rest_framework.throttling.UserRateThrottle",
@@ -166,7 +166,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://alpha.potlock.xyz",
     "https://alpha.potlock.app",  # regex matching might not be advisable.
     "http://dev.local",
-    "https://dev.local",
 ]
 
 # REDIS / CACHE CONFIGS
