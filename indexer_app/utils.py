@@ -148,10 +148,13 @@ async def handle_new_pot(
 
 async def handle_pot_config_update(
         receiver_id: str,
-        log_data: list
+        log_data: dict
 ):
         try:
-                data = log_data[0]
+                data = log_data
+                logger.info(f"asserting involved accts....  {receiver_id}")
+                chef, _ = await Account.objects.aget_or_create(id=data["chef"])
+                owner, _ = await Account.objects.aget_or_create(id=data["owner"])
                 logger.info(f"building updated config for pot {receiver_id}")
                 pot_config = {
                     "deployer": data["deployed_by"],
@@ -195,7 +198,11 @@ async def handle_pot_config_update(
                     "all_paid_out": data["all_paid_out"],
                     "protocol_config_provider": data["protocol_config_provider"],
                 }
-                await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
+
+                pot, created = await Pot.objects.aupdate_or_create(
+                    id=receiver_id, defaults=pot_config
+                )
+                # await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
         except Exception as e:
                 logger.error(f"Failed to update Pot config, Error: {e}")
 

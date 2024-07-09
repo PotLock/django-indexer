@@ -71,6 +71,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     continue
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
+                    event_name = parsed_log.get("event")
+                    if event_name == "update_pot_config":
+                        await handle_pot_config_update(parsed_log.get("data")[0], receiver_id)
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -350,41 +353,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
                         # TODO: handle remove upvote
-                        case (
-                                "owner_change_owner"
-                                | "owner_add_admins"
-                                | "owner_remove_admins"
-                                | "owner_set_admins"
-                                | "owner_clear_admins"
-                                | "admin_set_chef"
-                                | "admin_remove_chef"
-                                | "admin_set_chef_fee_basis_points"
-                                | "admin_set_pot_name"
-                                | "admin_set_pot_description"
-                                | "admin_set_max_projects"
-                                | "admin_set_base_currency"
-                                | "admin_set_round_timestamps"
-                                | "admin_set_registry_provider"
-                                | "admin_remove_registry_provider"
-                                | "admin_set_min_matching_pool_donation_amount"
-                                | "admin_set_sybil_wrapper_provider"
-                                | "admin_remove_sybil_wrapper_provider"
-                                | "admin_set_custom_sybil_checks"
-                                | "admin_remove_custom_sybil_checks"
-                                | "admin_set_custom_min_threshold_score"
-                                | "admin_remove_custom_min_threshold_score"
-                                | "admin_set_referral_fee_matching_pool_basis_points"
-                                | "admin_set_referral_fee_public_round_basis_points"
-                                | "admin_set_cooldown_end_ms"
-                                | "admin_dangerously_set_pot_config"
-                        ):
-                                logger.info(f"updating pot config.....{log_data}")
-                                await handle_pot_config_update(
-                                        receiver_id,
-                                        log_data,
-                                )
-                                break
-
                 except Exception as e:
                     logger.error(f"Error in indexer handler:\n{e}")
                     # with open("indexer_error.txt", "a") as file:
