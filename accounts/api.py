@@ -41,6 +41,7 @@ from .serializers import (
     AccountSerializer,
     PaginatedAccountsResponseSerializer,
 )
+from api.pagination import ResultPagination
 
 
 class DonorsAPI(APIView, PageNumberPagination):
@@ -87,7 +88,7 @@ class DonorsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountsListAPI(APIView, PageNumberPagination):
+class AccountsListAPI(APIView, ResultPagination):
 
     @extend_schema(
         responses={

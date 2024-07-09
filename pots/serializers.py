@@ -2,15 +2,15 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
-from base.serializers import TwoDecimalStringField
+from base.serializers import ResultPagination
 from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
 from .models import Pot, PotApplication, PotPayout
 
 
 class PotSerializer(ModelSerializer):
-    total_matching_pool_usd = TwoDecimalStringField(max_digits=20, decimal_places=2)
-    total_public_donations_usd = TwoDecimalStringField(max_digits=20, decimal_places=2)
+    total_matching_pool_usd = ResultPagination(max_digits=20, decimal_places=2)
+    total_public_donations_usd = ResultPagination(max_digits=20, decimal_places=2)
 
     class Meta:
         model = Pot
