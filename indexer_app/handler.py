@@ -27,6 +27,7 @@ from .utils import (  # handle_batch_donations,
     handle_set_payouts,
     handle_social_profile_update,
     handle_transfer_payout,
+    handle_pot_config_update
 )
 
 
@@ -70,6 +71,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     continue
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
+                    event_name = parsed_log.get("event")
+                    if event_name == "update_pot_config":
+                        await handle_pot_config_update(parsed_log.get("data")[0], receiver_id)
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -349,7 +353,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
                         # TODO: handle remove upvote
-
                 except Exception as e:
                     logger.error(f"Error in indexer handler:\n{e}")
                     # with open("indexer_error.txt", "a") as file:
