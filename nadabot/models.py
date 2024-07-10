@@ -44,11 +44,47 @@ class NadabotRegistry(models.Model):
         related_name="nadabot_admin_registries",
         help_text=_("registry admins."),
     )
+    blacklisted_accounts = models.ManyToManyField(
+        Account,
+        related_name="registry_blacklisted_in",
+        help_text=_("registry blacklisted accounts."),
+    )
     source_metadata = models.JSONField(
         _("source metadata"),
         null=False,
         help_text=_("nadabot registry source metadata."),
     )
+
+
+class BlackList(models.Model):
+    registry = models.ForeignKey(
+        NadabotRegistry,
+        on_delete=models.CASCADE,
+        related_name="blacklists",
+        verbose_name=_("registry"),
+        help_text=_("blacklist entries by this registry")
+    )
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="registries_blacklisted_from",
+        null=False,
+        help_text=_("Nadabot Registry Blacklisted from."),
+    )
+    reason = models.TextField(
+        _("blacklist reason"),
+        blank=True,
+        null=True,
+        help_text=_("Reason account is blacklisted")
+    )
+    date_blacklisted = models.DateTimeField(
+        _("blacklisted on"),
+        null=False,
+        help_text=_("Blacklist Entry Date."),
+    )
+
+    class Meta:
+        unique_together = ['registry', 'account']
 
 class Provider(models.Model):
     id = models.PositiveIntegerField(
@@ -125,6 +161,7 @@ class Provider(models.Model):
     submitted_by = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
+        related_name="providers_submitted",
         verbose_name=_("submitted by"),
         max_length=100,
         null=False,
@@ -155,6 +192,7 @@ class Provider(models.Model):
     registry = models.ForeignKey(
         NadabotRegistry,
         on_delete=models.CASCADE,
+        related_name="providers",
         verbose_name=_("registry"),
         help_text=_("registry under which provider was registered")
     )
@@ -167,12 +205,14 @@ class Stamp(models.Model):
     user = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
+        related_name="stamps",
         verbose_name=_("user"),
         help_text=_("The user who earned the stamp.")
     )
     provider = models.ForeignKey(
         Provider,
         on_delete=models.CASCADE,
+        related_name="stamps",
         verbose_name=_("provider"),
         help_text=_("The provider the user verified with.")
     )
@@ -220,7 +260,7 @@ class Group(models.Model):
     )
     providers = models.ManyToManyField(
         Provider,
-        related_name="group_provider",
+        related_name="groups",
         help_text=_("group providers."),
     )
     created_at = models.DateTimeField(

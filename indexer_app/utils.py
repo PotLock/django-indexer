@@ -14,7 +14,7 @@ from activities.models import Activity
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
-from nadabot.models import Group, NadabotRegistry, Provider, Rule, Stamp
+from nadabot.models import Group, NadabotRegistry, Provider, Rule, Stamp, BlackList
 from pots.models import (
     Pot,
     PotApplication,
@@ -57,20 +57,65 @@ async def handle_nadabot_registry(
 ):
     logger.info(f"nadabot registry init... {data}")
 
-    registry, _ = await Account.objects.aget_or_create(id=receiverId)
-    owner, _ = await Account.objects.aget_or_create(id=data["owner"])
-    nadabot_registry = await NadabotRegistry.objects.acreate(
-        id=registry,
-        owner=owner,
-        created_at=created_at,
-        updated_at=created_at,
-        source_metadata=data.get('source_metadata')
-    )
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        nadabot_registry = await NadabotRegistry.objects.acreate(
+            id=registry,
+            owner=owner,
+            created_at=created_at,
+            updated_at=created_at,
+            source_metadata=data.get('source_metadata')
+        )
 
-    if data.get("admins"):
-        for admin_id in data["admins"]:
-            admin, _ = await Account.objects.aget_or_create(id=admin_id)
-            await nadabot_registry.admins.aadd(admin)
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                await nadabot_registry.admins.aadd(admin)
+    except Exception as e:
+        logger.error(f"Error in registry initiialization: {e}")
+
+
+async def handle_registry_blacklist_action(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    logger.info(f"Registry blacklist action....... {data}")
+
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        bulk_obj = []
+        for acct in data["accounts"]:
+            account, _ = await Account.objects.aget_or_create(id=acct)
+            bulk_obj.append(
+                {
+                    "registry": registry,
+                    "account": account,
+                    "reason": data.get("reason"),
+                    "date_blacklisted": created_at
+                }
+            )
+            await BlackList.objects.abulk_create(
+                objs = [BlackList(**data) for data in bulk_obj], ignore_conflicts=True
+            )
+    except Exception as e:
+        logger.error(f"Error in adding acct to blacklist: {e}")
+
+
+async def handle_registry_unblacklist_action(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    logger.info(f"Registry remove blacklisted accts....... {data}")
+
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        entries =  BlackList.objects.filter(account__in=data["accounts"])
+        await entries.adelete()
+    except Exception as e:
+        logger.error(f"Error in removing acct from blacklist: {e}")
 
 
 
@@ -667,7 +712,7 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         logger.error(f"Failed to remove list admin, Error: {e}")
 
 
-async def handle_nadabot_admin_add(data, receiverId):
+async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
     obj = await NadabotRegistry.objects.aget(id=receiverId)
 
