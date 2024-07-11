@@ -14,7 +14,7 @@ from activities.models import Activity
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
-from nadabot.models import Group, NadabotRegistry, Provider, Rule, Stamp, BlackList
+from nadabot.models import Group, NadabotRegistry, Provider, Stamp, BlackList
 from pots.models import (
     Pot,
     PotApplication,
@@ -50,7 +50,7 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
             logger.error(f"Error in handle_social_profile_update: {e}")
 
 
-async def handle_nadabot_registry(
+async def handle_new_nadabot_registry(
         data: dict,
         receiverId: str,
         created_at: datetime
@@ -714,11 +714,14 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
 
 async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
-    obj = await NadabotRegistry.objects.aget(id=receiverId)
+    try:
+        obj = await NadabotRegistry.objects.aget(id=receiverId)
 
-    for acct in data["account_ids"]:
-        user, _ = await Account.objects.aget_or_create(id=acct)
-        await obj.admins.aadd(user)
+        for acct in data["account_ids"]:
+            user, _ = await Account.objects.aget_or_create(id=acct)
+            await obj.admins.aadd(user)
+    except Exception as e:
+        logger.error(f"Failed to add nadabot admin, Error: {e}")
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
@@ -959,11 +962,14 @@ async def handle_update_default_human_threshold(
 ):
     logger.info(f"update threshold data... {data}")
 
-    reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
-        **{"default_human_threshold": data["default_human_threshold"]}
-    )
+    try:
 
-    logger.info("updated threshold..")
+        reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
+            **{"default_human_threshold": data["default_human_threshold"]}
+        )
+        logger.info("updated threshold..")
+    except Exception as e:
+        logger.error(f"Failed to update default threshold, Error: {e}")
 
 
 async def handle_new_provider(
@@ -980,6 +986,7 @@ async def handle_new_provider(
 
     try:
         submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
+        contract, _ = await Account.objects.aget_or_create(id=data["contract_id"])
 
         provider_id = data["id"]
 
@@ -988,10 +995,10 @@ async def handle_new_provider(
                 await cache.aset("last_id", provider_id+1)
 
         provider = await Provider.objects.aupdate_or_create(
-                id=provider_id,
-                contract_id=data["contract_id"],
+                on_chain_id=provider_id,
+                contract_id=contract,
                 method_name=data["method_name"],
-                provider_name=data["provider_name"],
+                name=data["provider_name"],
                 description=data.get("description"),
                 status=data["status"],
                 admin_notes=data.get("admin_notes"),
@@ -1001,7 +1008,7 @@ async def handle_new_provider(
                 icon_url=data.get("icon_url"),
                 external_url=data.get("external_url"),
                 submitted_by_id=data["submitted_by"],
-                submitted_at_ms = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
+                submitted_at = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
                 stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
                 account_id_arg_name = data["account_id_arg_name"],
                 custom_args = data.get("custom_args"),
@@ -1027,7 +1034,7 @@ async def handle_add_stamp(
         stamp = await Stamp.objects.aupdate_or_create(
             user=user,
             provider_id=data["provider_id"],
-            verification_date = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+            verified_at = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
         )
     except Exception as e:
         logger.error(f"Failed to create stamp: {e}")
@@ -1048,16 +1055,13 @@ async def handle_new_group(
             rule_key = next(iter(rule))
             rule_val = rule.get(rule_key)
 
-        rule_obj, _ = await Rule.objects.aget_or_create(
-            rule = rule_key,
-            value = rule_val
-        )
         group = await Group.objects.acreate(
             id=group_data["id"],
             name=group_data["name"],
             created_at=created_at,
             updated_at=created_at,
-            group_rule = rule_obj
+            rule_key = rule_key,
+            rule_val = rule_val
         )
 
         logger.info(f"addding provider.... : {group_data['providers']}")

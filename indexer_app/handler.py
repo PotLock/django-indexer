@@ -17,7 +17,7 @@ from .utils import (  # handle_batch_donations,
     handle_list_registration_update,
     handle_list_upvote,
     handle_add_nadabot_admin,
-    handle_nadabot_registry,
+    handle_new_nadabot_registry,
     handle_new_donation,
     handle_new_group,
     handle_new_list,
@@ -165,8 +165,8 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, now_datetime
                                 )
-                            elif match_nadabot_registry_pattern(".nadabot.near"): # matches registries in the pattern, version(v1).env(staging).nadabot.near
-                                await handle_nadabot_registry(args_dict, receiver_id, now_datetime)
+                            elif match_nadabot_registry_pattern(receiver_id): # matches registries in the pattern, version(v1).env(staging).nadabot.near
+                                await handle_new_nadabot_registry(args_dict, receiver_id, now_datetime)
                             elif match_pot_subaccount_pattern(receiver_id):
                                 logger.info(
                                     f"new pot deployment: {args_dict}, {action}"

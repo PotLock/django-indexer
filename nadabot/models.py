@@ -10,6 +10,15 @@ class ProviderStatus(models.TextChoices):
     DEACTIVATED = "Deactivated", "Deactivated"
 
 
+class RuleType(models.TextChoices):
+    HIGHEST = 'Highest'
+    LOWEST = 'Lowest'
+    SUM = 'Sum'
+    DIMINISHING_RETURNS = 'Diminishing_returns'
+    INCREASING_RETURNS = 'Increasing_returns'
+
+
+
 class NadabotRegistry(models.Model):
     id = models.OneToOneField(
         Account,
@@ -87,13 +96,21 @@ class BlackList(models.Model):
         unique_together = ['registry', 'account']
 
 class Provider(models.Model):
-    id = models.PositiveIntegerField(
+    id = models.AutoField(
         _("provider id"),
         primary_key=True,
-        help_text=_("Provider id."),
+        help_text=_("Provider id.")
     )
-    contract_id = models.CharField(
-        _("contract ID"),
+    on_chain_id = models.IntegerField(
+        _("contract provider id"),
+        null=False,
+        help_text=_("Provider id in contract"),
+    )
+    contract = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="provider_instances",
+        verbose_name=_("contract ID"),
         max_length=100,
         null=False,
         help_text=_("Contract ID of the external contract that is the source of this provider.")
@@ -104,7 +121,7 @@ class Provider(models.Model):
         null=False,
         help_text=_("Method name of the external contract that is the source of this provider.")
     )
-    provider_name = models.CharField(
+    name = models.CharField(
         _("provider name"),
         max_length=64,
         null=False,
@@ -121,6 +138,7 @@ class Provider(models.Model):
         max_length=20,
         choices=ProviderStatus,
         null=False,
+        db_index=True,
         help_text=_("Status of the provider.")
     )
     admin_notes = models.TextField(
@@ -167,15 +185,17 @@ class Provider(models.Model):
         null=False,
         help_text=_("User who submitted this provider.")
     )
-    submitted_at_ms = models.DateTimeField(
+    submitted_at = models.DateTimeField(
         _("submitted at (milliseconds)"),
         null=False,
+        db_index=True,
         help_text=_("Timestamp of when this provider was submitted.")
     )
     stamp_validity_ms = models.BigIntegerField(
         _("stamp validity"),
         blank=True,
         null=True,
+        db_index=True,
         help_text=_("Milliseconds that stamps from this provider are valid for before they expire.")
     )
     account_id_arg_name = models.CharField(
@@ -197,10 +217,6 @@ class Provider(models.Model):
         help_text=_("registry under which provider was registered")
     )
 
-    class Meta:
-        indexes = [models.Index(fields=["id", "status"], name="idx_provider_id_status")]
-
-
 class Stamp(models.Model):
     user = models.ForeignKey(
         Account,
@@ -216,28 +232,9 @@ class Stamp(models.Model):
         verbose_name=_("provider"),
         help_text=_("The provider the user verified with.")
     )
-    verification_date = models.DateField(
+    verified_at = models.DateField(
         _("verification date"),
-        auto_now_add=True,
         help_text=_("The date of verification.")
-    )
-
-class Rule(models.Model):
-    id = models.AutoField(
-        _("rule id"),
-        primary_key=True,
-        help_text=_("rule id for group rules"),
-    )
-    rule = models.CharField(
-        _("rule enum choice"),
-        max_length=50,
-        null=False,
-        help_text=_("particular rule choice from the rule enum")
-    )
-    value = models.PositiveIntegerField(
-        _("rule value"),
-        null=True,
-        help_text=_("An optional value that rule choices might carry."),
     )
 
 class Group(models.Model):
@@ -252,11 +249,17 @@ class Group(models.Model):
         null=False,
         help_text=_("name given to the group")
     )
-    group_rule = models.ForeignKey(
-        Rule,
-        on_delete=models.CASCADE,
-        verbose_name=_("rule"),
+    rule_type = models.CharField(
+        _("rule type"),
+        choices=RuleType,
+        max_length=100,
+        null=True,
         help_text=_("The rule this group uses.")
+    )
+    rule_val = models.PositiveIntegerField(
+        _("rule value"),
+        null=True,
+        help_text=_("An optional value that the group's rule choices might carry."),
     )
     providers = models.ManyToManyField(
         Provider,

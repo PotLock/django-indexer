@@ -64,6 +64,7 @@ media/
 
 # Celery beat schedule file
 celerybeat-schedule
+dump.rdb
 
 # Flask stuff:
 instance/
@@ -99,7 +100,7 @@ poetry.lock
 # dotenv
 .env
 .env.*
-
+pyrightconfig.json
 # virtualenv
 .venv/
 venv/
