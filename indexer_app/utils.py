@@ -61,7 +61,7 @@ async def handle_new_nadabot_registry(
     try:
         registry, _ = await Account.objects.aget_or_create(id=receiverId)
         owner, _ = await Account.objects.aget_or_create(id=data["owner"])
-        nadabot_registry = await NadabotRegistry.objects.acreate(
+        nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
             id=registry,
             owner=owner,
             created_at=created_at,
@@ -1057,7 +1057,7 @@ async def handle_new_provider(
     data = data["provider"]
 
     logger.info(
-        f"upserting accounts involved, {data['submitted_by']}"
+        f"upserting accounts involved, {data['submitted_by']}, {data['contract_id']}"
     )
 
     try:
@@ -1072,7 +1072,7 @@ async def handle_new_provider(
 
         provider = await Provider.objects.aupdate_or_create(
                 on_chain_id=provider_id,
-                contract_id=contract,
+                contract=contract,
                 method_name=data["method_name"],
                 name=data["provider_name"],
                 description=data.get("description"),
@@ -1105,11 +1105,12 @@ async def handle_add_stamp(
     logger.info(f"upserting accounts involved, {data['user_id']}")
 
     user, _ = await Account.objects.aget_or_create(id=data["user_id"])
+    provider, _ = await Provider.objects.aget_or_create(on_chain_id=data["provider_id"])
 
     try:
         stamp = await Stamp.objects.aupdate_or_create(
             user=user,
-            provider_id=data["provider_id"],
+            provider=provider,
             verified_at = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
         )
     except Exception as e:
@@ -1124,6 +1125,9 @@ async def handle_new_group(
     logger.info(f"new group data: {data}")
     group_data = data.get('group', {})
     try:
+        # group enums can have values, they are represented as a dict in the events from the indexer, and enum choices without values are presented as normal strings:
+        # withValue: {'group': {'id': 5, 'name': 'Here we go again', 'providers': [8, 1, 4, 6], 'rule': {'IncreasingReturns': 10}}}
+        # noValue: {"id":6,"name":"Lachlan test group","providers":[1,2],"rule":"Highest"}
         rule = group_data['rule']
         rule_key = rule
         rule_val = None
