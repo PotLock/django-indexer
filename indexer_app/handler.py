@@ -34,8 +34,8 @@ from .utils import (  # handle_batch_donations,
     handle_transfer_payout,
     handle_update_default_human_threshold,
     handle_registry_blacklist_action,
-    handle_registry_unblacklist_action
-    handle_pot_config_update
+    handle_registry_unblacklist_action,
+    handle_pot_config_update,
 )
 
 
@@ -64,7 +64,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 not in receipt_execution_outcome.execution_outcome.outcome.status
             ):
                 continue
-            receiver_id = receipt_execution_outcome.receiver_id
+            receiver_id = receipt_execution_outcome.receipt.receiver_id
             if (
                 receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
                 and not receiver_id.endswith((settings.POTLOCK_TLA, settings.NADABOT_TLA))

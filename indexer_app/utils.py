@@ -218,8 +218,8 @@ async def handle_new_pot(
 
 
 async def handle_pot_config_update(
-        receiver_id: str,
-        log_data: dict
+    log_data: dict,
+    receiver_id: str,
 ):
         try:
                 data = log_data
