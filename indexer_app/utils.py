@@ -1066,6 +1066,9 @@ async def handle_new_provider(
 
         provider_id = data["id"]
 
+        # due to an event malfunction from the contract, the first 13 migrated(migrated from a previous contract) providers,
+        # had the same id emitted for them, the id `13`, so we have to catch it and manoeuvre aroubd it.
+        # TODO: REMOVE when next version contract is deployed, as this issue would be fixed.
         if provider_id == 13:
                 provider_id = await cache.aget("last_id", 1)
                 await cache.aset("last_id", provider_id+1)
