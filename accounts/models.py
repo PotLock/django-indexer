@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from base.logging import logger
+from chains.models import Chain
 
 
 class Account(models.Model):
@@ -16,6 +17,15 @@ class Account(models.Model):
         db_index=True,
         validators=[],
         help_text=_("On-chain account address."),
+    )
+    chain = models.ForeignKey(
+        Chain,
+        null=False,
+        blank=False,
+        on_delete=models.CASCADE,
+        related_name="accounts",
+        related_query_name="account",
+        help_text=_("Blockchain this account is located on."),
     )
     total_donations_in_usd = models.DecimalField(
         _("total donations received in USD"),

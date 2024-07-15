@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_spectacular",
+    "django_extensions",
     "corsheaders",
     # "cachalot",
     "celery",
@@ -104,6 +105,7 @@ INSTALLED_APPS = [
     "pots",
     "tokens",
     "nadabot",
+    "chains",
 ]
 
 DEFAULT_PAGE_SIZE = 30
