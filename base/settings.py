@@ -59,6 +59,7 @@ REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
 
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
@@ -102,6 +103,7 @@ INSTALLED_APPS = [
     "lists",
     "pots",
     "tokens",
+    "nadabot",
 ]
 
 DEFAULT_PAGE_SIZE = 30

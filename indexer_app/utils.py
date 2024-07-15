@@ -15,6 +15,7 @@ from activities.models import Activity
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
+from nadabot.models import Group, NadabotRegistry, Provider, Stamp, BlackList
 from pots.models import (
     Pot,
     PotApplication,
@@ -48,6 +49,75 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
                 # account.fetch_near_social_profile_data()
         except Exception as e:
             logger.error(f"Error in handle_social_profile_update: {e}")
+
+
+async def handle_new_nadabot_registry(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    logger.info(f"nadabot registry init... {data}")
+
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
+            id=registry,
+            owner=owner,
+            created_at=created_at,
+            updated_at=created_at,
+            source_metadata=data.get('source_metadata')
+        )
+
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                await nadabot_registry.admins.aadd(admin)
+    except Exception as e:
+        logger.error(f"Error in registry initiialization: {e}")
+
+
+async def handle_registry_blacklist_action(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    logger.info(f"Registry blacklist action....... {data}")
+
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        bulk_obj = []
+        for acct in data["accounts"]:
+            account, _ = await Account.objects.aget_or_create(id=acct)
+            bulk_obj.append(
+                {
+                    "registry": registry,
+                    "account": account,
+                    "reason": data.get("reason"),
+                    "date_blacklisted": created_at
+                }
+            )
+            await BlackList.objects.abulk_create(
+                objs = [BlackList(**data) for data in bulk_obj], ignore_conflicts=True
+            )
+    except Exception as e:
+        logger.error(f"Error in adding acct to blacklist: {e}")
+
+
+async def handle_registry_unblacklist_action(
+        data: dict,
+        receiverId: str,
+        created_at: datetime
+):
+    logger.info(f"Registry remove blacklisted accts....... {data}")
+
+    try:
+        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        entries =  BlackList.objects.filter(account__in=data["accounts"])
+        await entries.adelete()
+    except Exception as e:
+        logger.error(f"Error in removing acct from blacklist: {e}")
+
 
 
 async def handle_new_pot(
@@ -148,8 +218,8 @@ async def handle_new_pot(
 
 
 async def handle_pot_config_update(
-        receiver_id: str,
-        log_data: dict
+    log_data: dict,
+    receiver_id: str,
 ):
         try:
                 data = log_data
@@ -718,6 +788,16 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         logger.error(f"Failed to remove list admin, Error: {e}")
 
 
+async def handle_add_nadabot_admin(data, receiverId):
+    logger.info(f"adding admin...: {data}, {receiverId}")
+    try:
+        obj = await NadabotRegistry.objects.aget(id=receiverId)
+
+        for acct in data["account_ids"]:
+            user, _ = await Account.objects.aget_or_create(id=acct)
+            await obj.admins.aadd(user)
+    except Exception as e:
+        logger.error(f"Failed to add nadabot admin, Error: {e}")
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
@@ -952,6 +1032,128 @@ async def handle_new_donation(
     #         }
     #         await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
 
+async def handle_update_default_human_threshold(
+        data: dict,
+        receiverId: str
+):
+    logger.info(f"update threshold data... {data}")
+
+    try:
+
+        reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
+            **{"default_human_threshold": data["default_human_threshold"]}
+        )
+        logger.info("updated threshold..")
+    except Exception as e:
+        logger.error(f"Failed to update default threshold, Error: {e}")
+
+
+async def handle_new_provider(
+        data: dict,
+        receiverId: str,
+        signerId: str
+):
+    logger.info(f"new provider data: {data}, {receiverId}")
+    data = data["provider"]
+
+    logger.info(
+        f"upserting accounts involved, {data['submitted_by']}, {data['contract_id']}"
+    )
+
+    try:
+        submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
+        contract, _ = await Account.objects.aget_or_create(id=data["contract_id"])
+
+        provider_id = data["id"]
+
+        # due to an event malfunction from the contract, the first 13 migrated(migrated from a previous contract) providers,
+        # had the same id emitted for them, the id `13`, so we have to catch it and manoeuvre aroubd it.
+        # TODO: REMOVE when next version contract is deployed, as this issue would be fixed.
+        if provider_id == 13:
+                provider_id = await cache.aget("last_id", 1)
+                await cache.aset("last_id", provider_id+1)
+
+        provider = await Provider.objects.aupdate_or_create(
+                on_chain_id=provider_id,
+                contract=contract,
+                method_name=data["method_name"],
+                name=data["provider_name"],
+                description=data.get("description"),
+                status=data["status"],
+                admin_notes=data.get("admin_notes"),
+                default_weight=data["default_weight"],
+                gas=data.get("gas"),
+                tags=data.get("tags"),
+                icon_url=data.get("icon_url"),
+                external_url=data.get("external_url"),
+                submitted_by_id=data["submitted_by"],
+                submitted_at = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
+                stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
+                account_id_arg_name = data["account_id_arg_name"],
+                custom_args = data.get("custom_args"),
+                registry_id=receiverId
+        )
+    except Exception as e:
+        logger.error(f"Failed to add new stamp provider: {e}")
+
+
+async def handle_add_stamp(
+        data: dict,
+        receiverId: str,
+        signerId: str
+):
+    logger.info(f"new stamp data: {data}, {receiverId}")
+    data = data["stamp"]
+
+    logger.info(f"upserting accounts involved, {data['user_id']}")
+
+    user, _ = await Account.objects.aget_or_create(id=data["user_id"])
+    provider, _ = await Provider.objects.aget_or_create(on_chain_id=data["provider_id"])
+
+    try:
+        stamp = await Stamp.objects.aupdate_or_create(
+            user=user,
+            provider=provider,
+            verified_at = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+        )
+    except Exception as e:
+        logger.error(f"Failed to create stamp: {e}")
+
+
+
+async def handle_new_group(
+    data: dict,
+    created_at: datetime
+):
+    logger.info(f"new group data: {data}")
+    group_data = data.get('group', {})
+    try:
+        # group enums can have values, they are represented as a dict in the events from the indexer, and enum choices without values are presented as normal strings:
+        # withValue: {'group': {'id': 5, 'name': 'Here we go again', 'providers': [8, 1, 4, 6], 'rule': {'IncreasingReturns': 10}}}
+        # noValue: {"id":6,"name":"Lachlan test group","providers":[1,2],"rule":"Highest"}
+        rule = group_data['rule']
+        rule_key = rule
+        rule_val = None
+        if type(rule) == dict:
+            rule_key = next(iter(rule))
+            rule_val = rule.get(rule_key)
+
+        group = await Group.objects.acreate(
+            id=group_data["id"],
+            name=group_data["name"],
+            created_at=created_at,
+            updated_at=created_at,
+            rule_type = rule_key,
+            rule_val = rule_val
+        )
+
+        logger.info(f"addding provider.... : {group_data['providers']}")
+        if group_data.get("providers"):
+            for provider_id in group_data["providers"]:
+                provider, _ = await Provider.objects.aget_or_create(on_chain_id=provider_id)
+                await group.providers.aadd(provider)
+    except Exception as e:
+        logger.error(f"Failed to create group, because: {e}")
 
 async def cache_block_height(
     key: str, height: int, block_count: int, block_timestamp: int
