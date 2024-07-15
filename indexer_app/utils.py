@@ -1143,14 +1143,15 @@ async def handle_new_group(
             name=group_data["name"],
             created_at=created_at,
             updated_at=created_at,
-            rule_key = rule_key,
+            rule_type = rule_key,
             rule_val = rule_val
         )
 
         logger.info(f"addding provider.... : {group_data['providers']}")
         if group_data.get("providers"):
             for provider_id in group_data["providers"]:
-                await group.providers.aadd(provider_id)
+                provider, _ = await Provider.objects.aget_or_create(on_chain_id=provider_id)
+                await group.providers.aadd(provider)
     except Exception as e:
         logger.error(f"Failed to create group, because: {e}")
 

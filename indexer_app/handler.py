@@ -83,23 +83,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 try:
                     parsed_log = json.loads(log[len("EVENT_JSON:") :])
                     event_name = parsed_log.get("event")
+                    print("parsa parsa...", parsed_log)
                     if event_name == "update_pot_config":
                         await handle_pot_config_update(parsed_log.get("data")[0], receiver_id)
-                    print("parsa parsa...", parsed_log)
-                    event_name = parsed_log.get("event")
-                    if event_name == "add_or_update_provider":
-                        await handle_new_provider(parsed_log.get("data")[0], receiver_id, signer_id)
-                    elif event_name == "add_stamp":
-                        await handle_add_stamp(parsed_log.get("data")[0], receiver_id, signer_id)
-                    elif event_name == "update_default_human_threshold":
-                        await handle_update_default_human_threshold(parsed_log.get("data")[0], receiver_id)
-                    if event_name == "add_or_update_group":
-                            await handle_new_group(parsed_log.get("data")[0], now_datetime)
-                    if event_name == "blacklist_account":
-                        await handle_registry_blacklist_action(parsed_log.get("data")[0], receiver_id, now_datetime)
-                    if event_name == "unblacklist_account":
-                        await handle_registry_unblacklist_action(parsed_log.get("data")[0], receiver_id, now_datetime)
-                    event_name = parsed_log.get("event")
+
                     if event_name == "add_or_update_provider":
                         await handle_new_provider(parsed_log.get("data")[0], receiver_id, signer_id)
                     elif event_name == "add_stamp":
