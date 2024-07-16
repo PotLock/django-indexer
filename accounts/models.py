@@ -137,6 +137,9 @@ class Account(models.Model):
 
     def save(self, *args, **kwargs):
         if self._state.adding:  # If the account is being created (not updated)
+            if not self.chain_id:
+                # default to NEAR chain when none is provided
+                self.chain = Chain.objects.get(name="NEAR")
             self.fetch_near_social_profile_data(
                 False  # don't save yet as we want to avoid infinite loop
             )
