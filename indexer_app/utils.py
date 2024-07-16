@@ -1088,7 +1088,7 @@ async def handle_new_provider(
                 external_url=data.get("external_url"),
                 submitted_by_id=data["submitted_by"],
                 submitted_at = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
-                stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
+                stamp_validity_ms = data.get("stamp_validity_ms"),
                 account_id_arg_name = data["account_id_arg_name"],
                 custom_args = data.get("custom_args"),
                 registry_id=receiverId
