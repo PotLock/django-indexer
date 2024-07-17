@@ -8,6 +8,7 @@ from billiard.exceptions import WorkerLostError
 from celery import shared_task
 from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
@@ -62,12 +63,18 @@ async def indexer(from_block: int, to_block: int):
 
             # Log time before caching block height
             cache_start_time = time.time()
-            await cache_block_height(
-                CURRENT_BLOCK_HEIGHT_KEY,
-                streamer_message.block.header.height,
-                block_count,
-                streamer_message.block.header.timestamp,
-            )  # current block height
+            # Fire and forget the cache update
+            asyncio.create_task(
+                cache.aset(
+                    CURRENT_BLOCK_HEIGHT_KEY, streamer_message.block.header.height
+                )
+            )
+            # await cache_block_height(
+            #     CURRENT_BLOCK_HEIGHT_KEY,
+            #     streamer_message.block.header.height,
+            #     block_count,
+            #     streamer_message.block.header.timestamp,
+            # )  # current block height
             cache_end_time = time.time()
 
             logger.info(
