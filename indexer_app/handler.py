@@ -58,10 +58,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     logger.info(
         f"Block Height: {block_height}, Block Timestamp: {block_timestamp} ({formatted_date})"
     )
-    logger.info(
-        f"Time after processing block info: {time.time() - start_time:.4f} seconds"
-    )
-    log_memory_usage("After processing block info")
+    # logger.info(
+    #     f"Time after processing block info: {time.time() - start_time:.4f} seconds"
+    # )
+    # log_memory_usage("After processing block info")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
     #         file.write(f"{streamer_message}")
@@ -139,10 +139,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
 
                 # TODO: handle set_source_metadata logs for various contracts
 
-            logger.info(
-                f"Time to process logs for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - log_processing_start:.4f} seconds"
-            )
-            log_memory_usage("After processing logs")
+            # logger.info(
+            #     f"Time to process logs for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - log_processing_start:.4f} seconds"
+            # )
+            # log_memory_usage("After processing logs")
 
             # 2. HANDLE METHOD CALLS
             # Skip if the tx failed
@@ -428,16 +428,16 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     logger.error(f"Error in indexer handler:\n{e}")
                     # with open("indexer_error.txt", "a") as file:
                     #     file.write(f"{e}\n")
-            logger.info(
-                f"Time to process method calls for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - method_call_processing_start:.4f} seconds"
-            )
-            log_memory_usage("After processing method calls")
-        logger.info(
-            f"Time to process shard {shard_index}: {time.time() - shard_start_time:.4f} seconds"
-        )
-        log_memory_usage(f"After processing shard {shard_index}")
+            # logger.info(
+            #     f"Time to process method calls for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - method_call_processing_start:.4f} seconds"
+            # )
+            # log_memory_usage("After processing method calls")
+        # logger.info(
+        #     f"Time to process shard {shard_index}: {time.time() - shard_start_time:.4f} seconds"
+        # )
+        # log_memory_usage(f"After processing shard {shard_index}")
 
-    logger.info(
-        f"Total time to process streamer message: {time.time() - start_time:.4f} seconds"
-    )
-    log_memory_usage("End of handle_streamer_message")
+    # logger.info(
+    #     f"Total time to process streamer message: {time.time() - start_time:.4f} seconds"
+    # )
+    # log_memory_usage("End of handle_streamer_message")
