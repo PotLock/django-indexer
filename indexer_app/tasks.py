@@ -65,16 +65,16 @@ async def indexer(from_block: int, to_block: int):
             cache_start_time = time.time()
             # Fire and forget the cache update
             asyncio.create_task(
-                cache.aset(
-                    CURRENT_BLOCK_HEIGHT_KEY, streamer_message.block.header.height
-                )
+                cache_block_height(
+                    CURRENT_BLOCK_HEIGHT_KEY,
+                    streamer_message.block.header.height,
+                    block_count,
+                    streamer_message.block.header.timestamp,
+                )  # current block height
+                # cache.aset(
+                #     CURRENT_BLOCK_HEIGHT_KEY, streamer_message.block.header.height
+                # )
             )
-            # await cache_block_height(
-            #     CURRENT_BLOCK_HEIGHT_KEY,
-            #     streamer_message.block.header.height,
-            #     block_count,
-            #     streamer_message.block.header.timestamp,
-            # )  # current block height
             cache_end_time = time.time()
 
             logger.info(
