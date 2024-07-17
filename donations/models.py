@@ -203,90 +203,36 @@ class Donation(models.Model):
         existing_referrer_fee_usd = self.referrer_fee_usd
         existing_chef_fee_usd = self.chef_fee_usd
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.donated_at
-        token = self.token
-        time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
-        token_prices = TokenHistoricalPrice.objects.filter(
-            token=token,
-            timestamp__gte=self.donated_at - time_window,
-            timestamp__lte=self.donated_at + time_window,
-        )
-        existing_token_price = token_prices.first()
-        total_amount = token.format_price(self.total_amount)
-        net_amount = token.format_price(self.net_amount)
-        protocol_amount = token.format_price(self.protocol_fee)
-        referrer_amount = (
-            None if not self.referrer_fee else token.format_price(self.referrer_fee)
-        )
-        chef_amount = None if not self.chef_fee else token.format_price(self.chef_fee)
-        # chef_amount = token.format_price(self.chef_fee or "0")
-        if existing_token_price:
-            try:
-                price_usd = existing_token_price.price_usd
-                self.total_amount_usd = total_amount * price_usd
-                self.net_amount_usd = net_amount * price_usd
-                self.protocol_fee_usd = protocol_amount * price_usd
-                self.referrer_fee_usd = (
-                    None if not referrer_amount else referrer_amount * price_usd
-                )
-                self.chef_fee_usd = None if not chef_amount else chef_amount * price_usd
-                self.save()
-                logger.info(
-                    "USD prices calculated and saved using existing TokenHistoricalPrice"
-                )
-            except Exception as e:
+
+        try:
+            token = self.token
+            price_usd = token.fetch_usd_prices_common(self.donated_at)
+            if not price_usd:
                 logger.error(
-                    f"Failed to calculate and save USD prices using existing TokenHistoricalPrice: {e}"
+                    f"No USD price found for token {token.symbol} at {self.paid_at}"
                 )
-            # TODO: update totals for relevant accounts
-        else:
-            # no existing price within acceptable time period; fetch from coingecko
-            price_data = {}
-            try:
-                logger.info(
-                    "No existing price within acceptable time period; fetching historical price..."
-                )
-                endpoint = f"{settings.COINGECKO_URL}/coins/{self.token.id.id}/history?date={format_date(self.donated_at)}&localization=false"
-                if settings.COINGECKO_API_KEY:
-                    endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
-                logger.info(f"coingecko endpoint: {endpoint}")
-                response = requests.get(endpoint)
-                logger.info(f"coingecko response: {response}")
-                if response.status_code == 429:
-                    logger.warning("Coingecko rate limit exceeded")
-                price_data = response.json()
-            except Exception as e:
-                logger.warning(f"Failed to fetch coingecko price data: {e}")
-            logger.info(f"coingecko price data: {price_data}")
-            price_usd = (
-                price_data.get("market_data", {}).get("current_price", {}).get("usd")
+                return
+            total_amount = token.format_price(self.total_amount)
+            net_amount = token.format_price(self.net_amount)
+            protocol_amount = token.format_price(self.protocol_fee)
+            referrer_amount = (
+                None if not self.referrer_fee else token.format_price(self.referrer_fee)
             )
-            logger.info(f"unit price: {price_usd}")
-            if price_usd:
-                try:
-                    # convert price_usd to decimal
-                    price_usd = Decimal(price_usd)
-                    self.total_amount_usd = total_amount * price_usd
-                    self.net_amount_usd = net_amount * price_usd
-                    self.protocol_fee_usd = protocol_amount * price_usd
-                    self.referrer_fee_usd = (
-                        None if not referrer_amount else referrer_amount * price_usd
-                    )
-                    self.chef_fee_usd = (
-                        None if not chef_amount else chef_amount * price_usd
-                    )
-                    self.save()
-                except Exception as e:
-                    logger.error(
-                        f"Failed to calculate and save USD prices using fetched price: {e}"
-                    )
-                # TODO: update totals for relevant accounts
-                try:
-                    TokenHistoricalPrice.objects.create(
-                        token=token,
-                        price_usd=price_usd,
-                        timestamp=self.donated_at,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Error creating TokenHistoricalPrice: {e} token: {token} price_usd: {price_usd}"
-                    )
+            chef_amount = None if not self.chef_fee else token.format_price(self.chef_fee)
+            self.total_amount_usd = total_amount * price_usd
+            self.net_amount_usd = net_amount * price_usd
+            self.protocol_fee_usd = protocol_amount * price_usd
+            self.referrer_fee_usd = (
+                None if not referrer_amount else referrer_amount * price_usd
+            )
+            self.chef_fee_usd = None if not chef_amount else chef_amount * price_usd
+            self.save()
+            logger.info(
+                f"Saved USD prices for donation: {self.on_chain_id}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate and save USD prices: {e}"
+            )
+        # chef_amount = token.format_price(self.chef_fee or "0")
+        # TODO: update totals for relevant accounts
