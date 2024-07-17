@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 from datetime import datetime
 
 from django.conf import settings
@@ -7,21 +8,22 @@ from django.core.cache import cache
 from near_lake_framework import near_primitives
 
 from base.utils import convert_ns_to_utc
-from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 from nadabot.utils import match_nadabot_registry_pattern
-from .logging import logger
-from .utils import (  # handle_batch_donations,
+from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
+
+from .logging import log_memory_usage, logger
+from .utils import handle_add_nadabot_admin  # handle_batch_donations,
+from .utils import (
     handle_add_stamp,
     handle_default_list_status_change,
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
-    handle_add_nadabot_admin,
-    handle_new_nadabot_registry,
     handle_new_donation,
     handle_new_group,
     handle_new_list,
     handle_new_list_registration,
+    handle_new_nadabot_registry,
     handle_new_pot,
     handle_new_pot_factory,
     handle_new_provider,
@@ -29,17 +31,20 @@ from .utils import (  # handle_batch_donations,
     handle_payout_challenge_response,
     handle_pot_application,
     handle_pot_application_status_change,
+    handle_pot_config_update,
+    handle_registry_blacklist_action,
+    handle_registry_unblacklist_action,
     handle_set_payouts,
     handle_social_profile_update,
     handle_transfer_payout,
     handle_update_default_human_threshold,
-    handle_registry_blacklist_action,
-    handle_registry_unblacklist_action,
-    handle_pot_config_update,
 )
 
 
 async def handle_streamer_message(streamer_message: near_primitives.StreamerMessage):
+    start_time = time.time()
+    log_memory_usage("Start of handle_streamer_message")
+
     block_timestamp = streamer_message.block.header.timestamp
     block_height = streamer_message.block.header.height
     now_datetime = datetime.fromtimestamp(block_timestamp / 1000000000)
@@ -50,12 +55,19 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     logger.info(
         f"Block Height: {block_height}, Block Timestamp: {block_timestamp} ({formatted_date})"
     )
+    logger.info(
+        f"Time after processing block info: {time.time() - start_time:.4f} seconds"
+    )
+    log_memory_usage("After processing block info")
     # if block_height == 111867204:
     #     with open("indexer_outcome2.json", "w") as file:
     #         file.write(f"{streamer_message}")
 
-    for shard in streamer_message.shards:
-        for receipt_execution_outcome in shard.receipt_execution_outcomes:
+    for shard_index, shard in enumerate(streamer_message.shards):
+        shard_start_time = time.time()
+        for outcome_index, receipt_execution_outcome in enumerate(
+            shard.receipt_execution_outcomes
+        ):
             # we only want to proceed if the tx succeeded
             if (
                 "SuccessReceiptId"
@@ -67,7 +79,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             receiver_id = receipt_execution_outcome.receipt.receiver_id
             if (
                 receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
-                and not receiver_id.endswith((settings.POTLOCK_TLA, settings.NADABOT_TLA))
+                and not receiver_id.endswith(
+                    (settings.POTLOCK_TLA, settings.NADABOT_TLA)
+                )
             ):
                 continue
             # 1. HANDLE LOGS
@@ -75,6 +89,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             receipt = receipt_execution_outcome.receipt
             signer_id = receipt.receipt["Action"]["signer_id"]
 
+            log_processing_start = time.time()
             for log_index, log in enumerate(
                 receipt_execution_outcome.execution_outcome.outcome.logs, start=1
             ):
@@ -85,20 +100,32 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     event_name = parsed_log.get("event")
                     print("parsa parsa...", parsed_log)
                     if event_name == "update_pot_config":
-                        await handle_pot_config_update(parsed_log.get("data")[0], receiver_id)
+                        await handle_pot_config_update(
+                            parsed_log.get("data")[0], receiver_id
+                        )
 
                     if event_name == "add_or_update_provider":
-                        await handle_new_provider(parsed_log.get("data")[0], receiver_id, signer_id)
+                        await handle_new_provider(
+                            parsed_log.get("data")[0], receiver_id, signer_id
+                        )
                     elif event_name == "add_stamp":
-                        await handle_add_stamp(parsed_log.get("data")[0], receiver_id, signer_id)
+                        await handle_add_stamp(
+                            parsed_log.get("data")[0], receiver_id, signer_id
+                        )
                     elif event_name == "update_default_human_threshold":
-                        await handle_update_default_human_threshold(parsed_log.get("data")[0], receiver_id)
+                        await handle_update_default_human_threshold(
+                            parsed_log.get("data")[0], receiver_id
+                        )
                     if event_name == "add_or_update_group":
-                            await handle_new_group(parsed_log.get("data")[0], now_datetime)
+                        await handle_new_group(parsed_log.get("data")[0], now_datetime)
                     if event_name == "blacklist_account":
-                        await handle_registry_blacklist_action(parsed_log.get("data")[0], receiver_id, now_datetime)
+                        await handle_registry_blacklist_action(
+                            parsed_log.get("data")[0], receiver_id, now_datetime
+                        )
                     if event_name == "unblacklist_account":
-                        await handle_registry_unblacklist_action(parsed_log.get("data")[0], receiver_id, now_datetime)
+                        await handle_registry_unblacklist_action(
+                            parsed_log.get("data")[0], receiver_id, now_datetime
+                        )
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -108,6 +135,11 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                 log_data.append(parsed_log.get("data")[0])
 
                 # TODO: handle set_source_metadata logs for various contracts
+
+            logger.info(
+                f"Time to process logs for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - log_processing_start:.4f} seconds"
+            )
+            log_memory_usage("After processing logs")
 
             # 2. HANDLE METHOD CALLS
             # Skip if the tx failed
@@ -120,6 +152,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     # consider logging failures to logging service; for now, just skip
             #     print("here we are...")
             #     continue
+            method_call_processing_start = time.time()
             LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
             DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 
@@ -170,8 +203,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 await handle_new_pot_factory(
                                     args_dict, receiver_id, now_datetime
                                 )
-                            elif match_nadabot_registry_pattern(receiver_id): # matches registries in the pattern, version(v1).env(staging).nadabot.near
-                                await handle_new_nadabot_registry(args_dict, receiver_id, now_datetime)
+                            elif match_nadabot_registry_pattern(
+                                receiver_id
+                            ):  # matches registries in the pattern, version(v1).env(staging).nadabot.near
+                                await handle_new_nadabot_registry(
+                                    args_dict, receiver_id, now_datetime
+                                )
                             elif match_pot_subaccount_pattern(receiver_id):
                                 logger.info(
                                     f"new pot deployment: {args_dict}, {action}"
@@ -388,3 +425,16 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     logger.error(f"Error in indexer handler:\n{e}")
                     # with open("indexer_error.txt", "a") as file:
                     #     file.write(f"{e}\n")
+            logger.info(
+                f"Time to process method calls for receipt {receipt_execution_outcome.receipt.receipt_id}: {time.time() - method_call_processing_start:.4f} seconds"
+            )
+            log_memory_usage("After processing method calls")
+        logger.info(
+            f"Time to process shard {shard_index}: {time.time() - shard_start_time:.4f} seconds"
+        )
+        log_memory_usage(f"After processing shard {shard_index}")
+
+    logger.info(
+        f"Total time to process streamer message: {time.time() - start_time:.4f} seconds"
+    )
+    log_memory_usage("End of handle_streamer_message")
