@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from pathlib import Path
 
 import requests
@@ -8,7 +7,6 @@ from billiard.exceptions import WorkerLostError
 from celery import shared_task
 from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
-from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
@@ -22,8 +20,6 @@ from pots.models import Pot, PotPayout
 
 from .logging import logger
 from .utils import cache_block_height, get_block_height
-
-CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
 
 async def indexer(from_block: int, to_block: int):
@@ -51,50 +47,16 @@ async def indexer(from_block: int, to_block: int):
 
     while True:
         try:
-            # Log time before fetching a new block
-            fetch_start_time = time.time()
             # streamer_message is the current block
             streamer_message = await streamer_messages_queue.get()
-            fetch_end_time = time.time()
-            logger.info(
-                f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
-            )
             block_count += 1
-
-            # Log time before caching block height
-            cache_start_time = time.time()
-            # Fire and forget the cache update
-            asyncio.create_task(
-                cache_block_height(
-                    CURRENT_BLOCK_HEIGHT_KEY,
-                    streamer_message.block.header.height,
-                    block_count,
-                    streamer_message.block.header.timestamp,
-                )  # current block height
-                # cache.aset(
-                #     CURRENT_BLOCK_HEIGHT_KEY, streamer_message.block.header.height
-                # )
-            )
-            cache_end_time = time.time()
-
-            logger.info(
-                f"Time to cache block height: {cache_end_time - cache_start_time:.4f} seconds"
-            )
-
-            # Log time before handling the streamer message
-            handle_start_time = time.time()
+            await cache_block_height(
+                "current_block_height",
+                streamer_message.block.header.height,
+                block_count,
+                streamer_message.block.header.timestamp,
+            )  # current block height
             await handle_streamer_message(streamer_message)
-            handle_end_time = time.time()
-            logger.info(
-                f"Time to handle streamer message: {handle_end_time - handle_start_time:.4f} seconds"
-            )
-
-            # Log total time for one iteration
-            iteration_end_time = time.time()
-            logger.info(
-                f"Total time for one iteration: {iteration_end_time - fetch_start_time:.4f} seconds"
-            )
-
         except Exception as e:
             logger.error(f"Error in streamer_messages_queue: {e}")
 
@@ -107,7 +69,7 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        start_block = get_block_height(CURRENT_BLOCK_HEIGHT_KEY)
+        start_block = get_block_height("current_block_height")
         # start_block = 119_568_113
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))

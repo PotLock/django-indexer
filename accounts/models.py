@@ -6,7 +6,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from base.logging import logger
-from chains.models import Chain
 
 
 class Account(models.Model):
@@ -17,15 +16,6 @@ class Account(models.Model):
         db_index=True,
         validators=[],
         help_text=_("On-chain account address."),
-    )
-    chain = models.ForeignKey(
-        Chain,
-        null=False,
-        blank=False,
-        on_delete=models.CASCADE,
-        related_name="accounts",
-        related_query_name="account",
-        help_text=_("Blockchain this account is located on."),
     )
     total_donations_in_usd = models.DecimalField(
         _("total donations received in USD"),
@@ -137,9 +127,6 @@ class Account(models.Model):
 
     def save(self, *args, **kwargs):
         if self._state.adding:  # If the account is being created (not updated)
-            if not self.chain_id:
-                # default to NEAR chain when none is provided
-                self.chain = Chain.objects.get(name="NEAR")
             self.fetch_near_social_profile_data(
                 False  # don't save yet as we want to avoid infinite loop
             )

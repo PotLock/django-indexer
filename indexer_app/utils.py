@@ -15,7 +15,7 @@ from activities.models import Activity
 from donations.models import Donation
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
-from nadabot.models import BlackList, Group, NadabotRegistry, Provider, Stamp
+from nadabot.models import Group, NadabotRegistry, Provider, Stamp, BlackList
 from pots.models import (
     Pot,
     PotApplication,
@@ -52,7 +52,9 @@ async def handle_social_profile_update(args_dict, receiver_id, signer_id):
 
 
 async def handle_new_nadabot_registry(
-    data: dict, receiverId: str, created_at: datetime
+        data: dict,
+        receiverId: str,
+        created_at: datetime
 ):
     logger.info(f"nadabot registry init... {data}")
 
@@ -64,7 +66,7 @@ async def handle_new_nadabot_registry(
             owner=owner,
             created_at=created_at,
             updated_at=created_at,
-            source_metadata=data.get("source_metadata"),
+            source_metadata=data.get('source_metadata')
         )
 
         if data.get("admins"):
@@ -76,7 +78,9 @@ async def handle_new_nadabot_registry(
 
 
 async def handle_registry_blacklist_action(
-    data: dict, receiverId: str, created_at: datetime
+        data: dict,
+        receiverId: str,
+        created_at: datetime
 ):
     logger.info(f"Registry blacklist action....... {data}")
 
@@ -90,27 +94,30 @@ async def handle_registry_blacklist_action(
                     "registry": registry,
                     "account": account,
                     "reason": data.get("reason"),
-                    "date_blacklisted": created_at,
+                    "date_blacklisted": created_at
                 }
             )
             await BlackList.objects.abulk_create(
-                objs=[BlackList(**data) for data in bulk_obj], ignore_conflicts=True
+                objs = [BlackList(**data) for data in bulk_obj], ignore_conflicts=True
             )
     except Exception as e:
         logger.error(f"Error in adding acct to blacklist: {e}")
 
 
 async def handle_registry_unblacklist_action(
-    data: dict, receiverId: str, created_at: datetime
+        data: dict,
+        receiverId: str,
+        created_at: datetime
 ):
     logger.info(f"Registry remove blacklisted accts....... {data}")
 
     try:
         registry, _ = await Account.objects.aget_or_create(id=receiverId)
-        entries = BlackList.objects.filter(account__in=data["accounts"])
+        entries =  BlackList.objects.filter(account__in=data["accounts"])
         await entries.adelete()
     except Exception as e:
         logger.error(f"Error in removing acct from blacklist: {e}")
+
 
 
 async def handle_new_pot(
@@ -209,71 +216,72 @@ async def handle_new_pot(
         logger.error(f"Failed to handle new pot, Error: {e}")
 
 
+
 async def handle_pot_config_update(
     log_data: dict,
     receiver_id: str,
 ):
-    try:
-        data = log_data
-        logger.info(f"asserting involved accts....  {receiver_id}")
-        if data.get("chef"):
-            chef, _ = await Account.objects.aget_or_create(id=data["chef"])
-        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
-        logger.info(f"building updated config for pot {receiver_id}")
-        pot_config = {
-            "deployer": data["deployed_by"],
-            "source_metadata": data["source_metadata"],
-            "owner_id": data["owner"],
-            "chef_id": data.get("chef"),
-            "name": data["pot_name"],
-            "description": data["pot_description"],
-            "max_approved_applicants": data["max_projects"],
-            "base_currency": data["base_currency"],
-            "application_start": datetime.fromtimestamp(
-                data["application_start_ms"] / 1000
-            ),
-            "application_end": datetime.fromtimestamp(
-                data["application_end_ms"] / 1000
-            ),
-            "matching_round_start": datetime.fromtimestamp(
-                data["public_round_start_ms"] / 1000
-            ),
-            "matching_round_end": datetime.fromtimestamp(
-                data["public_round_end_ms"] / 1000
-            ),
-            "registry_provider": data["registry_provider"],
-            "min_matching_pool_donation_amount": data[
-                "min_matching_pool_donation_amount"
-            ],
-            "sybil_wrapper_provider": data["sybil_wrapper_provider"],
-            "custom_sybil_checks": data.get("custom_sybil_checks"),
-            "custom_min_threshold_score": data.get("custom_min_threshold_score"),
-            "referral_fee_matching_pool_basis_points": data[
-                "referral_fee_matching_pool_basis_points"
-            ],
-            "referral_fee_public_round_basis_points": data[
-                "referral_fee_public_round_basis_points"
-            ],
-            "chef_fee_basis_points": data["chef_fee_basis_points"],
-            "matching_pool_balance": data["matching_pool_balance"],
-            "total_public_donations": data["total_public_donations"],
-            "public_donations_count": data["public_donations_count"],
-            "cooldown_period_ms": data["cooldown_end_ms"],
-            "all_paid_out": data["all_paid_out"],
-            "protocol_config_provider": data["protocol_config_provider"],
-        }
+        try:
+                data = log_data
+                logger.info(f"asserting involved accts....  {receiver_id}")
+                if data.get("chef"):
+                    chef, _ = await Account.objects.aget_or_create(id=data["chef"])
+                owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+                logger.info(f"building updated config for pot {receiver_id}")
+                pot_config = {
+                    "deployer": data["deployed_by"],
+                    "source_metadata": data["source_metadata"],
+                    "owner_id": data["owner"],
+                    "chef_id": data.get("chef"),
+                    "name": data["pot_name"],
+                    "description": data["pot_description"],
+                    "max_approved_applicants": data["max_projects"],
+                    "base_currency": data["base_currency"],
+                    "application_start": datetime.fromtimestamp(
+                        data["application_start_ms"] / 1000
+                    ),
+                    "application_end": datetime.fromtimestamp(
+                        data["application_end_ms"] / 1000
+                    ),
+                    "matching_round_start": datetime.fromtimestamp(
+                        data["public_round_start_ms"] / 1000
+                    ),
+                    "matching_round_end": datetime.fromtimestamp(
+                        data["public_round_end_ms"] / 1000
+                    ),
+                    "registry_provider": data["registry_provider"],
+                    "min_matching_pool_donation_amount": data[
+                        "min_matching_pool_donation_amount"
+                    ],
+                    "sybil_wrapper_provider": data["sybil_wrapper_provider"],
+                    "custom_sybil_checks": data.get("custom_sybil_checks"),
+                    "custom_min_threshold_score": data.get("custom_min_threshold_score"),
+                    "referral_fee_matching_pool_basis_points": data[
+                        "referral_fee_matching_pool_basis_points"
+                    ],
+                    "referral_fee_public_round_basis_points": data[
+                        "referral_fee_public_round_basis_points"
+                    ],
+                    "chef_fee_basis_points": data["chef_fee_basis_points"],
+                    "matching_pool_balance": data["matching_pool_balance"],
+                    "total_public_donations": data["total_public_donations"],
+                    "public_donations_count": data["public_donations_count"],
+                    "cooldown_period_ms": data["cooldown_end_ms"],
+                    "all_paid_out": data["all_paid_out"],
+                    "protocol_config_provider": data["protocol_config_provider"],
+                }
 
-        pot, created = await Pot.objects.aupdate_or_create(
-            id=receiver_id, defaults=pot_config
-        )
+                pot, created = await Pot.objects.aupdate_or_create(
+                    id=receiver_id, defaults=pot_config
+                )
 
-        if data.get("admins"):
-            for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(id=admin_id)
-                pot.admins.aadd(admin)
-        # await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
-    except Exception as e:
-        logger.error(f"Failed to update Pot config, Error: {e}")
+                if data.get("admins"):
+                    for admin_id in data["admins"]:
+                        admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                        pot.admins.aadd(admin)
+                # await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
+        except Exception as e:
+                logger.error(f"Failed to update Pot config, Error: {e}")
 
 
 async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datetime):
@@ -790,8 +798,6 @@ async def handle_add_nadabot_admin(data, receiverId):
             await obj.admins.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add nadabot admin, Error: {e}")
-
-
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
@@ -1026,8 +1032,10 @@ async def handle_new_donation(
     #         }
     #         await Account.objects.filter(id=recipient.id).aupdate(**acctUpdate)
 
-
-async def handle_update_default_human_threshold(data: dict, receiverId: str):
+async def handle_update_default_human_threshold(
+        data: dict,
+        receiverId: str
+):
     logger.info(f"update threshold data... {data}")
 
     try:
@@ -1040,7 +1048,11 @@ async def handle_update_default_human_threshold(data: dict, receiverId: str):
         logger.error(f"Failed to update default threshold, Error: {e}")
 
 
-async def handle_new_provider(data: dict, receiverId: str, signerId: str):
+async def handle_new_provider(
+        data: dict,
+        receiverId: str,
+        signerId: str
+):
     logger.info(f"new provider data: {data}, {receiverId}")
     data = data["provider"]
 
@@ -1058,38 +1070,38 @@ async def handle_new_provider(data: dict, receiverId: str, signerId: str):
         # had the same id emitted for them, the id `13`, so we have to catch it and manoeuvre aroubd it.
         # TODO: REMOVE when next version contract is deployed, as this issue would be fixed.
         if provider_id == 13:
-            provider_id = await cache.aget("last_id", 1)
-            await cache.aset("last_id", provider_id + 1)
+                provider_id = await cache.aget("last_id", 1)
+                await cache.aset("last_id", provider_id+1)
 
         provider = await Provider.objects.aupdate_or_create(
-            on_chain_id=provider_id,
-            contract=contract,
-            method_name=data["method_name"],
-            name=data["provider_name"],
-            description=data.get("description"),
-            status=data["status"],
-            admin_notes=data.get("admin_notes"),
-            default_weight=data["default_weight"],
-            gas=data.get("gas"),
-            tags=data.get("tags"),
-            icon_url=data.get("icon_url"),
-            external_url=data.get("external_url"),
-            submitted_by_id=data["submitted_by"],
-            submitted_at=datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
-            stamp_validity_ms=(
-                datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000)
-                if data.get("stamp_validity_ms")
-                else None
-            ),
-            account_id_arg_name=data["account_id_arg_name"],
-            custom_args=data.get("custom_args"),
-            registry_id=receiverId,
+                on_chain_id=provider_id,
+                contract=contract,
+                method_name=data["method_name"],
+                name=data["provider_name"],
+                description=data.get("description"),
+                status=data["status"],
+                admin_notes=data.get("admin_notes"),
+                default_weight=data["default_weight"],
+                gas=data.get("gas"),
+                tags=data.get("tags"),
+                icon_url=data.get("icon_url"),
+                external_url=data.get("external_url"),
+                submitted_by_id=data["submitted_by"],
+                submitted_at = datetime.fromtimestamp(data.get("submitted_at_ms") / 1000),
+                stamp_validity_ms = datetime.fromtimestamp(data.get("stamp_validity_ms") / 1000) if data.get("stamp_validity_ms") else None,
+                account_id_arg_name = data["account_id_arg_name"],
+                custom_args = data.get("custom_args"),
+                registry_id=receiverId
         )
     except Exception as e:
         logger.error(f"Failed to add new stamp provider: {e}")
 
 
-async def handle_add_stamp(data: dict, receiverId: str, signerId: str):
+async def handle_add_stamp(
+        data: dict,
+        receiverId: str,
+        signerId: str
+):
     logger.info(f"new stamp data: {data}, {receiverId}")
     data = data["stamp"]
 
@@ -1102,20 +1114,24 @@ async def handle_add_stamp(data: dict, receiverId: str, signerId: str):
         stamp = await Stamp.objects.aupdate_or_create(
             user=user,
             provider=provider,
-            verified_at=datetime.fromtimestamp(data["validated_at_ms"] / 1000),
+            verified_at = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
         )
     except Exception as e:
         logger.error(f"Failed to create stamp: {e}")
 
 
-async def handle_new_group(data: dict, created_at: datetime):
+
+async def handle_new_group(
+    data: dict,
+    created_at: datetime
+):
     logger.info(f"new group data: {data}")
-    group_data = data.get("group", {})
+    group_data = data.get('group', {})
     try:
         # group enums can have values, they are represented as a dict in the events from the indexer, and enum choices without values are presented as normal strings:
         # withValue: {'group': {'id': 5, 'name': 'Here we go again', 'providers': [8, 1, 4, 6], 'rule': {'IncreasingReturns': 10}}}
         # noValue: {"id":6,"name":"Lachlan test group","providers":[1,2],"rule":"Highest"}
-        rule = group_data["rule"]
+        rule = group_data['rule']
         rule_key = rule
         rule_val = None
         if type(rule) == dict:
@@ -1127,25 +1143,21 @@ async def handle_new_group(data: dict, created_at: datetime):
             name=group_data["name"],
             created_at=created_at,
             updated_at=created_at,
-            rule_type=rule_key,
-            rule_val=rule_val,
+            rule_type = rule_key,
+            rule_val = rule_val
         )
 
         logger.info(f"addding provider.... : {group_data['providers']}")
         if group_data.get("providers"):
             for provider_id in group_data["providers"]:
-                provider, _ = await Provider.objects.aget_or_create(
-                    on_chain_id=provider_id
-                )
+                provider, _ = await Provider.objects.aget_or_create(on_chain_id=provider_id)
                 await group.providers.aadd(provider)
     except Exception as e:
         logger.error(f"Failed to create group, because: {e}")
 
-
 async def cache_block_height(
     key: str, height: int, block_count: int, block_timestamp: int
-):
-    logger.info(f"caching block height: {height}")
+) -> int:
     await cache.aset(key, height)
     # the cache os the default go to for the restart block, the db is a backup if the redis server crashes.
     # if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
@@ -1158,7 +1170,7 @@ async def cache_block_height(
             "updated_at": timezone.now(),
         },
     )  # better than ovverriding model's save method to get a singleton? we need only one entry
-    # return height
+    return height
 
 
 def get_block_height(key: str) -> int:
