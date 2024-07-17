@@ -207,13 +207,11 @@ class Donation(models.Model):
         try:
             token = self.token
             price_usd = token.fetch_usd_prices_common(self.donated_at)
-            # time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
-            # token_prices = TokenHistoricalPrice.objects.filter(
-            #     token=token,
-            #    timestamp__gte=self.donated_at - time_window,
-            #    timestamp__lte=self.donated_at + time_window,
-            # )
-            # existing_token_price = token_prices.first()
+            if not price_usd:
+                logger.error(
+                    f"No USD price found for token {token.symbol} at {self.paid_at}"
+                )
+                return
             total_amount = token.format_price(self.total_amount)
             net_amount = token.format_price(self.net_amount)
             protocol_amount = token.format_price(self.protocol_fee)

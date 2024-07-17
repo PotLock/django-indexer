@@ -46,7 +46,6 @@ class Token(models.Model):
     coingecko_id = models.CharField(
         _("coingecko_id"),
         max_length=255,
-        null=True,
         help_text=_("Token id on coingecko."),
     )
 
@@ -87,33 +86,37 @@ class Token(models.Model):
                 price_data = response.json()
             except Exception as e:
                 logger.warning(f"Failed to fetch coingecko price data: {e}")
-        price_usd = (
-            price_data.get("market_data", {}).get("current_price", {}).get("usd")
-        )
-        if price_usd:
-            TokenHistoricalPrice.objects.create(
-                token=self,
-                timestamp=timestamp,
-                price_usd=price_usd,
+            price_usd = (
+                price_data.get("market_data", {}).get("current_price", {}).get("usd")
             )
-            return Decimal(price_usd)
+            if price_usd:
+                TokenHistoricalPrice.objects.create(
+                    token=self,
+                    timestamp=timestamp,
+                    price_usd=price_usd,
+                )
+                return Decimal(price_usd)
+        return None
 
 
 
     def save(self, *args, **kwargs):
-        if self._state.adding:
-            endpoint = f"{settings.COINGECKO_URL}/coins/list?include_platform=true"
-            if settings.COINGECKO_API_KEY:
-                endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
-            logger.info(f"coingecko endpoint: {endpoint}")
-            response = requests.get(endpoint)
-            logger.info(f"coingecko response: {response}")
-            if response.status_code == 429:
-                logger.warning("Coingecko rate limit exceeded")
-            price_data = response.json()
-            coin_data = list(filter(lambda x: x["symbol"] == kwargs["symbol"] and x["platforms"].get("near-protocol"), price_data))
-            if coin_data:
-                self.coingecko_id = coin_data[0]["id"]
+        try:
+            if self._state.adding:
+                endpoint = f"{settings.COINGECKO_URL}/coins/list?include_platform=true"
+                if settings.COINGECKO_API_KEY:
+                    endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
+                logger.info(f"coingecko endpoint: {endpoint}")
+                response = requests.get(endpoint)
+                logger.info(f"coingecko response: {response}")
+                if response.status_code == 429:
+                    logger.warning("Coingecko rate limit exceeded")
+                price_data = response.json()
+                coin_data = list(filter(lambda x: x["symbol"] == kwargs["symbol"] and x["platforms"].get("near-protocol"), price_data))
+                if coin_data:
+                    self.coingecko_id = coin_data[0]["id"]
+        except Exception as e:
+            logger.warning(f"Failed to fetch token id from coingecko: {e}")
         super().save(*args, **kwargs)
 
 
