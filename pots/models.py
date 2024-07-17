@@ -450,65 +450,19 @@ class PotPayout(models.Model):
     ### Fetches USD prices for the Donation record and saves USD totals
     def fetch_usd_prices(self):
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
-        token = self.token
-        time_window = timedelta(hours=settings.HISTORICAL_PRICE_QUERY_HOURS or 24)
-        token_prices = TokenHistoricalPrice.objects.filter(
-            token=token,
-            timestamp__gte=self.paid_at - time_window,
-            timestamp__lte=self.paid_at + time_window,
-        )
-        existing_token_price = token_prices.first()
-        amount = token.format_price(self.amount)
-        if existing_token_price:
-            try:
-                price_usd = existing_token_price.price_usd
-                self.amount_paid_usd = amount * price_usd
-                self.save()
-            except Exception as e:
-                logger.error(
-                    f"Failed to calculate and save USD prices for payout using existing TokenHistoricalPrice: {e}"
-                )
-        else:
-            # no existing price within acceptable time period; fetch from coingecko
-            try:
+        try:
+            token = self.token
+            price_usd = token.fetch_usd_prices_common(self.paid_at)
+            if not price_usd:
                 logger.info(
-                    "No existing price within acceptable time period; fetching historical price..."
+                    f"No USD price found for token {self.token.symbol} at {self.paid_at}"
                 )
-                endpoint = f"{settings.COINGECKO_URL}/coins/{self.token.id.id}/history?date={format_date(self.paid_at)}&localization=false"
-                if settings.COINGECKO_API_KEY:
-                    endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
-                response = requests.get(endpoint)
-                logger.info(f"coingecko response: {response}")
-                if response.status_code == 429:
-                    logger.warning("Coingecko rate limit exceeded")
-                price_data = response.json()
-            except Exception as e:
-                logger.warning(f"Failed to fetch coingecko price data: {e}")
-            logger.info(f"coingecko price data: {price_data}")
-            price_usd = (
-                price_data.get("market_data", {}).get("current_price", {}).get("usd")
-            )
-            logger.info(f"unit price: {price_usd}")
-            if price_usd:
-                try:
-                    # convert price_usd to decimal
-                    price_usd = Decimal(price_usd)
-                    self.amount_paid_usd = amount * price_usd
-                    self.save()
-                except Exception as e:
-                    logger.error(
-                        f"Failed to calculate and save USD prices using fetched price: {e}"
-                    )
-                try:
-                    TokenHistoricalPrice.objects.create(
-                        token=token,
-                        price_usd=price_usd,
-                        timestamp=self.paid_at,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Error creating TokenHistoricalPrice: {e} token: {token} price_usd: {price_usd}"
-                    )
+                return
+            self.amount_paid_usd = token.format_price(self.amount) * price_usd
+            self.save()
+            logger.info(f"Saved USD prices for pot payout for pot id: {self.pot.id}")
+        except Exception as e:
+            logger.error(f"Failed to calculate and save USD prices: {e}")
 
 
 class PotPayoutChallenge(models.Model):
