@@ -1,17 +1,16 @@
+from datetime import timedelta
 from decimal import Decimal
 from os import name
 
+import requests
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.conf import settings
-import requests
-from datetime import timedelta
-
-from base.logging import logger
-from base.utils import format_date
 
 from accounts.models import Account
+from base.logging import logger
+from base.utils import format_date
 
 
 class Token(models.Model):
@@ -86,6 +85,7 @@ class Token(models.Model):
                 price_data = response.json()
             except Exception as e:
                 logger.warning(f"Failed to fetch coingecko price data: {e}")
+                return None
             price_usd = (
                 price_data.get("market_data", {}).get("current_price", {}).get("usd")
             )
@@ -98,25 +98,28 @@ class Token(models.Model):
                 return Decimal(price_usd)
         return None
 
-
-
     def save(self, *args, **kwargs):
         try:
             if self._state.adding:
                 endpoint = f"{settings.COINGECKO_URL}/coins/list?include_platform=true"
                 if settings.COINGECKO_API_KEY:
                     endpoint += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
-                logger.info(f"coingecko endpoint: {endpoint}")
                 response = requests.get(endpoint)
                 logger.info(f"coingecko response: {response}")
                 if response.status_code == 429:
                     logger.warning("Coingecko rate limit exceeded")
                 price_data = response.json()
-                coin_data = list(filter(lambda x: x["symbol"] == kwargs["symbol"] and x["platforms"].get("near-protocol"), price_data))
+                coin_data = list(
+                    filter(
+                        lambda x: x["symbol"] == kwargs["symbol"]
+                        and x["platforms"].get("near-protocol"),
+                        price_data,
+                    )
+                )
                 if coin_data:
                     self.coingecko_id = coin_data[0]["id"]
         except Exception as e:
-            logger.warning(f"Failed to fetch token id from coingecko: {e}")
+            logger.error(f"Failed to fetch token id from coingecko: {e}")
         super().save(*args, **kwargs)
 
 

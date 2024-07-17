@@ -454,19 +454,16 @@ class PotPayout(models.Model):
             token = self.token
             price_usd = token.fetch_usd_prices_common(self.paid_at)
             if not price_usd:
-                logger.error(
+                logger.info(
                     f"No USD price found for token {self.token.symbol} at {self.paid_at}"
                 )
                 return
             self.amount_paid_usd = token.format_price(self.amount) * price_usd
             self.save()
-            logger.info(
-                f"Saved USD prices for pot payout for pot id: {self.pot.id}"
-            )
+            logger.info(f"Saved USD prices for pot payout for pot id: {self.pot.id}")
         except Exception as e:
-            logger.error(
-                f"Failed to calculate and save USD prices: {e}"
-            )
+            logger.error(f"Failed to calculate and save USD prices: {e}")
+
 
 class PotPayoutChallenge(models.Model):
     id = models.AutoField(
