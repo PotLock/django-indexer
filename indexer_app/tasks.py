@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from pathlib import Path
 
 import requests
@@ -47,16 +48,44 @@ async def indexer(from_block: int, to_block: int):
 
     while True:
         try:
+            # Log time before fetching a new block
+            fetch_start_time = time.time()
             # streamer_message is the current block
             streamer_message = await streamer_messages_queue.get()
+            fetch_end_time = time.time()
+            logger.info(
+                f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
+            )
             block_count += 1
+
+            # Log time before caching block height
+            cache_start_time = time.time()
             await cache_block_height(
                 "current_block_height",
                 streamer_message.block.header.height,
                 block_count,
                 streamer_message.block.header.timestamp,
             )  # current block height
+            cache_end_time = time.time()
+
+            logger.info(
+                f"Time to cache block height: {cache_end_time - cache_start_time:.4f} seconds"
+            )
+
+            # Log time before handling the streamer message
+            handle_start_time = time.time()
             await handle_streamer_message(streamer_message)
+            handle_end_time = time.time()
+            logger.info(
+                f"Time to handle streamer message: {handle_end_time - handle_start_time:.4f} seconds"
+            )
+
+            # Log total time for one iteration
+            iteration_end_time = time.time()
+            logger.info(
+                f"Total time for one iteration: {iteration_end_time - fetch_start_time:.4f} seconds"
+            )
+
         except Exception as e:
             logger.error(f"Error in streamer_messages_queue: {e}")
 

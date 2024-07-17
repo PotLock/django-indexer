@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import time
@@ -48,9 +49,11 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
     block_timestamp = streamer_message.block.header.timestamp
     block_height = streamer_message.block.header.height
     now_datetime = datetime.fromtimestamp(block_timestamp / 1000000000)
-    await cache.aset(
-        "block_height", block_height
-    )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
+    # Fire and forget the cache update
+    asyncio.create_task(cache.aset("block_height", block_height))
+    # await cache.aset(
+    #     "block_height", block_height
+    # )  # TODO: add custom timeout if it should be valid for longer than default (5 minutes)
     formatted_date = convert_ns_to_utc(block_timestamp)
     logger.info(
         f"Block Height: {block_height}, Block Timestamp: {block_timestamp} ({formatted_date})"
