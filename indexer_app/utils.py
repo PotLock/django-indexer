@@ -61,12 +61,15 @@ async def handle_new_nadabot_registry(
     try:
         registry, _ = await Account.objects.aget_or_create(id=receiverId)
         owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        reg_defaults = {
+            "owner": owner,
+            "created_at": created_at,
+            "updated_at": created_at,
+            "source_metadata": data.get('source_metadata')
+        }
         nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
             id=registry,
-            owner=owner,
-            created_at=created_at,
-            updated_at=created_at,
-            source_metadata=data.get('source_metadata')
+            defaults=reg_defaults
         )
 
         if data.get("admins"):
@@ -1111,10 +1114,13 @@ async def handle_add_stamp(
     provider, _ = await Provider.objects.aget_or_create(on_chain_id=data["provider_id"])
 
     try:
+        stamp_default = {
+            "verified_at": datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+        }
         stamp = await Stamp.objects.aupdate_or_create(
             user=user,
             provider=provider,
-            verified_at = datetime.fromtimestamp(data["validated_at_ms"] / 1000)
+            defaults=stamp_default
         )
     except Exception as e:
         logger.error(f"Failed to create stamp: {e}")
@@ -1138,13 +1144,17 @@ async def handle_new_group(
             rule_key = next(iter(rule))
             rule_val = rule.get(rule_key)
 
-        group = await Group.objects.acreate(
+        group_default = {
+            "name": group_data["name"],
+            "created_at": created_at,
+            "updated_at": created_at,
+            "rule_type": rule_key,
+            "rule_val": rule_val
+        }
+
+        group, _ = Group.objects.update_or_create(
             id=group_data["id"],
-            name=group_data["name"],
-            created_at=created_at,
-            updated_at=created_at,
-            rule_type = rule_key,
-            rule_val = rule_val
+            defaults=group_default
         )
 
         logger.info(f"addding provider.... : {group_data['providers']}")

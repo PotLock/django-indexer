@@ -343,9 +343,60 @@ class Command(BaseCommand):
                 for group_provider_id in group["providers"]:
                     group_provider, _ = Provider.objects.get_or_create(on_chain_id=group_provider_id)
                     group_obj.providers.add(group_provider)
+
         # pot factory
         POTFACTORY_ID = "v1.potfactory.potlock.near"
-        # pot_factory, _ = PotFactory.objects
+        pot_factory, _ = Account.objects.get_or_create(id=POTFACTORY_ID)
+        # get pot factory metadata from fastnear
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_contract_source_metadata"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for pot factory metadata data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        metadata = response.json()
+        print("pot factory metadata; ", metadata)
+
+        # get pot factory config
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_config"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for pot factory config data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        config = response.json()
+        # get pot factory owner
+        owner, _ = Account.objects.get_or_create(id=config["owner"])
+        protocol_fee_recipient_account, _ = Account.objects.get_or_create(
+            id=config["protocol_fee_recipient_account"],
+        )
+        defaults = {
+            "owner": owner,
+            "deployed_at": datetime.fromtimestamp(1707662008),
+            "source_metadata": metadata,
+            "protocol_fee_basis_points": config["protocol_fee_basis_points"],
+            "protocol_fee_recipient": protocol_fee_recipient_account,
+            "require_whitelist": config["require_whitelist"],
+        }
+        # Create Factory object
+        factory, factory_created = PotFactory.objects.update_or_create(
+            id=pot_factory, defaults=defaults
+        )
+
+        if config.get("admins"):
+            for admin_id in config["admins"]:
+                admin, _ = Account.objects.get_or_create(
+                    id=admin_id,
+                )
+                factory.admins.add(admin)
+
+        # Add whitelisted deployers to the PotFactory
+        if config.get("whitelisted_deployers"):
+            for deployer_id in config["whitelisted_deployers"]:
+                deployer, _ = Account.objects.get_or_create(id=deployer_id)
+                factory.whitelisted_deployers.add(deployer)
         # pots
         near_acct, _ = Account.objects.get_or_create(id="near")
         url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_pots"
