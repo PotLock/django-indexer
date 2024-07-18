@@ -826,15 +826,16 @@ async def handle_new_donation(
     logger.info(f"handle_new_donation args data: {data}, {receiver_id}")
     logger.info(f"donation data: {donation_data}")
 
-    if "net_amount" in donation_data:
+    if "net_amount" in donation_data and donation_data["net_amount"] != "0":
         net_amount = int(donation_data["net_amount"])
     else:
         # direct donations don't have net_amount property, so have to calculate it here
         total_amount = int(donation_data["total_amount"])
         protocol_fee = int(donation_data["protocol_fee"])
         referrer_fee = int(donation_data["referrer_fee"] or 0)
+        chef_fee = int(donation_data.get("chef_fee") or 0)
 
-        net_amount = total_amount - protocol_fee - referrer_fee
+        net_amount = total_amount - protocol_fee - referrer_fee - chef_fee
 
     donated_at = datetime.fromtimestamp(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000
