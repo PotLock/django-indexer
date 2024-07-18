@@ -1165,6 +1165,16 @@ async def cache_block_height(
             "updated_at": timezone.now(),
         },
     )  # better than ovverriding model's save method to get a singleton? we need only one entry
+=======
+    # await BlockHeight.objects.aupdate_or_create(
+    #     id=1,
+    #     defaults={
+    #         "block_height": height,
+    #         "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000),
+    #         "updated_at": timezone.now(),
+    #     },
+    # )  # better than ovverriding model's save method to get a singleton? we need only one entry
+>>>>>>> e288b20 (resolve conflicts, 🤦)
     # return height
 
 
