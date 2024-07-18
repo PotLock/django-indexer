@@ -5,7 +5,7 @@ from django.conf import settings
 BASE_PATTERN = (
     r"nadabot\.testnet"
     if settings.ENVIRONMENT == "testnet"
-else r"v\d+(?:new)?\.[a-zA-Z]+\.nadabot\.near"
+else r"v\d+(?:new)?(?:\.[a-zA-Z]+)?\.nadabot\.near"
 )
 
 

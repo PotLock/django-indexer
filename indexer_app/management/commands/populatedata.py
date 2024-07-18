@@ -13,11 +13,13 @@ from pots.models import (
     Pot,
     PotApplication,
     PotApplicationReview,
+    PotFactory,
     PotPayout,
     PotPayoutChallenge,
     PotPayoutChallengeAdminResponse,
 )
 from tokens.models import Token
+from nadabot.models import Provider, NadabotRegistry, Stamp, Group
 
 
 class Command(BaseCommand):
@@ -213,8 +215,188 @@ class Command(BaseCommand):
                 page += 1
             else:
                 break
+        # Nadabot
+        NADABOT_ID = "v2new.staging.nadabot.near"
+        registry, _ = Account.objects.get_or_create(id=NADABOT_ID)
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{NADABOT_ID}/view/get_contract_source_metadata"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for nadabot source metadata failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        source_metadata = response.json()
+        print("........", source_metadata)
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{NADABOT_ID}/view/get_config"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for nadabot  config failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        config = response.json()
+        print("... requested config, now creating reg..")
+        owner, _ = Account.objects.get_or_create(id=config["owner"])
+        reg_defaults = {
+            "owner": owner,
+            "created_at": datetime.fromtimestamp(1711744807),
+            "updated_at": datetime.fromtimestamp(1711744807),
+            "source_metadata": source_metadata
+        }
+        nadabot_registry, _ = NadabotRegistry.objects.update_or_create(
+            id=registry, defaults=reg_defaults
+        )
+        if config.get("admins"):
+            for admin_id in config["admins"]:
+                admin, _ = Account.objects.get_or_create(id=admin_id)
+                nadabot_registry.admins.add(admin)
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{NADABOT_ID}/view/get_providers"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for provider data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        providers = response.json()
+        print("provider data; ", providers)
+        for provider in providers:
+            print("sleeping for 1 second")
+            time.sleep(1)
+            submitter, _ = Account.objects.get_or_create(id=provider["submitted_by"])
+            contract, _ = Account.objects.get_or_create(id=provider["contract_id"])
+            # provider_id = provider["id"]
+            provider_default = {
+                "contract": contract,
+                "method_name": provider["method_name"],
+                "name": provider["provider_name"],
+                "description": provider.get("description"),
+                "status": provider["status"],
+                "admin_notes": provider.get("admin_notes"),
+                "default_weight": provider["default_weight"],
+                "gas": provider.get("gas"),
+                "tags": provider.get("tags"),
+                "icon_url": provider.get("icon_url"),
+                "external_url": provider.get("external_url"),
+                "submitted_by_id": provider["submitted_by"],
+                "submitted_at": datetime.fromtimestamp(provider.get("submitted_at_ms") / 1000),
+                "stamp_validity_ms": provider.get("stamp_validity_ms"),
+                "account_id_arg_name": provider["account_id_arg_name"],
+                "custom_args": provider.get("custom_args"),
+                "registry_id": NADABOT_ID
+            }
+            provider, _ = Provider.objects.update_or_create(
+                    on_chain_id=provider["id"],
+                    defaults=provider_default
+            )
+
+        # stamps
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{NADABOT_ID}/view/get_stamps"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for stamps data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        stamps = response.json()
+        for stamp in stamps:
+            user, _ = Account.objects.get_or_create(id=stamp["user_id"])
+            provider, _ = Provider.objects.get_or_create(on_chain_id=stamp["provider"]["id"])
+            stamp_default = {
+                "verified_at": datetime.fromtimestamp(stamp["validated_at_ms"] / 1000)
+            }
+            stamp_obj, _ = Stamp.objects.update_or_create(
+                user=user,
+                provider=provider,
+                defaults=stamp_default
+            )
+
+        # Groups
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{NADABOT_ID}/view/get_groups"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for groups data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        groups = response.json()
+        for group in groups:
+            print("the roup.. ", group)
+            rule = group['rule']
+            rule_key = rule
+            rule_val = None
+            if type(rule) == dict:
+                rule_key = next(iter(rule))
+                rule_val = rule.get(rule_key)
+
+            group_default = {
+                "name": group["name"],
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+                "rule_type": rule_key,
+                "rule_val": rule_val
+            }
+            group_obj, _ = Group.objects.update_or_create(
+                id=group["id"],
+                defaults=group_default
+            )
+            if group.get("providers"):
+                for group_provider_id in group["providers"]:
+                    group_provider, _ = Provider.objects.get_or_create(on_chain_id=group_provider_id)
+                    group_obj.providers.add(group_provider)
+
         # pot factory
         POTFACTORY_ID = "v1.potfactory.potlock.near"
+        pot_factory, _ = Account.objects.get_or_create(id=POTFACTORY_ID)
+        # get pot factory metadata from fastnear
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_contract_source_metadata"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for pot factory metadata data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        metadata = response.json()
+        print("pot factory metadata; ", metadata)
+
+        # get pot factory config
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_config"
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(
+                f"Request for pot factory config data failed ({response.status_code}) with message: {response.text}"
+            )
+            return
+        config = response.json()
+        # get pot factory owner
+        owner, _ = Account.objects.get_or_create(id=config["owner"])
+        protocol_fee_recipient_account, _ = Account.objects.get_or_create(
+            id=config["protocol_fee_recipient_account"],
+        )
+        defaults = {
+            "owner": owner,
+            "deployed_at": datetime.fromtimestamp(1707662008),
+            "source_metadata": metadata,
+            "protocol_fee_basis_points": config["protocol_fee_basis_points"],
+            "protocol_fee_recipient": protocol_fee_recipient_account,
+            "require_whitelist": config["require_whitelist"],
+        }
+        # Create Factory object
+        factory, factory_created = PotFactory.objects.update_or_create(
+            id=pot_factory, defaults=defaults
+        )
+
+        if config.get("admins"):
+            for admin_id in config["admins"]:
+                admin, _ = Account.objects.get_or_create(
+                    id=admin_id,
+                )
+                factory.admins.add(admin)
+
+        # Add whitelisted deployers to the PotFactory
+        if config.get("whitelisted_deployers"):
+            for deployer_id in config["whitelisted_deployers"]:
+                deployer, _ = Account.objects.get_or_create(id=deployer_id)
+                factory.whitelisted_deployers.add(deployer)
         # pots
         near_acct, _ = Account.objects.get_or_create(id="near")
         url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_pots"
@@ -477,7 +659,7 @@ class Command(BaseCommand):
                 for payout in config["payouts"]:
                     paid_at = (
                         None
-                        if "paid_at" not in payout
+                        if payout.get("paid_at") is None
                         else datetime.fromtimestamp(payout["paid_at"] / 1000)
                     )
                     recipient, _ = Account.objects.get_or_create(
