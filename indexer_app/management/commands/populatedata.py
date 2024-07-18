@@ -659,7 +659,7 @@ class Command(BaseCommand):
                 for payout in config["payouts"]:
                     paid_at = (
                         None
-                        if "paid_at" not in payout
+                        if payout.get("paid_at") is None
                         else datetime.fromtimestamp(payout["paid_at"] / 1000)
                     )
                     recipient, _ = Account.objects.get_or_create(
