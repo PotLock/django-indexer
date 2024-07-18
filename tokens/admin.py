@@ -5,7 +5,15 @@ from .models import Token, TokenHistoricalPrice
 
 @admin.register(Token)
 class TokenAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "symbol", "icon", "decimals", "get_most_recent_price")
+    list_display = (
+        "id",
+        "name",
+        "symbol",
+        "coingecko_id",
+        "icon",
+        "decimals",
+        "get_most_recent_price",
+    )
     search_fields = ("id",)
 
     def get_most_recent_price(self, obj):
