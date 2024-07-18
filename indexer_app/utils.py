@@ -1165,7 +1165,7 @@ async def cache_block_height(
             "updated_at": timezone.now(),
         },
     )  # better than ovverriding model's save method to get a singleton? we need only one entry
-    return height
+    # return height
 
 
 def get_block_height(key: str) -> int:
