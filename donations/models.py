@@ -209,7 +209,7 @@ class Donation(models.Model):
             price_usd = token.fetch_usd_prices_common(self.donated_at)
             if not price_usd:
                 logger.error(
-                    f"No USD price found for token {token.symbol} at {self.paid_at}"
+                    f"No USD price found for token {token.symbol} at {self.donated_at}"
                 )
                 return
             total_amount = token.format_price(self.total_amount)
