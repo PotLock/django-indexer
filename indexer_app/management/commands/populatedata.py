@@ -596,6 +596,17 @@ class Command(BaseCommand):
                     if donation.get("chef_id"):
                         chef, _ = Account.objects.get_or_create(id=donation["chef_id"])
 
+                    # net_amount is 0 for some donations, so calculate it
+                    net_amount = donation["net_amount"]
+                    if net_amount == "0":
+                        total_amount = int(donation["total_amount"])
+                        protocol_fee = int(donation["protocol_fee"])
+                        referrer_fee = int(donation["referrer_fee"] or 0)
+                        chef_fee = int(donation["chef_fee"] or 0)
+                        net_amount = (
+                            total_amount - protocol_fee - referrer_fee - chef_fee
+                        )
+
                     # pot donations always NEAR
                     ft_acct, _ = Account.objects.get_or_create(id="near")
                     ft_token, _ = Token.objects.get_or_create(id=ft_acct)
@@ -604,7 +615,7 @@ class Command(BaseCommand):
                         "total_amount": donation["total_amount"],
                         "total_amount_usd": None,  # USD amounts will be added later
                         "net_amount_usd": None,
-                        "net_amount": donation["net_amount"],
+                        "net_amount": net_amount,
                         "token": ft_token,
                         "message": donation["message"],
                         "donated_at": datetime.fromtimestamp(
