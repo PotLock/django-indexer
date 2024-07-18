@@ -62,7 +62,8 @@ async def indexer(from_block: int, to_block: int):
             block_count += 1
 
             # Log time before caching block height
-            cache_start_time = time.time()            # Fire and forget the cache update
+            cache_start_time = time.time()
+            # Fire and forget the cache update
             asyncio.create_task(
                 cache_block_height(
                     CURRENT_BLOCK_HEIGHT_KEY,
