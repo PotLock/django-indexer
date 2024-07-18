@@ -24,17 +24,20 @@ class Token(models.Model):
         _("name"),
         max_length=255,
         null=True,
+        blank=True,
         help_text=_("Token name."),
     )
     symbol = models.CharField(
         _("symbol"),
         max_length=255,
         null=True,
+        blank=True,
         help_text=_("Token symbol."),
     )
     icon = models.TextField(
         _("icon"),
         null=True,
+        blank=True,
         help_text=_("Token icon (base64 data URL)."),
     )
     decimals = models.PositiveIntegerField(
@@ -46,6 +49,7 @@ class Token(models.Model):
         _("coingecko_id"),
         max_length=255,
         null=True,
+        blank=True,
         help_text=_("Token id on coingecko."),
     )
 
