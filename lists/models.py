@@ -46,11 +46,13 @@ class List(models.Model):
         _("description"),
         max_length=256,
         null=True,
+        blank=True,
         help_text=_("List description."),
     )
     cover_image_url = models.URLField(
         _("cover image url"),
         null=True,
+        blank=True,
         help_text=_("Cover image url."),
     )
     admin_only_registrations = models.BooleanField(
@@ -161,18 +163,21 @@ class ListRegistration(models.Model):
         _("registrant notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Registrant notes."),
     )
     admin_notes = models.TextField(
         _("admin notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Admin notes."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 

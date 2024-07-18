@@ -45,6 +45,7 @@ class PotFactory(models.Model):
     source_metadata = models.JSONField(
         _("source metadata"),
         null=True,
+        blank=True,
         help_text=_("Pot factory source metadata."),
     )
     protocol_fee_basis_points = models.PositiveIntegerField(
@@ -120,6 +121,7 @@ class Pot(models.Model):
         on_delete=models.CASCADE,
         related_name="chef_pots",
         null=True,
+        blank=True,
         help_text=_("Pot chef."),
     )
     name = models.TextField(
@@ -141,6 +143,7 @@ class Pot(models.Model):
         _("base currency"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Base currency."),
     )
     application_start = models.DateTimeField(
@@ -166,6 +169,7 @@ class Pot(models.Model):
     registry_provider = models.CharField(
         _("registry provider"),
         null=True,
+        blank=True,
         help_text=_("Registry provider."),
     )
     min_matching_pool_donation_amount = models.CharField(
@@ -176,16 +180,19 @@ class Pot(models.Model):
     sybil_wrapper_provider = models.CharField(
         _("sybil wrapper provider"),
         null=True,
+        blank=True,
         help_text=_("Sybil wrapper provider."),
     )
     custom_sybil_checks = models.CharField(
         _("custom sybil checks"),
         null=True,
+        blank=True,
         help_text=_("Custom sybil checks."),
     )
     custom_min_threshold_score = models.PositiveIntegerField(
         _("custom min threshold score"),
         null=True,
+        blank=True,
         help_text=_("Custom min threshold score."),
     )
     referral_fee_matching_pool_basis_points = models.PositiveIntegerField(
@@ -213,6 +220,7 @@ class Pot(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Total matching pool in USD."),
     )
     matching_pool_balance = models.CharField(
@@ -235,6 +243,7 @@ class Pot(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Total public donations in USD."),
     )
     public_donations_count = models.PositiveIntegerField(
@@ -245,11 +254,13 @@ class Pot(models.Model):
     cooldown_end = models.DateTimeField(
         _("cooldown end"),
         null=True,
+        blank=True,
         help_text=_("Pot cooldown end date."),
     )
     cooldown_period_ms = models.PositiveIntegerField(
         _("cooldown period in ms"),
         null=True,
+        blank=True,
         help_text=_("Pot cooldown period in ms."),
     )
     all_paid_out = models.BooleanField(
@@ -260,6 +271,7 @@ class Pot(models.Model):
     protocol_config_provider = models.CharField(
         _("protocol config provider"),
         null=True,
+        blank=True,
         help_text=_("Protocol config provider."),
     )
 
@@ -309,6 +321,7 @@ class PotApplication(models.Model):
         _("message"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Application message."),
     )
     status = models.CharField(
@@ -327,11 +340,13 @@ class PotApplication(models.Model):
     updated_at = models.DateTimeField(
         _("updated at"),
         null=True,
+        blank=True,
         help_text=_("Application last update date."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
@@ -368,6 +383,7 @@ class PotApplicationReview(models.Model):
         _("notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Review notes."),
     )
     status = models.CharField(
@@ -385,6 +401,7 @@ class PotApplicationReview(models.Model):
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
@@ -426,6 +443,7 @@ class PotPayout(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Payout amount in USD."),
     )
     token = models.ForeignKey(
@@ -438,12 +456,14 @@ class PotPayout(models.Model):
     paid_at = models.DateTimeField(
         _("paid at"),
         null=True,
+        blank=True,
         help_text=_("Payout date."),
         db_index=True,
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
@@ -514,6 +534,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         on_delete=models.CASCADE,
         related_name="payout_admin_responses",
         null=True,
+        blank=True,
         help_text=_("challenger being responded to."),
     )
 
@@ -522,6 +543,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         on_delete=models.CASCADE,
         related_name="payout_responses",
         null=True,
+        blank=True,
         help_text=_("Pot being challenged."),
     )
 
@@ -551,6 +573,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
