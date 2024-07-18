@@ -1,7 +1,6 @@
 # Add custom migration to donations app that uses run_python to update net_amount for all Donations where net_amount="0".
 
 from django.db import migrations
-from django.db.models import F
 
 
 def update_donations_net_amount(apps, schema_editor):
