@@ -22,6 +22,8 @@ from pots.models import Pot, PotPayout
 from .logging import logger
 from .utils import cache_block_height, get_block_height
 
+CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
+
 
 async def indexer(from_block: int, to_block: int):
     """
@@ -61,7 +63,7 @@ async def indexer(from_block: int, to_block: int):
             # Log time before caching block height
             cache_start_time = time.time()
             await cache_block_height(
-                "current_block_height",
+                CURRENT_BLOCK_HEIGHT_KEY,
                 streamer_message.block.header.height,
                 block_count,
                 streamer_message.block.header.timestamp,
@@ -98,7 +100,7 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        start_block = get_block_height("current_block_height")
+        start_block = get_block_height(CURRENT_BLOCK_HEIGHT_KEY)
         # start_block = 119_568_113
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))
