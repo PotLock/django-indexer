@@ -45,6 +45,7 @@ class Token(models.Model):
     coingecko_id = models.CharField(
         _("coingecko_id"),
         max_length=255,
+        null=True,
         help_text=_("Token id on coingecko."),
     )
 
