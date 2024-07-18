@@ -833,8 +833,9 @@ async def handle_new_donation(
         total_amount = int(donation_data["total_amount"])
         protocol_fee = int(donation_data["protocol_fee"])
         referrer_fee = int(donation_data["referrer_fee"] or 0)
+        chef_fee = int(donation_data.get("chef_fee") or 0)
 
-        net_amount = total_amount - protocol_fee - referrer_fee
+        net_amount = total_amount - protocol_fee - referrer_fee - chef_fee
 
     donated_at = datetime.fromtimestamp(
         (donation_data.get("donated_at") or donation_data.get("donated_at_ms")) / 1000

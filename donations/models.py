@@ -208,8 +208,8 @@ class Donation(models.Model):
             token = self.token
             price_usd = token.fetch_usd_prices_common(self.donated_at)
             if not price_usd:
-                logger.error(
-                    f"No USD price found for token {token.symbol} at {self.donated_at}"
+                logger.info(
+                    f"No USD price found for token {token.name} ({token.id.id}) at {self.donated_at}"
                 )
                 return
             total_amount = token.format_price(self.total_amount)
@@ -218,7 +218,9 @@ class Donation(models.Model):
             referrer_amount = (
                 None if not self.referrer_fee else token.format_price(self.referrer_fee)
             )
-            chef_amount = None if not self.chef_fee else token.format_price(self.chef_fee)
+            chef_amount = (
+                None if not self.chef_fee else token.format_price(self.chef_fee)
+            )
             self.total_amount_usd = total_amount * price_usd
             self.net_amount_usd = net_amount * price_usd
             self.protocol_fee_usd = protocol_amount * price_usd
@@ -227,12 +229,8 @@ class Donation(models.Model):
             )
             self.chef_fee_usd = None if not chef_amount else chef_amount * price_usd
             self.save()
-            logger.info(
-                f"Saved USD prices for donation: {self.on_chain_id}"
-            )
+            logger.info(f"Saved USD prices for donation: {self.on_chain_id}")
         except Exception as e:
-            logger.error(
-                f"Failed to calculate and save USD prices: {e}"
-            )
+            logger.error(f"Failed to calculate and save USD prices: {e}")
         # chef_amount = token.format_price(self.chef_fee or "0")
         # TODO: update totals for relevant accounts

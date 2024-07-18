@@ -9,8 +9,9 @@ def update_donations_net_amount(apps, schema_editor):
         total_amount = int(donation.total_amount)
         protocol_fee = int(donation.protocol_fee)
         referrer_fee = int(donation.referrer_fee or 0)
+        chef_fee = int(donation.chef_fee or 0)
 
-        net_amount = total_amount - protocol_fee - referrer_fee
+        net_amount = total_amount - protocol_fee - referrer_fee - chef_fee
         donation.net_amount = net_amount
         donation.save()
 
