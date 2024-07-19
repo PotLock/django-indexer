@@ -20,7 +20,7 @@ class RuleType(models.TextChoices):
 
 
 class NadabotRegistry(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         related_name="registry_id",
         on_delete=models.CASCADE,

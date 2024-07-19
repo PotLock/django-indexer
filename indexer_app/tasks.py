@@ -200,7 +200,7 @@ def update_pot_statistics():
         matching_pool_donations = Donation.objects.filter(pot=pot, matching_pool=True)
         public_donations = Donation.objects.filter(pot=pot, matching_pool=False)
         try:
-            print(f"Processing pot: {pot.id}")
+            print(f"Processing pot: {pot.account}")
 
             # total matching pool
             pot.total_matching_pool = sum(
@@ -219,17 +219,17 @@ def update_pot_statistics():
             jobs_logger.info(f"Total matching pool USD: {pot.total_matching_pool_usd}")
 
             # matching pool balance (get from contract)
-            url = f"{settings.FASTNEAR_RPC_URL}/account/{pot.id.id}/view/get_config"
+            url = f"{settings.FASTNEAR_RPC_URL}/account/{pot.account.id}/view/get_config"
             response = requests.get(url)
             if response.status_code != 200:
                 jobs_logger.error(
-                    f"Failed to get matching pool balance for pot {pot.id}: {response.text}"
+                    f"Failed to get matching pool balance for pot {pot.account}: {response.text}"
                 )
             else:
                 data = response.json()
                 pot.matching_pool_balance = data["matching_pool_balance"]
                 jobs_logger.info(
-                    f"Matching pool balance for pot {pot.id}: {pot.matching_pool_balance}"
+                    f"Matching pool balance for pot {pot.account}: {pot.matching_pool_balance}"
                 )
 
             # matching pool donations count
@@ -273,7 +273,7 @@ def update_pot_statistics():
                 ]
             )
         except Exception as e:
-            jobs_logger.error(f"Failed to update statistics for pot {pot.id}: {e}")
+            jobs_logger.error(f"Failed to update statistics for pot {pot.account}: {e}")
 
 
 @shared_task

@@ -38,8 +38,8 @@ class PotFactoryForm(forms.ModelForm):
 @admin.register(PotFactory)
 class PotFactoryAdmin(admin.ModelAdmin):
     form = PotFactoryForm
-    list_display = ("id", "owner", "deployed_at")
-    search_fields = ("id", "owner__id")
+    list_display = ("account", "owner", "deployed_at")
+    search_fields = ("account", "owner__id")
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(PotFactoryAdmin, self).get_form(request, obj, **kwargs)
@@ -79,8 +79,8 @@ class PotForm(forms.ModelForm):
 @admin.register(Pot)
 class PotAdmin(admin.ModelAdmin):
     form = PotForm
-    list_display = ("id", "pot_factory", "deployer", "deployed_at", "name")
-    search_fields = ("id", "name", "deployer__id")
+    list_display = ("account", "pot_factory", "deployer", "deployed_at", "name")
+    search_fields = ("account", "name", "deployer__id")
     list_filter = ("deployed_at",)
 
     def get_form(self, request, obj=None, **kwargs):
@@ -118,7 +118,7 @@ class PotApplicationAdminForm(forms.ModelForm):
 class PotApplicationAdmin(admin.ModelAdmin):
     form = PotApplicationAdminForm
     list_display = ("id", "pot", "applicant", "status", "submitted_at")
-    search_fields = ("pot__id", "applicant__id")
+    search_fields = ("pot__account", "applicant__id")
     list_filter = ("status", "submitted_at")
     autocomplete_fields = ["applicant"]
 
@@ -188,7 +188,7 @@ class PotApplicationReviewAdmin(admin.ModelAdmin):
 @admin.register(PotPayout)
 class PotPayoutAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "recipient", "amount", "amount_paid_usd", "paid_at")
-    search_fields = ("pot__id", "recipient__id")
+    search_fields = ("pot__account", "recipient__id")
     list_filter = ("paid_at",)
 
     def has_add_permission(self, request):
@@ -204,7 +204,7 @@ class PotPayoutAdmin(admin.ModelAdmin):
 @admin.register(PotPayoutChallenge)
 class PotPayoutChallengeAdmin(admin.ModelAdmin):
     list_display = ("id", "challenger", "pot", "message", "created_at")
-    search_fields = ("challenger__id", "pot__id")
+    search_fields = ("challenger__id", "pot__account")
     list_filter = ("created_at",)
 
     def has_add_permission(self, request):

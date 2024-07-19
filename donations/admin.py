@@ -21,7 +21,7 @@ class DonationAdmin(admin.ModelAdmin):
         "message",
         "donor__id",
     )  # Correct field name from 'donor__address' to 'donor__id' if 'id' is used in the model
-    list_filter = ("donated_at", "donor", "pot", "pot__id")
+    list_filter = ("donated_at", "donor", "pot", "pot__account")
     date_hierarchy = "donated_at"
     ordering = ("-donated_at",)
 
@@ -43,7 +43,7 @@ class DonationAdmin(admin.ModelAdmin):
         return obj.recipient.id if obj.recipient else None
 
     def token_address(self, obj):
-        return obj.token.id
+        return obj.token.account
 
     def referrer_address(self, obj):
         return obj.referrer.id if obj.referrer else None

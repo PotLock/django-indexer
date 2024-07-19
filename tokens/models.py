@@ -14,7 +14,7 @@ from base.utils import format_date
 
 
 class Token(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         on_delete=models.CASCADE,
         primary_key=True,

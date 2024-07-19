@@ -13,7 +13,7 @@ from tokens.models import Token, TokenHistoricalPrice
 
 
 class PotFactory(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         primary_key=True,
         related_name="pot_factory",
@@ -70,7 +70,7 @@ class PotFactory(models.Model):
 
 
 class Pot(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         primary_key=True,
         related_name="pot",
@@ -460,7 +460,7 @@ class PotPayout(models.Model):
                 return
             self.amount_paid_usd = token.format_price(self.amount) * price_usd
             self.save()
-            logger.info(f"Saved USD prices for pot payout for pot id: {self.pot.id}")
+            logger.info(f"Saved USD prices for pot payout for pot id: {self.pot.account}")
         except Exception as e:
             logger.error(f"Failed to calculate and save USD prices: {e}")
 

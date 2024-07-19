@@ -60,7 +60,7 @@ async def handle_new_nadabot_registry(
         registry, _ = await Account.objects.aget_or_create(id=receiverId)
         owner, _ = await Account.objects.aget_or_create(id=data["owner"])
         nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
-            id=registry,
+            account=registry,
             owner=owner,
             created_at=created_at,
             updated_at=created_at,
@@ -140,7 +140,7 @@ async def handle_new_pot(
         # Create Pot object
         logger.info(f"creating pot with owner {owner_id}....")
         pot_defaults = {
-            "pot_factory_id": predecessorId,
+            "pot_factory_account": predecessorId,
             "deployer": signer,
             "deployed_at": created_at,
             "source_metadata": data["source_metadata"],
@@ -186,7 +186,7 @@ async def handle_new_pot(
             "protocol_config_provider": data["protocol_config_provider"],
         }
         pot, created = await Pot.objects.aupdate_or_create(
-            id=receiver, defaults=pot_defaults
+            account=receiver, defaults=pot_defaults
         )
 
         # Add admins to the Pot
@@ -264,7 +264,7 @@ async def handle_pot_config_update(
         }
 
         pot, created = await Pot.objects.aupdate_or_create(
-            id=receiver_id, defaults=pot_config
+            account=receiver_id, defaults=pot_config
         )
 
         if data.get("admins"):
@@ -304,7 +304,7 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         }
         # Create Factory object
         factory, factory_created = await PotFactory.objects.aupdate_or_create(
-            id=receiver, defaults=defaults
+            account=receiver, defaults=defaults
         )
 
         # Add admins to the PotFactory
@@ -663,10 +663,10 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
 
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
-        pot = await Pot.objects.aget(id=receiver_id)
+        pot = await Pot.objects.aget(account=receiver_id)
         near_acct, _ = await Account.objects.aget_or_create(id="near")
         near_token, _ = await Token.objects.aget_or_create(
-            id=near_acct
+            account=near_acct
         )  # Pots only support native NEAR
 
         insertion_data = []
@@ -783,7 +783,7 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
 async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
     try:
-        obj = await NadabotRegistry.objects.aget(id=receiverId)
+        obj = await NadabotRegistry.objects.aget(account=receiverId)
 
         for acct in data["account_ids"]:
             user, _ = await Account.objects.aget_or_create(id=acct)
@@ -891,7 +891,7 @@ async def handle_new_donation(
                     if "decimals" in ft_metadata:
                         token_defaults["decimals"] = ft_metadata["decimals"]
         token, _ = await Token.objects.aupdate_or_create(
-            id=token_acct, defaults=token_defaults
+            account=token_acct, defaults=token_defaults
         )
 
     except Exception as e:
@@ -923,7 +923,7 @@ async def handle_new_donation(
         }
 
         if donation_type == "pot":
-            default_data["pot"] = await Pot.objects.aget(id=receiver_id)
+            default_data["pot"] = await Pot.objects.aget(account=receiver_id)
 
         logger.info(f"default donation data: {default_data}")
 
@@ -1033,7 +1033,7 @@ async def handle_update_default_human_threshold(data: dict, receiverId: str):
 
     try:
 
-        reg = await NadabotRegistry.objects.filter(id=receiverId).aupdate(
+        reg = await NadabotRegistry.objects.filter(account=receiverId).aupdate(
             **{"default_human_threshold": data["default_human_threshold"]}
         )
         logger.info("updated threshold..")
