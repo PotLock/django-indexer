@@ -842,6 +842,8 @@ async def handle_new_donation(
     )
 
     try:
+        # insert donate contract which is the receiver id(because of activity relationship mainly)
+        donate_contract, _ = await Account.objects.aget_or_create(id=receiver_id)
         # Upsert donor account
         donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
         recipient = None
