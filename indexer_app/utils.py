@@ -712,6 +712,7 @@ async def handle_transfer_payout(
             data = response.json()
             pot = await Pot.objects.aget(id=receiver_id)
             pot.all_paid_out = data["all_paid_out"]
+            await pot.asave()
     except Exception as e:
         logger.error(f"Failed to create payout data, Error: {e}")
 
