@@ -199,7 +199,7 @@ class AccountActivePotsAPI(APIView, PageNumberPagination):
             applicant=account, status=PotApplicationStatus.APPROVED
         )
         pot_ids = applications.values_list("pot_id", flat=True)
-        pots = Pot.objects.filter(id__in=pot_ids)
+        pots = Pot.objects.filter(account__in=pot_ids)
         if request.query_params.get("status") == "live":
             pots = pots.filter(
                 matching_round_start__lte=now, matching_round_end__gte=now

@@ -15,7 +15,7 @@ class PotSerializer(ModelSerializer):
     class Meta:
         model = Pot
         fields = [
-            "id",
+            "account",
             "pot_factory",
             "deployer",
             "deployed_at",
@@ -99,7 +99,7 @@ class PotPayoutSerializer(ModelSerializer):
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"
 
 SIMPLE_POT_EXAMPLE = {
-    "id": "some-pot.v1.potfactory.potlock.near",
+    "account": "some-pot.v1.potfactory.potlock.near",
     "deployed_at": "2024-02-16T17:45:03.600845Z",
     "source_metadata": {
         "link": "https://github.com/PotLock/core",

@@ -158,7 +158,7 @@ class Command(BaseCommand):
                         if "decimals" in ft_metadata:
                             token_defaults["decimals"] = ft_metadata["decimals"]
                 ft_token, _ = Token.objects.update_or_create(
-                    id=ft_acct, defaults=token_defaults
+                    account=ft_acct, defaults=token_defaults
                 )
                 if donation.get("referrer_id"):
                     referrer, _ = Account.objects.get_or_create(
@@ -260,7 +260,7 @@ class Command(BaseCommand):
             if config.get("chef"):
                 chef, _ = Account.objects.get_or_create(id=config["chef"])
             pot_defaults = {
-                "pot_factory_id": POTFACTORY_ID,
+                "pot_factory_account": POTFACTORY_ID,
                 "owner_id": config["owner"],
                 "chef_id": config["chef"],
                 "name": config["pot_name"],
@@ -311,7 +311,7 @@ class Command(BaseCommand):
                 "protocol_config_provider": config["protocol_config_provider"],
             }
             pot, created = Pot.objects.update_or_create(
-                id=pot_acct, defaults=pot_defaults
+                account=pot_acct, defaults=pot_defaults
             )
             print("pot created? ", created)
             print("adding admins")
@@ -427,7 +427,7 @@ class Command(BaseCommand):
 
                     # pot donations always NEAR
                     ft_acct, _ = Account.objects.get_or_create(id="near")
-                    ft_token, _ = Token.objects.get_or_create(id=ft_acct)
+                    ft_token, _ = Token.objects.get_or_create(account=ft_acct)
                     donation_defaults = {
                         "donor": donor,
                         "total_amount": donation["total_amount"],
@@ -483,7 +483,7 @@ class Command(BaseCommand):
                     recipient, _ = Account.objects.get_or_create(
                         id=payout["project_id"]
                     )
-                    near_token, _ = Token.objects.get_or_create(id=near_acct)
+                    near_token, _ = Token.objects.get_or_create(account=near_acct)
                     payout_defaults = {
                         "pot": pot,
                         "recipient": recipient,
