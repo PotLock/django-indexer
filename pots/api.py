@@ -95,7 +95,7 @@ class PotDetailAPI(APIView):
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
         serializer = PotSerializer(pot)
@@ -129,7 +129,7 @@ class PotApplicationsAPI(APIView, PageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -166,7 +166,7 @@ class PotDonationsAPI(APIView, PageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -203,7 +203,7 @@ class PotSponsorsAPI(APIView, PageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -245,7 +245,7 @@ class PotPayoutsAPI(APIView, PageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 

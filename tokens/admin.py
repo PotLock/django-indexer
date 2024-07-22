@@ -6,7 +6,7 @@ from .models import Token, TokenHistoricalPrice
 @admin.register(Token)
 class TokenAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
+        "account",
         "name",
         "symbol",
         "coingecko_id",
@@ -14,7 +14,7 @@ class TokenAdmin(admin.ModelAdmin):
         "decimals",
         "get_most_recent_price",
     )
-    search_fields = ("id",)
+    search_fields = ("account",)
 
     def get_most_recent_price(self, obj):
         price = obj.get_most_recent_price()
@@ -35,7 +35,7 @@ class TokenAdmin(admin.ModelAdmin):
 @admin.register(TokenHistoricalPrice)
 class TokenHistoricalPriceAdmin(admin.ModelAdmin):
     list_display = ("token", "timestamp", "price_usd")
-    search_fields = ("token__id",)
+    search_fields = ("token__account",)
     list_filter = ("timestamp",)
 
     # def has_add_permission(self, request):
