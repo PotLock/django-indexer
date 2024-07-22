@@ -697,12 +697,21 @@ async def handle_transfer_payout(
         payout = {
             "recipient_id": data["project_id"],
             "amount": data["amount"],
-            "paid_at": data.get("paid_at", created_at),
+            "paid_at": data["paid_at"] or created_at,
             "tx_hash": receiptId,
         }
         await PotPayout.objects.filter(recipient_id=data["project_id"]).aupdate(
             **payout
         )
+        # check if all_paid_out is now true
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{receiver_id}/view/get_config"
+        response = requests.get(url)
+        if response.status_code != 200:
+            logger.error(f"Failed to get config for pot {receiver_id}: {response.text}")
+        else:
+            data = response.json()
+            pot = await Pot.objects.aget(id=receiver_id)
+            pot.all_paid_out = data["all_paid_out"]
     except Exception as e:
         logger.error(f"Failed to create payout data, Error: {e}")
 
