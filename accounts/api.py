@@ -14,6 +14,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.pagination import pagination_parameters
 from base.logging import logger
 from donations.models import Donation
 from donations.serializers import (
@@ -41,7 +42,6 @@ from .serializers import (
     AccountSerializer,
     PaginatedAccountsResponseSerializer,
 )
-from api.pagination import ResultPagination
 
 
 class DonorsAPI(APIView, PageNumberPagination):
@@ -53,7 +53,8 @@ class DonorsAPI(APIView, PageNumberPagination):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Sort by field, e.g., most_donated_usd",
-            )
+            ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -88,9 +89,12 @@ class DonorsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountsListAPI(APIView, ResultPagination):
+class AccountsListAPI(APIView, PageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
                 response=PaginatedAccountsResponseSerializer,
@@ -106,7 +110,7 @@ class AccountsListAPI(APIView, ResultPagination):
                 ],
             ),
             500: OpenApiResponse(description="Internal server error"),
-        }
+        },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
@@ -165,6 +169,7 @@ class AccountActivePotsAPI(APIView, PageNumberPagination):
                 required=False,
                 description="Filter by pot status",
             ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -220,6 +225,7 @@ class AccountPotApplicationsAPI(APIView, PageNumberPagination):
                 OpenApiParameter.QUERY,
                 description="Filter pot applications by status",
             ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -268,6 +274,7 @@ class AccountDonationsReceivedAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -308,6 +315,7 @@ class AccountDonationsSentAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -348,6 +356,7 @@ class AccountPayoutsReceivedAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(

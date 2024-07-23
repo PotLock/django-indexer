@@ -2,15 +2,15 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
-from base.serializers import ResultPagination
+from base.serializers import TwoDecimalPlacesField
 from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
 from .models import Pot, PotApplication, PotFactory, PotPayout
 
 
 class PotSerializer(ModelSerializer):
-    total_matching_pool_usd = ResultPagination(max_digits=20, decimal_places=2)
-    total_public_donations_usd = ResultPagination(max_digits=20, decimal_places=2)
+    total_matching_pool_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
+    total_public_donations_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
 
     class Meta:
         model = Pot
@@ -71,14 +71,13 @@ class PotFactorySerializer(ModelSerializer):
             "deployed_at",
             "protocol_fee_basis_points",
             "require_whitelist",
-            "protocol_fee_recipient"
+            "protocol_fee_recipient",
         ]
 
     owner = AccountSerializer()
     protocol_fee_recipient = AccountSerializer()
     admins = AccountSerializer(many=True)
     whitelisted_deployers = AccountSerializer(many=True)
-
 
 
 class PotApplicationSerializer(ModelSerializer):
@@ -122,7 +121,6 @@ class PotPayoutSerializer(ModelSerializer):
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"
 
 EXAMPLE_POT_FACTORY_ID = "v1.potfactory.potlock.near"
-
 
 
 SIMPLE_POT_EXAMPLE = {
@@ -188,15 +186,16 @@ SIMPLE_POT_FACTORY_EXAMPLE = {
     "admins": [SIMPLE_ACCOUNT_EXAMPLE],
     "whitelisted_deployers": [SIMPLE_ACCOUNT_EXAMPLE],
     "source_metadata": {
-    "link": "https://github.com/PotLock/core",
+        "link": "https://github.com/PotLock/core",
         "version": "1.0.0",
-        "commit_hash": "e6b108e9442920333b44eb1a4068b9b9ae551d79"
+        "commit_hash": "e6b108e9442920333b44eb1a4068b9b9ae551d79",
     },
     "deployed_at": "2024-02-12T13:49:58.940854Z",
     "protocol_fee_basis_points": 200,
     "require_whitelist": False,
-    "protocol_fee_recipient": SIMPLE_ACCOUNT_EXAMPLE
+    "protocol_fee_recipient": SIMPLE_ACCOUNT_EXAMPLE,
 }
+
 
 class PaginatedPotFactoriesResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField()

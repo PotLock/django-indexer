@@ -19,6 +19,7 @@ from accounts.serializers import (
     AccountSerializer,
     PaginatedAccountsResponseSerializer,
 )
+from api.pagination import pagination_parameters
 from donations.models import Donation
 from donations.serializers import (
     PAGINATED_DONATION_EXAMPLE,
@@ -47,6 +48,9 @@ from .serializers import (
 class PotsListAPI(APIView, PageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
                 response=PaginatedPotsResponseSerializer,
@@ -61,7 +65,7 @@ class PotsListAPI(APIView, PageNumberPagination):
                     ),
                 ],
             ),
-        }
+        },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
@@ -74,6 +78,9 @@ class PotsListAPI(APIView, PageNumberPagination):
 class PotFactoriesAPI(APIView, PageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
                 response=PaginatedPotFactoriesResponseSerializer,
@@ -88,7 +95,7 @@ class PotFactoriesAPI(APIView, PageNumberPagination):
                     ),
                 ],
             ),
-        }
+        },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
@@ -137,6 +144,7 @@ class PotApplicationsAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -174,6 +182,7 @@ class PotDonationsAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -211,6 +220,7 @@ class PotSponsorsAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -253,6 +263,7 @@ class PotPayoutsAPI(APIView, PageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
