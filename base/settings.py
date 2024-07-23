@@ -111,7 +111,7 @@ INSTALLED_APPS = [
 DEFAULT_PAGE_SIZE = 30
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "api.pagination.ResultPagination",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": DEFAULT_PAGE_SIZE,
     "DEFAULT_THROTTLE_CLASSES": [
         # "rest_framework.throttling.UserRateThrottle",

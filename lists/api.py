@@ -15,6 +15,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.pagination import pagination_parameters
+
 from .models import List, ListRegistrationStatus
 from .serializers import (
     PAGINATED_LIST_EXAMPLE,
@@ -31,6 +33,9 @@ from .serializers import (
 class ListsListAPI(APIView, PageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
                 response=PaginatedListsResponseSerializer,
@@ -46,7 +51,7 @@ class ListsListAPI(APIView, PageNumberPagination):
                 ],
             ),
             500: OpenApiResponse(description="Internal server error"),
-        }
+        },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
@@ -110,6 +115,7 @@ class ListRegistrationsAPI(APIView, PageNumberPagination):
                 OpenApiParameter.QUERY,
                 description="Filter registrations by category",
             ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
@@ -149,10 +155,10 @@ class ListRegistrationsAPI(APIView, PageNumberPagination):
                 )
             registrations = registrations.filter(status=status_param)
         if category_param:
-                category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
-                registrations = registrations.filter(
-                        registrant__near_social_profile_data__plCategories__iregex = category_regex_pattern
-                )
+            category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
+            registrations = registrations.filter(
+                registrant__near_social_profile_data__plCategories__iregex=category_regex_pattern
+            )
         results = self.paginate_queryset(registrations, request, view=self)
         serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

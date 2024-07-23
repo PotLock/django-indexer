@@ -13,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.pagination import pagination_parameters
 from base.logging import logger
 
 from .serializers import DonationContractConfigSerializer
@@ -23,6 +24,9 @@ DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 class DonationContractConfigAPI(APIView, PageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
                 response=DonationContractConfigSerializer,
@@ -43,7 +47,7 @@ class DonationContractConfigAPI(APIView, PageNumberPagination):
                 ],
             ),
             500: OpenApiResponse(description="Internal server error"),
-        }
+        },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):

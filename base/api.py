@@ -9,7 +9,6 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import serializers
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
