@@ -710,7 +710,7 @@ async def handle_transfer_payout(
             logger.error(f"Failed to get config for pot {receiver_id}: {response.text}")
         else:
             data = response.json()
-            pot = await Pot.objects.aget(id=receiver_id)
+            pot = await Pot.objects.aget(account=receiver_id)
             pot.all_paid_out = data["all_paid_out"]
             await pot.asave()
     except Exception as e:
