@@ -34,6 +34,7 @@ from .serializers import (
     PAGINATED_POT_FACTORY_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
     PaginatedPotApplicationsResponseSerializer,
+    PaginatedPotFactoriesResponseSerializer,
     PaginatedPotPayoutsResponseSerializer,
     PaginatedPotsResponseSerializer,
     PotApplicationSerializer,
@@ -75,7 +76,7 @@ class PotFactoriesAPI(APIView, PageNumberPagination):
     @extend_schema(
         responses={
             200: OpenApiResponse(
-                response=PaginatedPotsResponseSerializer,
+                response=PaginatedPotFactoriesResponseSerializer,
                 description="Returns a paginated list of pot factories",
                 examples=[
                     OpenApiExample(
