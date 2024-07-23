@@ -13,7 +13,7 @@ from nadabot.utils import match_nadabot_registry_pattern
 from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import log_memory_usage, logger
-from .utils import handle_add_nadabot_admin  # handle_batch_donations,
+from .utils import handle_add_factory_deployers, handle_add_nadabot_admin  # handle_batch_donations,
 from .utils import (
     handle_add_stamp,
     handle_default_list_status_change,
@@ -421,6 +421,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         case "owner_add_admins":
                             logger.info(f"adding admins.. {args_dict}")
                             await handle_add_nadabot_admin(args_dict, receiver_id)
+                            break
+                        case "admin_add_whitelisted_deployers":
+                            logger.info(f"adding whitelisted deployers... {args_dict}")
+                            await handle_add_factory_deployers(args_dict, receiver_id)
                             break
                         # TODO: handle remove upvote
 
