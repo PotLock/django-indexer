@@ -27,6 +27,7 @@ from pots.api import (
     PotApplicationsAPI,
     PotDetailAPI,
     PotDonationsAPI,
+    PotFactoriesAPI,
     PotPayoutsAPI,
     PotsListAPI,
     PotSponsorsAPI,
@@ -116,6 +117,9 @@ urlpatterns = [
     ),
     path(
         "v1/pots/<str:pot_id>/payouts", PotPayoutsAPI.as_view(), name="pots_payouts_api"
+    ),
+    path(
+        "v1/potfactories", PotFactoriesAPI.as_view(), name="pot_factories_api"
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),
