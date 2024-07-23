@@ -683,6 +683,15 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
             insertion_data.append(pot_payout)
 
         await PotPayout.objects.abulk_create(insertion_data, ignore_conflicts=True)
+        url = f"{settings.FASTNEAR_RPC_URL}/account/{receiver_id}/view/get_config"
+        response = requests.get(url)
+        if response.status_code != 200:
+            logger.error(f"Failed to get config for pot {receiver_id}: {response.text}")
+        else:
+            data = response.json()
+            pot = await Pot.objects.aget(account=receiver_id)
+            pot.cooldown_end =datetime.fromtimestamp(data["cooldown_end_ms"] / 1000)
+            await pot.asave()
     except Exception as e:
         logger.error(f"Failed to set payouts, Error: {e}")
 
