@@ -1,6 +1,17 @@
-from rest_framework.pagination import PageNumberPagination
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter
 
-class ResultPagination(PageNumberPagination):
-    page_size = 30
-    page_size_query_param = 'limit'
-    max_page_size = 200
+pagination_parameters = [
+    OpenApiParameter(
+        "page",
+        OpenApiTypes.INT,
+        OpenApiParameter.QUERY,
+        description="Page number for pagination",
+    ),
+    OpenApiParameter(
+        "page_size",
+        OpenApiTypes.INT,
+        OpenApiParameter.QUERY,
+        description="Number of results per page",
+    ),
+]

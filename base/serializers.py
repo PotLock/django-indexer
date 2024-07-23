@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 
-class ResultPagination(serializers.DecimalField):
+class TwoDecimalPlacesField(serializers.DecimalField):
     def to_representation(self, value):
         if value is None:
             return value
