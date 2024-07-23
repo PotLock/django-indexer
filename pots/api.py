@@ -26,16 +26,19 @@ from donations.serializers import (
     PaginatedDonationsResponseSerializer,
 )
 
-from .models import Pot, PotApplication, PotApplicationStatus
+from .models import Pot, PotApplication, PotApplicationStatus, PotFactory
 from .serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
     PAGINATED_POT_APPLICATION_EXAMPLE,
     PAGINATED_POT_EXAMPLE,
+    PAGINATED_POT_FACTORY_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
     PaginatedPotApplicationsResponseSerializer,
+    PaginatedPotFactoriesResponseSerializer,
     PaginatedPotPayoutsResponseSerializer,
     PaginatedPotsResponseSerializer,
     PotApplicationSerializer,
+    PotFactorySerializer,
     PotPayoutSerializer,
     PotSerializer,
 )
@@ -65,6 +68,33 @@ class PotsListAPI(APIView, PageNumberPagination):
         pots = Pot.objects.all()
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotFactoriesAPI(APIView, PageNumberPagination):
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedPotFactoriesResponseSerializer,
+                description="Returns a paginated list of pot factories",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pot factories",
+                        value=PAGINATED_POT_FACTORY_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+        }
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        pot_factories = PotFactory.objects.all()
+        results = self.paginate_queryset(pot_factories, request, view=self)
+        serializer = PotFactorySerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
 
 
