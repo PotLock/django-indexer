@@ -802,6 +802,18 @@ async def handle_add_nadabot_admin(data, receiverId):
         logger.error(f"Failed to add nadabot admin, Error: {e}")
 
 
+async def handle_add_factory_deployers(data, receiverId):
+    logger.info(f"adding factory deployer...: {data}, {receiverId}")
+    try:
+        factory = await PotFactory.objects.aget(id=receiverId)
+
+        for acct in data["whitelisted_deployers"]:
+            user, _ = await Account.objects.aget_or_create(id=acct)
+            await factory.whitelisted_deployers.aadd(user)
+    except Exception as e:
+        logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
+
+
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
 #     receiver_id: str,
