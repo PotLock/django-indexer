@@ -63,9 +63,11 @@ async def indexer(from_block: int, to_block: int):
             # Log time before caching block height
             save_start_time = time.time()
             # Update current block height
-            await save_block_height(
-                streamer_message.block.header.height,
-                streamer_message.block.header.timestamp,
+            asyncio.create_task(
+                save_block_height(
+                    streamer_message.block.header.height,
+                    streamer_message.block.header.timestamp,
+                )
             )
             save_end_time = time.time()
 
