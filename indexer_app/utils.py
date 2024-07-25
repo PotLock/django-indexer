@@ -4,6 +4,7 @@ from datetime import datetime
 from math import log
 
 import requests
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 from django.forms.models import model_to_dict
@@ -690,7 +691,7 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
         else:
             data = response.json()
             pot = await Pot.objects.aget(account=receiver_id)
-            pot.cooldown_end =datetime.fromtimestamp(data["cooldown_end_ms"] / 1000)
+            pot.cooldown_end = datetime.fromtimestamp(data["cooldown_end_ms"] / 1000)
             await pot.asave()
     except Exception as e:
         logger.error(f"Failed to set payouts, Error: {e}")
@@ -814,13 +815,22 @@ async def handle_add_nadabot_admin(data, receiverId):
 async def handle_add_factory_deployers(data, receiverId):
     logger.info(f"adding factory deployer...: {data}, {receiverId}")
     try:
-        factory = await PotFactory.objects.aget(id=receiverId)
-
+        factory = await PotFactory.objects.aget(account=receiverId)
         for acct in data["whitelisted_deployers"]:
             user, _ = await Account.objects.aget_or_create(id=acct)
             await factory.whitelisted_deployers.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
+
+
+async def handle_set_factory_configs(data, receiverId):
+    logger.info(f"setting factory configs...: {data}, {receiverId}")
+    try:
+        factory = await PotFactory.objects.aget(account=receiverId)
+        config_update = sync_to_async(factory.update_configs)
+        await config_update()
+    except Exception as e:
+        logger.error(f"Failed to update factory configs, Error: {e}")
 
 
 # # TODO: Need to abstract some actions.
@@ -1176,18 +1186,11 @@ async def handle_new_group(data: dict, created_at: datetime):
         logger.error(f"Failed to create group, because: {e}")
 
 
-async def cache_block_height(
-    key: str, height: int, block_count: int, block_timestamp: int
-):
-    logger.info(f"caching block height: {height}")
-    await cache.aset(key, height)
-    # the cache os the default go to for the restart block, the db is a backup if the redis server crashes.
-    # if (block_count % int(settings.BLOCK_SAVE_HEIGHT or 400)) == 0:
-    # logger.info(f"saving daylight, {height}")
+async def save_block_height(block_height: int, block_timestamp: int):
     await BlockHeight.objects.aupdate_or_create(
         id=1,
         defaults={
-            "block_height": height,
+            "block_height": block_height,
             "block_timestamp": datetime.fromtimestamp(block_timestamp / 1000000000),
             "updated_at": timezone.now(),
         },
@@ -1195,9 +1198,7 @@ async def cache_block_height(
     # return height
 
 
-def get_block_height(key: str) -> int:
-    block_height = cache.get(key)
-    if not block_height:
-        record = BlockHeight.objects.filter(id=1).first()
-        block_height = 104_922_190 if not record else record.block_height
-    return block_height
+def get_block_height() -> int:
+    record = BlockHeight.objects.filter(id=1).first()
+    if record:
+        return record.block_height

@@ -8,7 +8,6 @@ from billiard.exceptions import WorkerLostError
 from celery import shared_task
 from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
-from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
@@ -21,7 +20,7 @@ from indexer_app.handler import handle_streamer_message
 from pots.models import Pot, PotPayout
 
 from .logging import logger
-from .utils import cache_block_height, get_block_height
+from .utils import get_block_height, save_block_height
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
@@ -62,23 +61,18 @@ async def indexer(from_block: int, to_block: int):
             block_count += 1
 
             # Log time before caching block height
-            cache_start_time = time.time()
-            # Fire and forget the cache update
+            save_start_time = time.time()
+            # Update current block height
             asyncio.create_task(
-                cache_block_height(
-                    CURRENT_BLOCK_HEIGHT_KEY,
+                save_block_height(
                     streamer_message.block.header.height,
-                    block_count,
                     streamer_message.block.header.timestamp,
-                )  # current block height
-                # cache.aset(
-                #     CURRENT_BLOCK_HEIGHT_KEY, streamer_message.block.header.height
-                # )
+                )
             )
-            cache_end_time = time.time()
+            save_end_time = time.time()
 
             logger.info(
-                f"Time to cache block height: {cache_end_time - cache_start_time:.4f} seconds"
+                f"Time to save block height: {save_end_time - save_start_time:.4f} seconds"
             )
 
             # Log time before handling the streamer message
@@ -107,7 +101,7 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        start_block = get_block_height(CURRENT_BLOCK_HEIGHT_KEY)
+        start_block = get_block_height()
         # start_block = 119_568_113
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))
@@ -219,7 +213,9 @@ def update_pot_statistics():
             jobs_logger.info(f"Total matching pool USD: {pot.total_matching_pool_usd}")
 
             # matching pool balance (get from contract)
-            url = f"{settings.FASTNEAR_RPC_URL}/account/{pot.account.id}/view/get_config"
+            url = (
+                f"{settings.FASTNEAR_RPC_URL}/account/{pot.account.id}/view/get_config"
+            )
             response = requests.get(url)
             if response.status_code != 200:
                 jobs_logger.error(
