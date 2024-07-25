@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import datetime
 from math import log
+from asgiref.sync import sync_to_async
 
 import requests
 from django.conf import settings
@@ -814,14 +815,22 @@ async def handle_add_nadabot_admin(data, receiverId):
 async def handle_add_factory_deployers(data, receiverId):
     logger.info(f"adding factory deployer...: {data}, {receiverId}")
     try:
-        factory = await PotFactory.objects.aget(id=receiverId)
-
+        factory = await PotFactory.objects.aget(account=receiverId)
         for acct in data["whitelisted_deployers"]:
             user, _ = await Account.objects.aget_or_create(id=acct)
             await factory.whitelisted_deployers.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
 
+    
+async def handle_set_factory_configs(data, receiverId):
+    logger.info(f"setting factory configs...: {data}, {receiverId}")
+    try:
+        factory = await PotFactory.objects.aget(account=receiverId)
+        config_update = sync_to_async(factory.update_configs)
+        await config_update()
+    except Exception as e:
+        logger.error(f"Failed to update factory configs, Error: {e}")
 
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
