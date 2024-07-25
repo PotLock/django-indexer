@@ -84,9 +84,10 @@ class PotFactory(models.Model):
                 self.protocol_fee_recipient = acct
                 self.require_whitelist = config.get("require_whitelist")
                 self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
-                self.admins.aclear()
+                self.admins.clear()
                 for admin_id in config.get("admins"):
                     self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
+                self.whitelisted_deployers.clear()
                 for deployer_id in config.get("whitelisted_deployers"):
                     self.whitelisted_deployers.add(Account.objects.get_or_create(id=deployer_id)[0])
                 self.save()
