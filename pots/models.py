@@ -80,16 +80,14 @@ class PotFactory(models.Model):
                 config = response.json()
                 print(config)
                 self.protocol_fee_basis_points = config.get("protocol_fee_basis_points")
-                print(f"start creation.. {config.get('protocol_fee_recipient_account')}")
                 acct, created = Account.objects.get_or_create(id=config.get("protocol_fee_recipient_account"))
                 self.protocol_fee_recipient = acct
                 self.require_whitelist = config.get("require_whitelist")
                 self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
+                self.admins.aclear()
                 for admin_id in config.get("admins"):
-                    print(f"creating admin ..... {admin_id}")
                     self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
                 for deployer_id in config.get("whitelisted_deployers"):
-                    print(f"creating deployer ..... {deployer_id}")
                     self.whitelisted_deployers.add(Account.objects.get_or_create(id=deployer_id)[0])
                 self.save()
         except Exception as e:

@@ -2,7 +2,7 @@ import base64
 import json
 from datetime import datetime
 from math import log
-from xmlrpc.client import boolean
+from asgiref.sync import sync_to_async
 
 import requests
 from django.conf import settings
@@ -813,60 +813,15 @@ async def handle_add_factory_deployers(data, receiverId):
     except Exception as e:
         logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
 
-async def handle_update_factory_whitelist_required(data, receiverId):
-    logger.info(f"updating factory whitelist required...: {data}, {receiverId}")
-    try:
-        factory = await PotFactory.objects.aget(account=receiverId)
-        factory.require_whitelist = data["require_whitelist"]
-        await factory.asave()
-    except Exception as e:
-        logger.error(f"Failed to update factory whitelist required, Error: {e}")
     
 async def handle_set_factory_configs(data, receiverId):
-    logger.info(f"setting factory protocol recipient...: {data}, {receiverId}")
+    logger.info(f"setting factory configs...: {data}, {receiverId}")
     try:
         factory = await PotFactory.objects.aget(account=receiverId)
-        if data.get("protocol_fee_recipient_account"):
-            protocol_recipient, _ = await Account.objects.aget_or_create(id=data["protocol_fee_recipient_account"])
-            factory.protocol_fee_recipient = protocol_recipient
-        if data.get("protocol_fee_basis_points"):
-            factory.protocol_fee_basis_points = data["protocol_fee_basis_points"]
-        if data.get("require_whitelist"):
-            factory.require_whitelist = data["require_whitelist"]
-        if data.get("new_owner"):
-            new_owner, _ = await Account.objects.aget_or_create(id=data["new_owner"])
-            factory.owner = new_owner
-        if data.get("whitelisted_deployers"):
-            for acct in data["whitelisted_deployers"]:
-                user, _ = await Account.objects.aget_or_create(id=acct)
-                await factory.whitelisted_deployers.aadd(user)
-        await factory.asave()
+        config_update = sync_to_async(factory.update_configs)
+        await config_update()
     except Exception as e:
-        logger.error(f"Failed to set factory protocol recipient, Error: {e}")
-
-async def handle_factory_admin_accounts(data, receiverId, clear: boolean):
-    logger.info(f"updating factory admins...: {data}, {receiverId}")
-    try:
-        factory = await PotFactory.objects.aget(account=receiverId)
-        if clear:
-            await factory.admins.aclear()
-        if data.get("account_ids"):
-            for acct in data["account_ids"]:
-                user, _ = await Account.objects.aget_or_create(id=acct)
-                await factory.admins.aadd(user)
-    except Exception as e:
-        logger.error(f"Failed to update factory admins, Error: {e}")
-    
-async def handle_factory_remove_admin(data, receiverId):
-    logger.info(f"removing factory admins...: {data}, {receiverId}")
-    try:
-        factory = await PotFactory.objects.aget(account=receiverId)
-        for acct in data["account_ids"]:
-            user= await Account.objects.aget(id=acct)
-            await factory.admins.aremove(user)
-    except Exception as e:
-        logger.error(f"Failed to remove factory admins, Error: {e}")
-
+        logger.error(f"Failed to update factory configs, Error: {e}")
 
 # # TODO: Need to abstract some actions.
 # async def handle_batch_donations(
