@@ -207,6 +207,7 @@ class Provider(models.Model):
     custom_args = models.CharField(
         _("custom args"),
         null=True,
+        blank=True,
         help_text=_("Custom args as Base64VecU8.")
     )
     registry = models.ForeignKey(
@@ -254,11 +255,13 @@ class Group(models.Model):
         choices=RuleType,
         max_length=100,
         null=True,
+        blank=True,
         help_text=_("The rule this group uses.")
     )
     rule_val = models.PositiveIntegerField(
         _("rule value"),
         null=True,
+        blank=True,
         help_text=_("An optional value that the group's rule choices might carry."),
     )
     providers = models.ManyToManyField(

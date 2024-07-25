@@ -47,6 +47,7 @@ class Donation(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Total amount in USD."),
         db_index=True,
     )
@@ -61,6 +62,7 @@ class Donation(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Net amount in USD."),
     )
     # ft = models.ForeignKey(
@@ -83,6 +85,7 @@ class Donation(models.Model):
         on_delete=models.CASCADE,
         related_name="donations",
         null=True,
+        blank=True,
         help_text=_("Donation pot."),
         db_index=True,
     )
@@ -96,6 +99,7 @@ class Donation(models.Model):
         _("message"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Donation message."),
     )
     donated_at = models.DateTimeField(
@@ -109,6 +113,7 @@ class Donation(models.Model):
         on_delete=models.CASCADE,
         related_name="received_donations",
         null=True,
+        blank=True,
         help_text=_("Donation recipient."),
         db_index=True,
     )
@@ -123,6 +128,7 @@ class Donation(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Protocol fee in USD."),
     )
     referrer = models.ForeignKey(
@@ -130,12 +136,14 @@ class Donation(models.Model):
         on_delete=models.CASCADE,
         related_name="referral_donations",
         null=True,
+        blank=True,
         help_text=_("Donation referrer."),
     )
     referrer_fee = models.CharField(
         _("referrer fee"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Referrer fee."),
     )
     referrer_fee_usd = models.DecimalField(
@@ -143,6 +151,7 @@ class Donation(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Referrer fee in USD."),
     )
     chef = models.ForeignKey(
@@ -150,12 +159,14 @@ class Donation(models.Model):
         on_delete=models.CASCADE,
         related_name="chef_donations",
         null=True,
+        blank=True,
         help_text=_("Donation chef."),
     )
     chef_fee = models.CharField(
         _("chef fee"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Chef fee."),
     )
     chef_fee_usd = models.DecimalField(
@@ -163,12 +174,14 @@ class Donation(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Chef fee in USD."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 

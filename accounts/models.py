@@ -57,6 +57,7 @@ class Account(models.Model):
     near_social_profile_data = models.JSONField(
         _("NEAR social profile data"),
         null=True,
+        blank=True,
         help_text=_("NEAR social data contained under 'profile' key."),
     )
 

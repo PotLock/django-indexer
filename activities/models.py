@@ -48,12 +48,14 @@ class Activity(models.Model):
     action_result = models.JSONField(
         _("action result"),
         null=True,
+        blank=True,
         help_text=_("Activity action result."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
     type = models.CharField(
