@@ -134,6 +134,15 @@ async def handle_new_pot(
         signer, _ = await Account.objects.aget_or_create(id=signer_id)
         receiver, _ = await Account.objects.aget_or_create(id=receiver_id)
 
+        # check if pot exists
+        pot = await Pot.objects.filter(account=receiver).afirst()
+        if pot:
+            logger.info("Pot already exists, update using api call")
+            pot_config_update = sync_to_async(pot.update_configs)
+            await pot_config_update()
+            return
+            
+
         logger.info("upsert chef")
         if data.get("chef"):
             chef, _ = await Account.objects.aget_or_create(id=data["chef"])
@@ -186,8 +195,8 @@ async def handle_new_pot(
             "all_paid_out": False,
             "protocol_config_provider": data["protocol_config_provider"],
         }
-        pot, created = await Pot.objects.aupdate_or_create(
-            account=receiver, defaults=pot_defaults
+        pot = await Pot.objects.acreate(
+            account=receiver, **pot_defaults
         )
 
         # Add admins to the Pot
