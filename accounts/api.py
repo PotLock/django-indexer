@@ -9,12 +9,13 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework.pagination import PageNumberPagination
+
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 from base.logging import logger
 from donations.models import Donation
 from donations.serializers import (
@@ -44,7 +45,7 @@ from .serializers import (
 )
 
 
-class DonorsAPI(APIView, PageNumberPagination):
+class DonorsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -89,7 +90,7 @@ class DonorsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountsListAPI(APIView, PageNumberPagination):
+class AccountsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -157,7 +158,7 @@ class AccountDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class AccountActivePotsAPI(APIView, PageNumberPagination):
+class AccountActivePotsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -214,7 +215,7 @@ class AccountActivePotsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountPotApplicationsAPI(APIView, PageNumberPagination):
+class AccountPotApplicationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -269,7 +270,7 @@ class AccountPotApplicationsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountDonationsReceivedAPI(APIView, PageNumberPagination):
+class AccountDonationsReceivedAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -310,7 +311,7 @@ class AccountDonationsReceivedAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountDonationsSentAPI(APIView, PageNumberPagination):
+class AccountDonationsSentAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -351,7 +352,7 @@ class AccountDonationsSentAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class AccountPayoutsReceivedAPI(APIView, PageNumberPagination):
+class AccountPayoutsReceivedAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[

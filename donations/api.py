@@ -8,12 +8,13 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import PageNumberPagination
+
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 from base.logging import logger
 
 from .serializers import DonationContractConfigSerializer
@@ -21,7 +22,7 @@ from .serializers import DonationContractConfigSerializer
 DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 
 
-class DonationContractConfigAPI(APIView, PageNumberPagination):
+class DonationContractConfigAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[

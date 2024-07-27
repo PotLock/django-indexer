@@ -10,12 +10,12 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 
 from .models import List, ListRegistrationStatus
 from .serializers import (
@@ -30,7 +30,7 @@ from .serializers import (
 )
 
 
-class ListsListAPI(APIView, PageNumberPagination):
+class ListsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -98,7 +98,7 @@ class ListDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class ListRegistrationsAPI(APIView, PageNumberPagination):
+class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
