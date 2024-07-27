@@ -8,7 +8,6 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,6 +19,7 @@ from accounts.serializers import (
     PaginatedAccountsResponseSerializer,
 )
 from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 from donations.models import Donation
 from donations.serializers import (
     PAGINATED_DONATION_EXAMPLE,
@@ -45,7 +45,7 @@ from .serializers import (
 )
 
 
-class PotsListAPI(APIView, PageNumberPagination):
+class PotsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -75,7 +75,7 @@ class PotsListAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotFactoriesAPI(APIView, PageNumberPagination):
+class PotFactoriesAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -139,7 +139,7 @@ class PotDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class PotApplicationsAPI(APIView, PageNumberPagination):
+class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -177,7 +177,7 @@ class PotApplicationsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotDonationsAPI(APIView, PageNumberPagination):
+class PotDonationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -215,7 +215,7 @@ class PotDonationsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotSponsorsAPI(APIView, PageNumberPagination):
+class PotSponsorsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -258,7 +258,7 @@ class PotSponsorsAPI(APIView, PageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotPayoutsAPI(APIView, PageNumberPagination):
+class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
