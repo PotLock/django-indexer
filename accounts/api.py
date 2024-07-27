@@ -9,12 +9,13 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework.pagination import PageNumberPagination
+
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination as PageNumberPagination
 from base.logging import logger
 from donations.models import Donation
 from donations.serializers import (

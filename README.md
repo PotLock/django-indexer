@@ -108,7 +108,7 @@ Possible Error Codes:
 
 #### Pagination
 
-Pagination available using `page` and `page_size` as query param on endpoints that specify `paginated`. Default `page_size` is 30.
+Pagination available using `page` and `page_size` as query param on endpoints that specify `paginated`. Default `page_size` is 30(can use `max` as param to get the max page size which is 100)
 
 Endpoints that support pagination will return a success response containing the following:
 
