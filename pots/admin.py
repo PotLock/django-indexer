@@ -220,7 +220,7 @@ class PotPayoutChallengeAdmin(admin.ModelAdmin):
 @admin.register(PotPayoutChallengeAdminResponse)
 class PotPayoutChallengeAdminResponseAdmin(admin.ModelAdmin):
     list_display = ("id", "pot", "admin", "message", "created_at", "resolved")
-    search_fields = ("admin__id", "challenge__id")
+    search_fields = ("admin__id", "challenger__id")
     list_filter = ("created_at", "resolved")
 
     def has_add_permission(self, request):

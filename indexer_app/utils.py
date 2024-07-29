@@ -731,7 +731,7 @@ async def handle_payout_challenge(
     data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
-
+        acct, _ = await Account.objects.aget_or_create(id=signer_id)
         logger.info(f"challenging payout..: {data}, {receiver_id}")
         payoutChallenge = {
             "created_at": created_at,
@@ -762,7 +762,7 @@ async def handle_payout_challenge_response(
     try:
         logger.info(f"responding to payout challenge..: {data}, {receiver_id}")
         response_defaults = {
-            "admin": signer_id,
+            "admin_id": signer_id,
             "message": data.get("notes"),
             "resolved": data.get("resolve_challenge"),
             "tx_hash": receiptId,
