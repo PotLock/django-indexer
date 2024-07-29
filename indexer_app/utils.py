@@ -744,6 +744,7 @@ async def handle_payout_challenge(
         payoutChallenge = {
             "created_at": created_at,
             "message": data["reason"],
+            "tx_hash": receiptId,
         }
         await PotPayoutChallenge.objects.aupdate_or_create(
             challenger_id=signer_id, pot_id=receiver_id, defaults=payoutChallenge
