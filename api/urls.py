@@ -78,7 +78,7 @@ urlpatterns = [
         name="accounts_api_by_id_payouts_received",
     ),
     path(
-        "v1/accounts/<str:account_id>/registrations",
+        "v1/accounts/<str:account_id>/list-registrations",
         AccountListRegistrationsAPI.as_view(),
         name="accounts_api_by_id_registrations",
     ),

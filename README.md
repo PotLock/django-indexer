@@ -148,10 +148,9 @@ enum PotApplicationStatus {
 }
 ```
 
-#### ✅ Get registrations to lists by account: `GET /accounts/{ACCOUNT_ID}/registrations` (paginated)
+#### ✅ Get registrations to lists by account: `GET /accounts/{ACCOUNT_ID}/list-registrations` (paginated)
 
 Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
-Can also specify project category to filter by using `category` query param if desired, e.g. `category=Education`
 
 ### `List` endpoints
 
