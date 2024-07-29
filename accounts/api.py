@@ -305,7 +305,7 @@ class AccountDonationsReceivedAPI(APIView, CustomSizePageNumberPagination):
                 {"message": f"Account with ID {account_id} not found."}, status=404
             )
 
-        donations = Donation.objects.filter(recipient=account)
+        donations = Donation.objects.prefetch_related('donor', 'pot', 'recipient', 'referrer', 'chef', 'token').filter(recipient=account)
         results = self.paginate_queryset(donations, request, view=self)
         serializer = DonationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
@@ -336,7 +336,7 @@ class AccountDonationsSentAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    # @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -346,7 +346,7 @@ class AccountDonationsSentAPI(APIView, CustomSizePageNumberPagination):
                 {"message": f"Account with ID {account_id} not found."}, status=404
             )
 
-        donations = Donation.objects.filter(donor=account)
+        donations = Donation.objects.select_related('donor', 'pot', 'recipient', 'referrer', 'chef', 'token').prefetch_related('pot__admins').filter(donor=account) #TODO:  this takes more time than just doing a  prefetch_related for the fields.
         results = self.paginate_queryset(donations, request, view=self)
         serializer = DonationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

@@ -135,17 +135,17 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    # @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
-            list_obj = List.objects.get(id=list_id)
+            list_obj = List.objects.prefetch_related('registrations').get(id=list_id)
         except List.DoesNotExist:
             return Response(
                 {"message": f"List with ID {list_id} not found."}, status=404
             )
 
-        registrations = list_obj.registrations.all()
+        registrations = list_obj.registrations.select_related().all()
         status_param = request.query_params.get("status")
         category_param = request.query_params.get("category")
         if status_param:
