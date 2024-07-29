@@ -336,7 +336,7 @@ class AccountDonationsSentAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    # @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
