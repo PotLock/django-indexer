@@ -344,7 +344,8 @@ class Pot(models.Model):
                 self.referral_fee_matching_pool_basis_points = config.get("referral_fee_matching_pool_basis_points")
                 self.referral_fee_public_round_basis_points = config.get("referral_fee_public_round_basis_points")
                 self.chef_fee_basis_points = config.get("chef_fee_basis_points")
-                self.cooldown_end = datetime.fromtimestamp(config.get("cooldown_end_ms") / 1000)
+                if config.get("cooldown_end_ms"):
+                    self.cooldown_end = datetime.fromtimestamp(config.get("cooldown_end_ms") / 1000)
                 self.all_paid_out = config.get("all_paid_out")
                 self.protocol_config_provider = config.get("protocol_config_provider")
                 self.save()
