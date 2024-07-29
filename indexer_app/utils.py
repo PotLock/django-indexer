@@ -134,6 +134,15 @@ async def handle_new_pot(
         signer, _ = await Account.objects.aget_or_create(id=signer_id)
         receiver, _ = await Account.objects.aget_or_create(id=receiver_id)
 
+        # check if pot exists
+        pot = await Pot.objects.filter(account=receiver).afirst()
+        if pot:
+            logger.info("Pot already exists, update using api call")
+            pot_config_update = sync_to_async(pot.update_configs)
+            await pot_config_update()
+            return
+            
+
         logger.info("upsert chef")
         if data.get("chef"):
             chef, _ = await Account.objects.aget_or_create(id=data["chef"])
@@ -186,8 +195,8 @@ async def handle_new_pot(
             "all_paid_out": False,
             "protocol_config_provider": data["protocol_config_provider"],
         }
-        pot, created = await Pot.objects.aupdate_or_create(
-            account=receiver, defaults=pot_defaults
+        pot = await Pot.objects.acreate(
+            account=receiver, **pot_defaults
         )
 
         # Add admins to the Pot
@@ -215,63 +224,62 @@ async def handle_pot_config_update(
     receiver_id: str,
 ):
     try:
-        data = log_data
-        logger.info(f"asserting involved accts....  {receiver_id}")
-        if data.get("chef"):
-            chef, _ = await Account.objects.aget_or_create(id=data["chef"])
-        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
-        logger.info(f"building updated config for pot {receiver_id}")
-        pot_config = {
-            "deployer": data["deployed_by"],
-            "source_metadata": data["source_metadata"],
-            "owner_id": data["owner"],
-            "chef_id": data.get("chef"),
-            "name": data["pot_name"],
-            "description": data["pot_description"],
-            "max_approved_applicants": data["max_projects"],
-            "base_currency": data["base_currency"],
-            "application_start": datetime.fromtimestamp(
-                data["application_start_ms"] / 1000
-            ),
-            "application_end": datetime.fromtimestamp(
-                data["application_end_ms"] / 1000
-            ),
-            "matching_round_start": datetime.fromtimestamp(
-                data["public_round_start_ms"] / 1000
-            ),
-            "matching_round_end": datetime.fromtimestamp(
-                data["public_round_end_ms"] / 1000
-            ),
-            "registry_provider": data["registry_provider"],
-            "min_matching_pool_donation_amount": data[
-                "min_matching_pool_donation_amount"
-            ],
-            "sybil_wrapper_provider": data["sybil_wrapper_provider"],
-            "custom_sybil_checks": data.get("custom_sybil_checks"),
-            "custom_min_threshold_score": data.get("custom_min_threshold_score"),
-            "referral_fee_matching_pool_basis_points": data[
-                "referral_fee_matching_pool_basis_points"
-            ],
-            "referral_fee_public_round_basis_points": data[
-                "referral_fee_public_round_basis_points"
-            ],
-            "chef_fee_basis_points": data["chef_fee_basis_points"],
-            "matching_pool_balance": data["matching_pool_balance"],
-            "total_public_donations": data["total_public_donations"],
-            "public_donations_count": data["public_donations_count"],
-            "cooldown_period_ms": data["cooldown_end_ms"],
-            "all_paid_out": data["all_paid_out"],
-            "protocol_config_provider": data["protocol_config_provider"],
-        }
+        pot = await Pot.objects.filter(account=receiver_id).afirst()
+        if pot:
+            logger.info("Pot already exists, updating using api call")
+            pot_config_update = sync_to_async(pot.update_configs)
+            await pot_config_update()
+        # pot_config = {
+        #     "deployer": data["deployed_by"],
+        #     "source_metadata": data["source_metadata"],
+        #     "owner_id": data["owner"],
+        #     "chef_id": data.get("chef"),
+        #     "name": data["pot_name"],
+        #     "description": data["pot_description"],
+        #     "max_approved_applicants": data["max_projects"],
+        #     "base_currency": data["base_currency"],
+        #     "application_start": datetime.fromtimestamp(
+        #         data["application_start_ms"] / 1000
+        #     ),
+        #     "application_end": datetime.fromtimestamp(
+        #         data["application_end_ms"] / 1000
+        #     ),
+        #     "matching_round_start": datetime.fromtimestamp(
+        #         data["public_round_start_ms"] / 1000
+        #     ),
+        #     "matching_round_end": datetime.fromtimestamp(
+        #         data["public_round_end_ms"] / 1000
+        #     ),
+        #     "registry_provider": data["registry_provider"],
+        #     "min_matching_pool_donation_amount": data[
+        #         "min_matching_pool_donation_amount"
+        #     ],
+        #     "sybil_wrapper_provider": data["sybil_wrapper_provider"],
+        #     "custom_sybil_checks": data.get("custom_sybil_checks"),
+        #     "custom_min_threshold_score": data.get("custom_min_threshold_score"),
+        #     "referral_fee_matching_pool_basis_points": data[
+        #         "referral_fee_matching_pool_basis_points"
+        #     ],
+        #     "referral_fee_public_round_basis_points": data[
+        #         "referral_fee_public_round_basis_points"
+        #     ],
+        #     "chef_fee_basis_points": data["chef_fee_basis_points"],
+        #     "matching_pool_balance": data["matching_pool_balance"],
+        #     "total_public_donations": data["total_public_donations"],
+        #     "public_donations_count": data["public_donations_count"],
+        #     "cooldown_period_ms": data["cooldown_end_ms"],
+        #     "all_paid_out": data["all_paid_out"],
+        #     "protocol_config_provider": data["protocol_config_provider"],
+        # }
 
-        pot, created = await Pot.objects.aupdate_or_create(
-            account=receiver_id, defaults=pot_config
-        )
+        # pot, created = await Pot.objects.aupdate_or_create(
+        #     account=receiver_id, defaults=pot_config
+        # )
 
-        if data.get("admins"):
-            for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(id=admin_id)
-                pot.admins.aadd(admin)
+        # if data.get("admins"):
+        #     for admin_id in data["admins"]:
+        #         admin, _ = await Account.objects.aget_or_create(id=admin_id)
+        #         pot.admins.aadd(admin)
         # await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
     except Exception as e:
         logger.error(f"Failed to update Pot config, Error: {e}")
