@@ -580,6 +580,12 @@ class PotPayoutChallenge(models.Model):
         null=False,
         help_text=_("Challenge message."),
     )
+    tx_hash = models.CharField(
+        _("transaction hash"),
+        null=True,
+        blank=True,
+        help_text=_("Transaction hash."),
+    )
 
     class Meta:
         verbose_name_plural = "Payout Challenges"
