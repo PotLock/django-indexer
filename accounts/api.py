@@ -23,6 +23,8 @@ from donations.serializers import (
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
+from lists.models import ListRegistration, ListRegistrationStatus
+from lists.serializers import PAGINATED_LIST_REGISTRATION_EXAMPLE, ListRegistrationSerializer, PaginatedListRegistrationsResponseSerializer
 from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 from pots.serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
@@ -390,4 +392,66 @@ class AccountPayoutsReceivedAPI(APIView, CustomSizePageNumberPagination):
         payouts = PotPayout.objects.filter(recipient=account, paid_at__isnull=False)
         results = self.paginate_queryset(payouts, request, view=self)
         serializer = PotPayoutSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by registration status",
+            ),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedListRegistrationsResponseSerializer,
+                description="Returns List registrations for the account provided",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple registration example",
+                        description="Example response for list registrations",
+                        value=PAGINATED_LIST_REGISTRATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        print(f"opp... {account}")
+        registrations = ListRegistration.objects.filter(registrant=account)
+        status_param = request.query_params.get("status")
+        category_param = request.query_params.get("category")
+        if status_param:
+            if status_param not in ListRegistrationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            registrations = registrations.filter(status=status_param)
+        if category_param:
+            category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
+            registrations = registrations.filter(
+                registrant__near_social_profile_data__plCategories__iregex=category_regex_pattern
+            )
+        results = self.paginate_queryset(registrations, request, view=self)
+        serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
