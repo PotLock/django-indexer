@@ -758,7 +758,7 @@ async def handle_payout_challenge(
         }
 
         activity, activity_created = await Activity.objects.aupdate_or_create(
-            action_result=payoutChallenge, type="Challenge_Payout", defaults=defaults
+            action_result=data, type="Challenge_Payout", defaults=defaults
         )
     except Exception as e:
         logger.error(f"Failed to create payoutchallenge, Error: {e}")
