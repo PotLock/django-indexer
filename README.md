@@ -15,6 +15,7 @@
       - [✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)](#-get-donations-sent-for-account-get-accountsaccount_iddonations_sent-paginated)
       - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
       - [✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/pot_applications` (paginated)](#-get-applications-for-account-get-accountsaccount_idpot_applications-paginated)
+      - [✅ Get registrations to lists by account: `GET /accounts/{ACCOUNT_ID}/list-registrations` (paginated)](#-get-registrations-to-lists-by-account-get-accountsaccount_idlist-registrations-paginated)
     - [`List` endpoints](#list-endpoints)
       - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
       - [✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)](#-get-list-by-id-get-listslist_id-paginated)

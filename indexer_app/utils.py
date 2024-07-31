@@ -141,7 +141,6 @@ async def handle_new_pot(
             pot_config_update = sync_to_async(pot.update_configs)
             await pot_config_update()
             return
-            
 
         logger.info("upsert chef")
         if data.get("chef"):
@@ -195,9 +194,7 @@ async def handle_new_pot(
             "all_paid_out": False,
             "protocol_config_provider": data["protocol_config_provider"],
         }
-        pot = await Pot.objects.acreate(
-            account=receiver, **pot_defaults
-        )
+        pot = await Pot.objects.acreate(account=receiver, **pot_defaults)
 
         # Add admins to the Pot
         if data.get("admins"):

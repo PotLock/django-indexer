@@ -68,33 +68,41 @@ class PotFactory(models.Model):
 
     class Meta:
         verbose_name_plural = "Pot Factories"
-    
 
     def update_configs(self):
         try:
 
-            url = f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            url = (
+                f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            )
             response = requests.get(url)
             if response.status_code != 200:
-                logger.error(f"Failed to get config for pot {self.account}: {response.text}")
+                logger.error(
+                    f"Failed to get config for pot {self.account}: {response.text}"
+                )
             else:
                 config = response.json()
                 print(config)
                 self.protocol_fee_basis_points = config.get("protocol_fee_basis_points")
-                acct, created = Account.objects.get_or_create(id=config.get("protocol_fee_recipient_account"))
+                acct, created = Account.objects.get_or_create(
+                    id=config.get("protocol_fee_recipient_account")
+                )
                 self.protocol_fee_recipient = acct
                 self.require_whitelist = config.get("require_whitelist")
-                self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
+                self.owner, created = Account.objects.get_or_create(
+                    id=config.get("owner")
+                )
                 self.admins.clear()
                 for admin_id in config.get("admins"):
                     self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
                 self.whitelisted_deployers.clear()
                 for deployer_id in config.get("whitelisted_deployers"):
-                    self.whitelisted_deployers.add(Account.objects.get_or_create(id=deployer_id)[0])
+                    self.whitelisted_deployers.add(
+                        Account.objects.get_or_create(id=deployer_id)[0]
+                    )
                 self.save()
         except Exception as e:
             logger.error(f"Failed to update factory config, Error: {e}")
-
 
 
 class Pot(models.Model):
@@ -313,39 +321,65 @@ class Pot(models.Model):
                 name="idx_matching_period",
             ),
         ]
-    
+
     def update_configs(self):
         try:
-            url = f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            url = (
+                f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            )
             response = requests.get(url)
             if response.status_code != 200:
-                logger.error(f"Failed to get config for pot {self.account}: {response.text}")
+                logger.error(
+                    f"Failed to get config for pot {self.account}: {response.text}"
+                )
             else:
                 config = response.json()
                 print(config)
-                self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
+                self.owner, created = Account.objects.get_or_create(
+                    id=config.get("owner")
+                )
                 self.admins.clear()
                 for admin_id in config.get("admins", []):
                     self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
-                self.chef, created = Account.objects.get_or_create(id=config.get("chef"))
+                self.chef, created = Account.objects.get_or_create(
+                    id=config.get("chef")
+                )
                 self.name = config.get("pot_name")
                 self.description = config.get("pot_description")
                 self.max_approved_applicants = config.get("max_projects")
                 self.base_currency = config.get("base_currency")
-                self.application_start = datetime.fromtimestamp(config.get("application_start_ms") / 1000)
-                self.application_end = datetime.fromtimestamp(config.get("application_end_ms") / 1000)
-                self.matching_round_start = datetime.fromtimestamp(config.get("public_round_start_ms") / 1000)
-                self.matching_round_end = datetime.fromtimestamp(config.get("public_round_end_ms") / 1000)
+                self.application_start = datetime.fromtimestamp(
+                    config.get("application_start_ms") / 1000
+                )
+                self.application_end = datetime.fromtimestamp(
+                    config.get("application_end_ms") / 1000
+                )
+                self.matching_round_start = datetime.fromtimestamp(
+                    config.get("public_round_start_ms") / 1000
+                )
+                self.matching_round_end = datetime.fromtimestamp(
+                    config.get("public_round_end_ms") / 1000
+                )
                 self.registry_provider = config.get("registry_provider")
-                self.min_matching_pool_donation_amount = config.get("min_matching_pool_donation_amount")
+                self.min_matching_pool_donation_amount = config.get(
+                    "min_matching_pool_donation_amount"
+                )
                 self.sybil_wrapper_provider = config.get("sybil_wrapper_provider")
                 self.custom_sybil_checks = config.get("custom_sybil_checks")
-                self.custom_min_threshold_score = config.get("custom_min_threshold_score")
-                self.referral_fee_matching_pool_basis_points = config.get("referral_fee_matching_pool_basis_points")
-                self.referral_fee_public_round_basis_points = config.get("referral_fee_public_round_basis_points")
+                self.custom_min_threshold_score = config.get(
+                    "custom_min_threshold_score"
+                )
+                self.referral_fee_matching_pool_basis_points = config.get(
+                    "referral_fee_matching_pool_basis_points"
+                )
+                self.referral_fee_public_round_basis_points = config.get(
+                    "referral_fee_public_round_basis_points"
+                )
                 self.chef_fee_basis_points = config.get("chef_fee_basis_points")
                 if config.get("cooldown_end_ms"):
-                    self.cooldown_end = datetime.fromtimestamp(config.get("cooldown_end_ms") / 1000)
+                    self.cooldown_end = datetime.fromtimestamp(
+                        config.get("cooldown_end_ms") / 1000
+                    )
                 self.all_paid_out = config.get("all_paid_out")
                 self.protocol_config_provider = config.get("protocol_config_provider")
                 self.save()
@@ -545,7 +579,9 @@ class PotPayout(models.Model):
                 return
             self.amount_paid_usd = token.format_price(self.amount) * price_usd
             self.save()
-            logger.info(f"Saved USD prices for pot payout for pot id: {self.pot.account}")
+            logger.info(
+                f"Saved USD prices for pot payout for pot id: {self.pot.account}"
+            )
         except Exception as e:
             logger.error(f"Failed to calculate and save USD prices: {e}")
 
@@ -587,6 +623,11 @@ class PotPayoutChallenge(models.Model):
         blank=True,
         help_text=_("Transaction hash."),
     )
+
+    class Meta:
+        verbose_name_plural = "Payout Challenges"
+
+        unique_together = (("challenger", "pot"),)
 
     class Meta:
         verbose_name_plural = "Payout Challenges"
