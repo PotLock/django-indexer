@@ -1,3 +1,5 @@
+import random
+
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -8,62 +10,50 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import List
-from .serializers import ListRegistrationSerializer, ListSerializer
+from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 
-SIMPLE_LIST_EXAMPLE = {
-    "id": 1,
-    "name": "PotLock Public Goods Registry",
-    "description": "The official registry of public goods on NEAR Protocol",
-    "cover_image_url": "https://images.unsplash.com/photo-1593642532973-d31b6557fa68",
-    "admin_only_registrations": True,
-    "default_registration_status": "Approved",
-    "created_at": "2024-06-05T17:55:14.030Z",
-    "updated_at": "2024-06-05T17:55:14.030Z",
-    "owner": "potlock.near",
-    "admins": ["plugrel.near"],
-}
-
-SIMPLE_LIST_REGISTRATION_EXAMPLE = {
-    "id": 10,
-    "status": "Approved",
-    "submitted_at": "2024-06-05T18:01:02.319Z",
-    "updated_at": "2024-06-05T18:01:02.319Z",
-    "registrant_notes": "I'm excited to apply for this list",
-    "admin_notes": "This is a great project that I want on my list.",
-    "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "list": 1,
-    "registrant": "project.near",
-    "registered_by": "project-admin.near",
-}
+from .models import List, ListRegistrationStatus
+from .serializers import (
+    PAGINATED_LIST_EXAMPLE,
+    PAGINATED_LIST_REGISTRATION_EXAMPLE,
+    SIMPLE_LIST_EXAMPLE,
+    SIMPLE_LIST_REGISTRATION_EXAMPLE,
+    ListRegistrationSerializer,
+    ListSerializer,
+    PaginatedListRegistrationsResponseSerializer,
+    PaginatedListsResponseSerializer,
+)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
-class ListsListAPI(APIView, LimitOffsetPagination):
+class ListsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
-                response=ListSerializer(many=True),
-                description="Returns a list of lists",
+                response=PaginatedListsResponseSerializer,
+                description="Returns a paginated list of lists",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for lists",
-                        value=SIMPLE_LIST_EXAMPLE,
+                        value=PAGINATED_LIST_EXAMPLE,
                         response_only=True,
                     ),
                 ],
             ),
             500: OpenApiResponse(description="Internal server error"),
-        }
+        },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all()
         results = self.paginate_queryset(lists, request, view=self)
@@ -95,6 +85,7 @@ class ListDetailAPI(APIView):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
@@ -107,21 +98,93 @@ class ListDetailAPI(APIView):
         return Response(serializer.data)
 
 
-class ListRegistrationsAPI(APIView, LimitOffsetPagination):
+class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
             OpenApiParameter("list_id", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by status",
+            ),
+            OpenApiParameter(
+                "category",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by category",
+            ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=ListRegistrationSerializer(many=True),
+                response=PaginatedListRegistrationsResponseSerializer,
                 description="Returns registrations for the list",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple registration example",
                         description="Example response for list registrations",
+                        value=PAGINATED_LIST_REGISTRATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="List not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        list_id = kwargs.get("list_id")
+        try:
+            list_obj = List.objects.prefetch_related('registrations').get(id=list_id)
+        except List.DoesNotExist:
+            return Response(
+                {"message": f"List with ID {list_id} not found."}, status=404
+            )
+
+        registrations = list_obj.registrations.select_related().all()
+        status_param = request.query_params.get("status")
+        category_param = request.query_params.get("category")
+        if status_param:
+            if status_param not in ListRegistrationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            registrations = registrations.filter(status=status_param)
+        if category_param:
+            category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
+            registrations = registrations.filter(
+                registrant__near_social_profile_data__plCategories__iregex=category_regex_pattern
+            )
+        results = self.paginate_queryset(registrations, request, view=self)
+        serializer = ListRegistrationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class ListRandomRegistrationAPI(APIView):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("list_id", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by status",
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=ListRegistrationSerializer,
+                description="Returns a random registration for the list",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple registration example",
+                        description="Example response for list registration",
                         value=SIMPLE_LIST_REGISTRATION_EXAMPLE,
                         response_only=True,
                     ),
@@ -141,6 +204,22 @@ class ListRegistrationsAPI(APIView, LimitOffsetPagination):
             )
 
         registrations = list_obj.registrations.all()
-        results = self.paginate_queryset(registrations, request, view=self)
-        serializer = ListRegistrationSerializer(results, many=True)
-        return self.get_paginated_response(serializer.data)
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in ListRegistrationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            registrations = registrations.filter(status=status_param)
+
+        # Get a random registration
+        registrations_list = list(registrations)
+        if not registrations_list:
+            return Response(
+                {"message": "No registrations found for the given criteria."},
+                status=404,
+            )
+
+        registration = random.choice(registrations_list)
+        serializer = ListRegistrationSerializer(registration)
+        return Response(serializer.data)

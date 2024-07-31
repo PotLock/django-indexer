@@ -12,7 +12,7 @@ class DonationAdmin(admin.ModelAdmin):
         [
             "donor_address",
             "recipient_address",
-            "ft_address",
+            "token_address",
             "referrer_address",
             "chef_address",
         ]
@@ -21,16 +21,16 @@ class DonationAdmin(admin.ModelAdmin):
         "message",
         "donor__id",
     )  # Correct field name from 'donor__address' to 'donor__id' if 'id' is used in the model
-    list_filter = ("donated_at", "donor", "pot")
+    list_filter = ("donated_at", "donor", "pot", "pot__account")
     date_hierarchy = "donated_at"
     ordering = ("-donated_at",)
 
     def get_queryset(self, request):
-        # Prefetch related donor, recipient, ft, referrer, and chef to prevent N+1 queries
+        # Prefetch related donor, recipient, token, referrer, and chef to prevent N+1 queries
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("donor", "recipient", "ft", "referrer", "chef")
+            .prefetch_related("donor", "recipient", "token", "referrer", "chef")
         )
 
     def donor_address(self, obj):
@@ -42,8 +42,8 @@ class DonationAdmin(admin.ModelAdmin):
     def recipient_address(self, obj):
         return obj.recipient.id if obj.recipient else None
 
-    def ft_address(self, obj):
-        return obj.ft.id
+    def token_address(self, obj):
+        return obj.token.account
 
     def referrer_address(self, obj):
         return obj.referrer.id if obj.referrer else None

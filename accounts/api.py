@@ -6,25 +6,49 @@ from drf_spectacular.utils import (
     OpenApiExample,
     OpenApiParameter,
     OpenApiResponse,
+    OpenApiTypes,
     extend_schema,
 )
-from rest_framework.pagination import LimitOffsetPagination
+
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 from base.logging import logger
 from donations.models import Donation
-from pots.models import Pot, PotApplication, PotApplicationStatus
-from pots.serializers import SIMPLE_POT_EXAMPLE, PotSerializer
+from donations.serializers import (
+    PAGINATED_DONATION_EXAMPLE,
+    DonationSerializer,
+    PaginatedDonationsResponseSerializer,
+)
+from lists.models import ListRegistration, ListRegistrationStatus
+from lists.serializers import PAGINATED_LIST_REGISTRATION_EXAMPLE, ListRegistrationSerializer, PaginatedListRegistrationsResponseSerializer
+from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
+from pots.serializers import (
+    PAGINATED_PAYOUT_EXAMPLE,
+    PAGINATED_POT_APPLICATION_EXAMPLE,
+    PAGINATED_POT_EXAMPLE,
+    PaginatedPotApplicationsResponseSerializer,
+    PaginatedPotPayoutsResponseSerializer,
+    PaginatedPotsResponseSerializer,
+    PotApplicationSerializer,
+    PotPayoutSerializer,
+    PotSerializer,
+)
 
 from .models import Account
-from .serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from .serializers import (
+    PAGINATED_ACCOUNT_EXAMPLE,
+    SIMPLE_ACCOUNT_EXAMPLE,
+    AccountSerializer,
+    PaginatedAccountsResponseSerializer,
+)
 
 
-class DonorsAPI(APIView, LimitOffsetPagination):
+class DonorsAPI(APIView, CustomSizePageNumberPagination):
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 mins
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -32,18 +56,19 @@ class DonorsAPI(APIView, LimitOffsetPagination):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Sort by field, e.g., most_donated_usd",
-            )
+            ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=AccountSerializer(many=True),
-                description="Returns a list of donor accounts",
+                response=PaginatedAccountsResponseSerializer,
+                description="Returns a paginated list of donor accounts",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="user.near",
                         description="Example response for donor accounts",
-                        value=SIMPLE_ACCOUNT_EXAMPLE,
+                        value=PAGINATED_ACCOUNT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -51,6 +76,7 @@ class DonorsAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         # Return all donors
         donations_subquery = Donation.objects.filter(donor_id=OuterRef("pk"))
@@ -66,27 +92,30 @@ class DonorsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
-class AccountsListAPI(APIView, LimitOffsetPagination):
+class AccountsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
-                response=AccountSerializer(many=True),
-                description="Returns a list of accounts",
+                response=PaginatedAccountsResponseSerializer,
+                description="Returns a paginated list of accounts",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for accounts data",
-                        value=SIMPLE_ACCOUNT_EXAMPLE,
+                        value=PAGINATED_ACCOUNT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
             ),
             500: OpenApiResponse(description="Internal server error"),
-        }
+        },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         accounts = Account.objects.all()
         results = self.paginate_queryset(accounts, request, view=self)
@@ -94,7 +123,6 @@ class AccountsListAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
 class AccountDetailAPI(APIView):
 
     @extend_schema(
@@ -119,6 +147,7 @@ class AccountDetailAPI(APIView):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -131,8 +160,7 @@ class AccountDetailAPI(APIView):
         return Response(serializer.data)
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
-class AccountActivePotsAPI(APIView, LimitOffsetPagination):
+class AccountActivePotsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
@@ -144,17 +172,18 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
                 required=False,
                 description="Filter by pot status",
             ),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=PotSerializer(many=True),
+                response=PaginatedPotsResponseSerializer,
                 description="Returns paginated active pots for the account",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for active pots",
-                        value=SIMPLE_POT_EXAMPLE,
+                        value=PAGINATED_POT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -163,6 +192,7 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         try:
@@ -177,11 +207,237 @@ class AccountActivePotsAPI(APIView, LimitOffsetPagination):
             applicant=account, status=PotApplicationStatus.APPROVED
         )
         pot_ids = applications.values_list("pot_id", flat=True)
-        pots = Pot.objects.filter(id__in=pot_ids)
+        pots = Pot.objects.filter(account__in=pot_ids)
         if request.query_params.get("status") == "live":
             pots = pots.filter(
                 matching_round_start__lte=now, matching_round_end__gte=now
             )
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountPotApplicationsAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter pot applications by status",
+            ),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedPotApplicationsResponseSerializer,
+                description="Returns paginated pot applications for the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pot applications",
+                        value=PAGINATED_POT_APPLICATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            400: OpenApiResponse(description="Invalid status value"),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        applications = PotApplication.objects.filter(applicant=account)
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in PotApplicationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            applications = applications.filter(status=status_param)
+        results = self.paginate_queryset(applications, request, view=self)
+        serializer = PotApplicationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountDonationsReceivedAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedDonationsResponseSerializer,
+                description="Returns paginated donations received by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for donations received",
+                        value=PAGINATED_DONATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        donations = Donation.objects.prefetch_related('donor', 'pot', 'recipient', 'referrer', 'chef', 'token').filter(recipient=account)
+        results = self.paginate_queryset(donations, request, view=self)
+        serializer = DonationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountDonationsSentAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedDonationsResponseSerializer,
+                description="Returns paginated donations sent by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for donations received",
+                        value=PAGINATED_DONATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        donations = Donation.objects.select_related('donor', 'pot', 'recipient', 'referrer', 'chef', 'token').prefetch_related('pot__admins').filter(donor=account) #TODO:  this takes more time than just doing a  prefetch_related for the fields.
+        results = self.paginate_queryset(donations, request, view=self)
+        serializer = DonationSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountPayoutsReceivedAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedPotPayoutsResponseSerializer,
+                description="Returns paginated payouts received by the account",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for payouts received",
+                        value=PAGINATED_PAYOUT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        payouts = PotPayout.objects.filter(recipient=account, paid_at__isnull=False)
+        results = self.paginate_queryset(payouts, request, view=self)
+        serializer = PotPayoutSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class AccountListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedListRegistrationsResponseSerializer,
+                description="Returns List registrations for the account provided",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple registration example",
+                        description="Example response for list registrations",
+                        value=PAGINATED_LIST_REGISTRATION_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+
+        registrations = ListRegistration.objects.filter(registrant=account)
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in ListRegistrationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            registrations = registrations.filter(status=status_param)
+        results = self.paginate_queryset(registrations, request, view=self)
+        serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

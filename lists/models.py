@@ -13,10 +13,16 @@ class ListRegistrationStatus(models.TextChoices):
 
 
 class List(models.Model):
-    id = models.PositiveIntegerField(
+    id = models.AutoField(
         _("list id"),
         primary_key=True,
-        help_text=_("List id."),
+        help_text=_("List ID in DB (does not necessarily correspond to on-chain ID)."),
+    )
+    on_chain_id = models.IntegerField(
+        _("contract list ID"),
+        null=False,
+        unique=True,
+        help_text=_("List ID in contract"),
     )
     owner = models.ForeignKey(
         Account,
@@ -24,6 +30,11 @@ class List(models.Model):
         related_name="lists",
         null=False,
         help_text=_("List owner."),
+    )
+    admins = models.ManyToManyField(
+        Account,
+        related_name="admin_lists",
+        help_text=_("List admins."),
     )
     name = models.CharField(
         _("name"),
@@ -35,11 +46,13 @@ class List(models.Model):
         _("description"),
         max_length=256,
         null=True,
+        blank=True,
         help_text=_("List description."),
     )
     cover_image_url = models.URLField(
         _("cover image url"),
         null=True,
+        blank=True,
         help_text=_("Cover image url."),
     )
     admin_only_registrations = models.BooleanField(
@@ -62,11 +75,6 @@ class List(models.Model):
     updated_at = models.DateTimeField(
         _("updated at"),
         help_text=_("List last update date."),
-    )
-    admins = models.ManyToManyField(
-        Account,
-        related_name="admin_lists",
-        help_text=_("List admins."),
     )
 
     class Meta:
@@ -155,20 +163,25 @@ class ListRegistration(models.Model):
         _("registrant notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Registrant notes."),
     )
     admin_notes = models.TextField(
         _("admin notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Admin notes."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
     class Meta:
         indexes = [models.Index(fields=["id", "status"], name="idx_list_id_status")]
+
+        unique_together = (("list", "registrant"),)

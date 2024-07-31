@@ -8,51 +8,100 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
-from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from accounts.serializers import (
+    PAGINATED_ACCOUNT_EXAMPLE,
+    AccountSerializer,
+    PaginatedAccountsResponseSerializer,
+)
+from api.pagination import pagination_parameters
+from api.pagination import CustomSizePageNumberPagination
 from donations.models import Donation
-from donations.serializers import SIMPLE_DONATION_EXAMPLE, DonationSerializer
+from donations.serializers import (
+    PAGINATED_DONATION_EXAMPLE,
+    DonationSerializer,
+    PaginatedDonationsResponseSerializer,
+)
 
-from .models import Pot, PotApplication, PotApplicationStatus
+from .models import Pot, PotApplication, PotApplicationStatus, PotFactory
 from .serializers import (
-    SIMPLE_PAYOUT_EXAMPLE,
-    SIMPLE_POT_APPLICATION_EXAMPLE,
+    PAGINATED_PAYOUT_EXAMPLE,
+    PAGINATED_POT_APPLICATION_EXAMPLE,
+    PAGINATED_POT_EXAMPLE,
+    PAGINATED_POT_FACTORY_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
+    PaginatedPotApplicationsResponseSerializer,
+    PaginatedPotFactoriesResponseSerializer,
+    PaginatedPotPayoutsResponseSerializer,
+    PaginatedPotsResponseSerializer,
     PotApplicationSerializer,
+    PotFactorySerializer,
     PotPayoutSerializer,
     PotSerializer,
 )
 
 
-@method_decorator(cache_page(60 * 15), name="dispatch")  # Cache for 15 mins
-class PotsListAPI(APIView, LimitOffsetPagination):
+class PotsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
         responses={
             200: OpenApiResponse(
-                response=PotSerializer(many=True),
-                description="Returns a list of pots",
+                response=PaginatedPotsResponseSerializer,
+                description="Returns a paginated list of pots",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for pots",
-                        value=SIMPLE_POT_EXAMPLE,
+                        value=PAGINATED_POT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
             ),
-        }
+        },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pots = Pot.objects.all()
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class PotFactoriesAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedPotFactoriesResponseSerializer,
+                description="Returns a paginated list of pot factories",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for pot factories",
+                        value=PAGINATED_POT_FACTORY_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        pot_factories = PotFactory.objects.all()
+        results = self.paginate_queryset(pot_factories, request, view=self)
+        serializer = PotFactorySerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
 
 
@@ -79,32 +128,34 @@ class PotDetailAPI(APIView):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
         serializer = PotSerializer(pot)
         return Response(serializer.data)
 
 
-class PotApplicationsAPI(APIView, LimitOffsetPagination):
+class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=PotApplicationSerializer(many=True),
+                response=PaginatedPotApplicationsResponseSerializer,
                 description="Returns applications for the pot",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for pot applications",
-                        value=SIMPLE_POT_APPLICATION_EXAMPLE,
+                        value=PAGINATED_POT_APPLICATION_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -112,10 +163,11 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -125,22 +177,23 @@ class PotApplicationsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotDonationsAPI(APIView, LimitOffsetPagination):
+class PotDonationsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=DonationSerializer(many=True),
+                response=PaginatedDonationsResponseSerializer,
                 description="Returns donations for the pot",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for donations",
-                        value=SIMPLE_DONATION_EXAMPLE,
+                        value=PAGINATED_DONATION_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -148,10 +201,11 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -161,22 +215,23 @@ class PotDonationsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotSponsorsAPI(APIView, LimitOffsetPagination):
+class PotSponsorsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=AccountSerializer(many=True),
+                response=PaginatedAccountsResponseSerializer,
                 description="Returns sponsors for the pot",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="user.near",
                         description="Example response for sponsors",
-                        value=SIMPLE_ACCOUNT_EXAMPLE,
+                        value=PAGINATED_ACCOUNT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -184,10 +239,11 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
@@ -202,22 +258,23 @@ class PotSponsorsAPI(APIView, LimitOffsetPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class PotPayoutsAPI(APIView, LimitOffsetPagination):
+class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
         ],
         responses={
             200: OpenApiResponse(
-                response=PotPayoutSerializer(many=True),
+                response=PaginatedPotPayoutsResponseSerializer,
                 description="Returns payouts for the pot",
                 examples=[
                     OpenApiExample(
                         "example-1",
                         summary="Simple example",
                         description="Example response for payouts",
-                        value=SIMPLE_PAYOUT_EXAMPLE,
+                        value=PAGINATED_PAYOUT_EXAMPLE,
                         response_only=True,
                     ),
                 ],
@@ -225,10 +282,11 @@ class PotPayoutsAPI(APIView, LimitOffsetPagination):
             404: OpenApiResponse(description="Pot not found"),
         },
     )
+    @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         pot_id = kwargs.get("pot_id")
         try:
-            pot = Pot.objects.get(id=pot_id)
+            pot = Pot.objects.get(account=pot_id)
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 

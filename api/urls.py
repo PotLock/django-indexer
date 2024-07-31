@@ -8,15 +8,27 @@ from drf_spectacular.views import (
 from accounts.api import (
     AccountActivePotsAPI,
     AccountDetailAPI,
+    AccountDonationsReceivedAPI,
+    AccountDonationsSentAPI,
+    AccountListRegistrationsAPI,
+    AccountPayoutsReceivedAPI,
+    AccountPotApplicationsAPI,
     AccountsListAPI,
     DonorsAPI,
 )
 from base.api import StatsAPI
-from lists.api import ListDetailAPI, ListRegistrationsAPI, ListsListAPI
+from donations.api import DonationContractConfigAPI
+from lists.api import (
+    ListDetailAPI,
+    ListRandomRegistrationAPI,
+    ListRegistrationsAPI,
+    ListsListAPI,
+)
 from pots.api import (
     PotApplicationsAPI,
     PotDetailAPI,
     PotDonationsAPI,
+    PotFactoriesAPI,
     PotPayoutsAPI,
     PotsListAPI,
     PotSponsorsAPI,
@@ -45,6 +57,37 @@ urlpatterns = [
         AccountActivePotsAPI.as_view(),
         name="accounts_api_by_id_active_pots",
     ),
+    path(
+        "v1/accounts/<str:account_id>/pot_applications",
+        AccountPotApplicationsAPI.as_view(),
+        name="accounts_api_by_id_pot_applications",
+    ),
+    path(
+        "v1/accounts/<str:account_id>/donations_received",
+        AccountDonationsReceivedAPI.as_view(),
+        name="accounts_api_by_id_donations_received",
+    ),
+    path(
+        "v1/accounts/<str:account_id>/donations_sent",
+        AccountDonationsSentAPI.as_view(),
+        name="accounts_api_by_id_donations_sent",
+    ),
+    path(
+        "v1/accounts/<str:account_id>/payouts_received",
+        AccountPayoutsReceivedAPI.as_view(),
+        name="accounts_api_by_id_payouts_received",
+    ),
+    path(
+        "v1/accounts/<str:account_id>/list-registrations",
+        AccountListRegistrationsAPI.as_view(),
+        name="accounts_api_by_id_registrations",
+    ),
+    # donate contract config
+    path(
+        "v1/donate_contract_config",
+        DonationContractConfigAPI.as_view(),
+        name="donate_contract_config_api",
+    ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
     # lists
@@ -53,6 +96,11 @@ urlpatterns = [
     path(
         "v1/lists/<int:list_id>/registrations",
         ListRegistrationsAPI.as_view(),
+        name="lists_api_by_id_registrations",
+    ),
+    path(
+        "v1/lists/<int:list_id>/random_registration",
+        ListRandomRegistrationAPI.as_view(),
         name="lists_api_by_id_registrations",
     ),
     # pots
@@ -75,6 +123,9 @@ urlpatterns = [
     ),
     path(
         "v1/pots/<str:pot_id>/payouts", PotPayoutsAPI.as_view(), name="pots_payouts_api"
+    ),
+    path(
+        "v1/potfactories", PotFactoriesAPI.as_view(), name="pot_factories_api"
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),

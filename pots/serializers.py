@@ -1,18 +1,21 @@
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
-from base.serializers import TwoDecimalStringField
+from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from base.serializers import TwoDecimalPlacesField
+from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
-from .models import Pot, PotApplication, PotPayout
+from .models import Pot, PotApplication, PotFactory, PotPayout
 
 
 class PotSerializer(ModelSerializer):
-    total_matching_pool_usd = TwoDecimalStringField(max_digits=20, decimal_places=2)
-    total_public_donations_usd = TwoDecimalStringField(max_digits=20, decimal_places=2)
+    total_matching_pool_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
+    total_public_donations_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
 
     class Meta:
         model = Pot
         fields = [
-            "id",
+            "account",
             "pot_factory",
             "deployer",
             "deployed_at",
@@ -49,24 +52,79 @@ class PotSerializer(ModelSerializer):
             "protocol_config_provider",
         ]
 
+    deployer = AccountSerializer()
+    owner = AccountSerializer()
+    admins = AccountSerializer(many=True)
+    chef = AccountSerializer()
+
+
+class PotFactorySerializer(ModelSerializer):
+
+    class Meta:
+        model = PotFactory
+        fields = [
+            "account",
+            "owner",
+            "admins",
+            "whitelisted_deployers",
+            "source_metadata",
+            "deployed_at",
+            "protocol_fee_basis_points",
+            "require_whitelist",
+            "protocol_fee_recipient",
+        ]
+
+    owner = AccountSerializer()
+    protocol_fee_recipient = AccountSerializer()
+    admins = AccountSerializer(many=True)
+    whitelisted_deployers = AccountSerializer(many=True)
+
 
 class PotApplicationSerializer(ModelSerializer):
+
     class Meta:
         model = PotApplication
-        fields = "__all__"  # TODO: potentially adjust this e.g. for formatting of datetimes, adding convenience fields etc
-        # TODO: add reviews
+        fields = [
+            "id",
+            "pot",
+            "applicant",
+            "message",
+            "status",
+            "submitted_at",
+            "updated_at",
+            "tx_hash",
+        ]
+
+    pot = PotSerializer()
+    applicant = AccountSerializer()
 
 
 class PotPayoutSerializer(ModelSerializer):
     class Meta:
         model = PotPayout
-        fields = "__all__"  # TODO: potentially adjust this e.g. for formatting of datetimes, adding convenience fields etc
+        fields = [
+            "id",
+            "pot",
+            "recipient",
+            "amount",
+            "amount_paid_usd",
+            "token",
+            "paid_at",
+            "tx_hash",
+        ]
+
+    pot = PotSerializer()
+    recipient = AccountSerializer()
+    token = TokenSerializer()
 
 
 EXAMPLE_POT_ID = "some-pot.v1.potfactory.potlock.near"
 
+EXAMPLE_POT_FACTORY_ID = "v1.potfactory.potlock.near"
+
+
 SIMPLE_POT_EXAMPLE = {
-    "id": EXAMPLE_POT_ID,
+    "account": "some-pot.v1.potfactory.potlock.near",
     "deployed_at": "2024-02-16T17:45:03.600845Z",
     "source_metadata": {
         "link": "https://github.com/PotLock/core",
@@ -101,11 +159,58 @@ SIMPLE_POT_EXAMPLE = {
     "all_paid_out": False,
     "protocol_config_provider": "v1.potfactory.potlock.near:get_protocol_config",
     "pot_factory": "v1.potfactory.potlock.near",
-    "deployer": "ossround.near",
-    "owner": "ossround.near",
-    "chef": "plugrel.near",
-    "admins": [],
+    "deployer": SIMPLE_ACCOUNT_EXAMPLE,
+    "owner": SIMPLE_ACCOUNT_EXAMPLE,
+    "chef": SIMPLE_ACCOUNT_EXAMPLE,
+    "admins": [SIMPLE_ACCOUNT_EXAMPLE],
 }
+
+PAGINATED_POT_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_POT_EXAMPLE],
+}
+
+
+class PaginatedPotsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotSerializer(many=True)
+
+
+SIMPLE_POT_FACTORY_EXAMPLE = {
+    "account": "v1.potfactory.potlock.near",
+    "owner": SIMPLE_ACCOUNT_EXAMPLE,
+    "admins": [SIMPLE_ACCOUNT_EXAMPLE],
+    "whitelisted_deployers": [SIMPLE_ACCOUNT_EXAMPLE],
+    "source_metadata": {
+        "link": "https://github.com/PotLock/core",
+        "version": "1.0.0",
+        "commit_hash": "e6b108e9442920333b44eb1a4068b9b9ae551d79",
+    },
+    "deployed_at": "2024-02-12T13:49:58.940854Z",
+    "protocol_fee_basis_points": 200,
+    "require_whitelist": False,
+    "protocol_fee_recipient": SIMPLE_ACCOUNT_EXAMPLE,
+}
+
+
+class PaginatedPotFactoriesResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotFactorySerializer(many=True)
+
+
+PAGINATED_POT_FACTORY_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_POT_FACTORY_EXAMPLE],
+}
+
 
 SIMPLE_POT_APPLICATION_EXAMPLE = {
     "id": 2,
@@ -114,9 +219,24 @@ SIMPLE_POT_APPLICATION_EXAMPLE = {
     "submitted_at": "2024-06-05T18:06:45.519Z",
     "updated_at": "2024-06-05T18:06:45.519Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": EXAMPLE_POT_ID,
-    "applicant": "applicant.near",
+    "pot": SIMPLE_POT_EXAMPLE,
+    "applicant": SIMPLE_ACCOUNT_EXAMPLE,
 }
+
+PAGINATED_POT_APPLICATION_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_POT_APPLICATION_EXAMPLE],
+}
+
+
+class PaginatedPotApplicationsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotApplicationSerializer(many=True)
+
 
 SIMPLE_PAYOUT_EXAMPLE = {
     "id": 4,
@@ -124,7 +244,21 @@ SIMPLE_PAYOUT_EXAMPLE = {
     "amount_paid_usd": "1.27",
     "paid_at": "2024-06-05T18:12:39.014Z",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "pot": EXAMPLE_POT_ID,
+    "pot": SIMPLE_POT_EXAMPLE,
     "recipient": "someproject.near",
-    "ft": "near",
+    "token": SIMPLE_TOKEN_EXAMPLE,
 }
+
+PAGINATED_PAYOUT_EXAMPLE = {
+    "count": 1,
+    "next": None,
+    "previous": None,
+    "results": [SIMPLE_PAYOUT_EXAMPLE],
+}
+
+
+class PaginatedPotPayoutsResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = PotPayoutSerializer(many=True)

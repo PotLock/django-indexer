@@ -1,0 +1,57 @@
+## DONATION EXAMPLES
+
+# POT DONATION:
+
+pub struct DonationExternal {
+    /// ID of the donation
+    pub id: DonationId,
+    /// ID of the donor               
+    pub donor_id: AccountId,
+    /// Amount donated         
+    pub total_amount: U128,
+    /// Amount after all fees/expenses (incl. storage)
+    pub net_amount: U128,
+    /// Optional message from the donor          
+    pub message: Option<String>,
+    /// Timestamp when the donation was made
+    pub donated_at: TimestampMs,
+    /// ID of the project receiving the donation, if applicable (matching pool donations will contain `None`)
+    pub project_id: Option<ProjectId>,
+    /// Referrer ID
+    pub referrer_id: Option<AccountId>,
+    /// Referrer fee
+    pub referrer_fee: Option<U128>,
+    /// Protocol fee
+    pub protocol_fee: U128,
+    /// Indicates whether this is matching pool donation
+    pub matching_pool: bool,
+    /// Chef ID
+    pub chef_id: Option<AccountId>,
+    /// Chef fee
+    pub chef_fee: Option<U128>,
+}
+
+# DIRECT DONATION:
+
+pub struct DonationExternal {
+    /// Unique identifier for the donation
+    pub id: DonationId,
+    /// ID of the donor               
+    pub donor_id: AccountId,
+    /// Amount donated         
+    pub total_amount: U128,
+    /// FT id (e.g. "near")
+    pub ft_id: AccountId,
+    /// Optional message from the donor          
+    pub message: Option<String>,
+    /// Timestamp when the donation was made
+    pub donated_at_ms: TimestampMs,
+    /// ID of the account receiving the donation  
+    pub recipient_id: AccountId,
+    /// Protocol fee
+    pub protocol_fee: U128,
+    /// Referrer ID
+    pub referrer_id: Option<AccountId>,
+    /// Referrer fee
+    pub referrer_fee: Option<U128>,
+}
