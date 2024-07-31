@@ -11,6 +11,7 @@ class AccountAdmin(admin.ModelAdmin):
         "total_donations_out_usd",
         "total_matching_pool_allocations_usd",
         "donors_count",
+        "near_social_profile_data",
     )
     search_fields = ("id",)  # Allow searching by account address
     list_filter = (
@@ -42,11 +43,11 @@ class AccountAdmin(admin.ModelAdmin):
         "Total Matching Pool Allocations (USD)"
     )
 
-    def has_add_permission(self, request):
-        return False
+    # def has_add_permission(self, request):
+    #     return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
+    # def has_change_permission(self, request, obj=None):
+    #     return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False

@@ -1,11 +1,19 @@
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+import requests
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
+from base.logging import logger
+from base.utils import format_date
+from tokens.models import Token, TokenHistoricalPrice
 
 
 class PotFactory(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         primary_key=True,
         related_name="pot_factory",
@@ -37,6 +45,7 @@ class PotFactory(models.Model):
     source_metadata = models.JSONField(
         _("source metadata"),
         null=True,
+        blank=True,
         help_text=_("Pot factory source metadata."),
     )
     protocol_fee_basis_points = models.PositiveIntegerField(
@@ -60,9 +69,44 @@ class PotFactory(models.Model):
     class Meta:
         verbose_name_plural = "Pot Factories"
 
+    def update_configs(self):
+        try:
+
+            url = (
+                f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            )
+            response = requests.get(url)
+            if response.status_code != 200:
+                logger.error(
+                    f"Failed to get config for pot {self.account}: {response.text}"
+                )
+            else:
+                config = response.json()
+                print(config)
+                self.protocol_fee_basis_points = config.get("protocol_fee_basis_points")
+                acct, created = Account.objects.get_or_create(
+                    id=config.get("protocol_fee_recipient_account")
+                )
+                self.protocol_fee_recipient = acct
+                self.require_whitelist = config.get("require_whitelist")
+                self.owner, created = Account.objects.get_or_create(
+                    id=config.get("owner")
+                )
+                self.admins.clear()
+                for admin_id in config.get("admins"):
+                    self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
+                self.whitelisted_deployers.clear()
+                for deployer_id in config.get("whitelisted_deployers"):
+                    self.whitelisted_deployers.add(
+                        Account.objects.get_or_create(id=deployer_id)[0]
+                    )
+                self.save()
+        except Exception as e:
+            logger.error(f"Failed to update factory config, Error: {e}")
+
 
 class Pot(models.Model):
-    id = models.OneToOneField(
+    account = models.OneToOneField(
         Account,
         primary_key=True,
         related_name="pot",
@@ -112,6 +156,7 @@ class Pot(models.Model):
         on_delete=models.CASCADE,
         related_name="chef_pots",
         null=True,
+        blank=True,
         help_text=_("Pot chef."),
     )
     name = models.TextField(
@@ -133,6 +178,7 @@ class Pot(models.Model):
         _("base currency"),
         max_length=64,
         null=True,
+        blank=True,
         help_text=_("Base currency."),
     )
     application_start = models.DateTimeField(
@@ -157,31 +203,31 @@ class Pot(models.Model):
     )
     registry_provider = models.CharField(
         _("registry provider"),
-        max_length=64,
         null=True,
+        blank=True,
         help_text=_("Registry provider."),
     )
     min_matching_pool_donation_amount = models.CharField(
         _("min matching pool donation amount"),
-        max_length=64,
         null=False,
         help_text=_("Min matching pool donation amount."),
     )
     sybil_wrapper_provider = models.CharField(
         _("sybil wrapper provider"),
-        max_length=64,
         null=True,
+        blank=True,
         help_text=_("Sybil wrapper provider."),
     )
     custom_sybil_checks = models.CharField(
         _("custom sybil checks"),
-        max_length=64,
         null=True,
+        blank=True,
         help_text=_("Custom sybil checks."),
     )
     custom_min_threshold_score = models.PositiveIntegerField(
         _("custom min threshold score"),
         null=True,
+        blank=True,
         help_text=_("Custom min threshold score."),
     )
     referral_fee_matching_pool_basis_points = models.PositiveIntegerField(
@@ -201,7 +247,6 @@ class Pot(models.Model):
     )
     total_matching_pool = models.CharField(
         _("total matching pool"),
-        max_length=64,
         null=False,
         help_text=_("Total matching pool."),
     )
@@ -210,11 +255,11 @@ class Pot(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Total matching pool in USD."),
     )
     matching_pool_balance = models.CharField(
         _("matching pool balance"),
-        max_length=64,
         null=False,
         help_text=_("Matching pool balance."),
     )
@@ -225,7 +270,6 @@ class Pot(models.Model):
     )
     total_public_donations = models.CharField(
         _("total public donations"),
-        max_length=64,
         null=False,
         help_text=_("Total public donations."),
     )
@@ -234,6 +278,7 @@ class Pot(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Total public donations in USD."),
     )
     public_donations_count = models.PositiveIntegerField(
@@ -244,11 +289,13 @@ class Pot(models.Model):
     cooldown_end = models.DateTimeField(
         _("cooldown end"),
         null=True,
+        blank=True,
         help_text=_("Pot cooldown end date."),
     )
     cooldown_period_ms = models.PositiveIntegerField(
         _("cooldown period in ms"),
         null=True,
+        blank=True,
         help_text=_("Pot cooldown period in ms."),
     )
     all_paid_out = models.BooleanField(
@@ -258,8 +305,8 @@ class Pot(models.Model):
     )
     protocol_config_provider = models.CharField(
         _("protocol config provider"),
-        max_length=64,
         null=True,
+        blank=True,
         help_text=_("Protocol config provider."),
     )
 
@@ -274,6 +321,70 @@ class Pot(models.Model):
                 name="idx_matching_period",
             ),
         ]
+
+    def update_configs(self):
+        try:
+            url = (
+                f"{settings.FASTNEAR_RPC_URL}/account/{self.account.id}/view/get_config"
+            )
+            response = requests.get(url)
+            if response.status_code != 200:
+                logger.error(
+                    f"Failed to get config for pot {self.account}: {response.text}"
+                )
+            else:
+                config = response.json()
+                print(config)
+                self.owner, created = Account.objects.get_or_create(
+                    id=config.get("owner")
+                )
+                self.admins.clear()
+                for admin_id in config.get("admins", []):
+                    self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
+                self.chef, created = Account.objects.get_or_create(
+                    id=config.get("chef")
+                )
+                self.name = config.get("pot_name")
+                self.description = config.get("pot_description")
+                self.max_approved_applicants = config.get("max_projects")
+                self.base_currency = config.get("base_currency")
+                self.application_start = datetime.fromtimestamp(
+                    config.get("application_start_ms") / 1000
+                )
+                self.application_end = datetime.fromtimestamp(
+                    config.get("application_end_ms") / 1000
+                )
+                self.matching_round_start = datetime.fromtimestamp(
+                    config.get("public_round_start_ms") / 1000
+                )
+                self.matching_round_end = datetime.fromtimestamp(
+                    config.get("public_round_end_ms") / 1000
+                )
+                self.registry_provider = config.get("registry_provider")
+                self.min_matching_pool_donation_amount = config.get(
+                    "min_matching_pool_donation_amount"
+                )
+                self.sybil_wrapper_provider = config.get("sybil_wrapper_provider")
+                self.custom_sybil_checks = config.get("custom_sybil_checks")
+                self.custom_min_threshold_score = config.get(
+                    "custom_min_threshold_score"
+                )
+                self.referral_fee_matching_pool_basis_points = config.get(
+                    "referral_fee_matching_pool_basis_points"
+                )
+                self.referral_fee_public_round_basis_points = config.get(
+                    "referral_fee_public_round_basis_points"
+                )
+                self.chef_fee_basis_points = config.get("chef_fee_basis_points")
+                if config.get("cooldown_end_ms"):
+                    self.cooldown_end = datetime.fromtimestamp(
+                        config.get("cooldown_end_ms") / 1000
+                    )
+                self.all_paid_out = config.get("all_paid_out")
+                self.protocol_config_provider = config.get("protocol_config_provider")
+                self.save()
+        except Exception as e:
+            logger.error(f"Failed to update pot config, Error: {e}")
 
 
 class PotApplicationStatus(models.TextChoices):
@@ -309,6 +420,7 @@ class PotApplication(models.Model):
         _("message"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Application message."),
     )
     status = models.CharField(
@@ -326,12 +438,14 @@ class PotApplication(models.Model):
     )
     updated_at = models.DateTimeField(
         _("updated at"),
+        null=True,
+        blank=True,
         help_text=_("Application last update date."),
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
@@ -339,6 +453,9 @@ class PotApplication(models.Model):
         verbose_name_plural = "Pot Applications"
 
         unique_together = (("pot", "applicant"),)
+
+    def __str__(self):
+        return f"{self.applicant.id} - {self.pot}"
 
 
 class PotApplicationReview(models.Model):
@@ -365,6 +482,7 @@ class PotApplicationReview(models.Model):
         _("notes"),
         max_length=1024,
         null=True,
+        blank=True,
         help_text=_("Review notes."),
     )
     status = models.CharField(
@@ -381,8 +499,8 @@ class PotApplicationReview(models.Model):
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 
@@ -416,7 +534,6 @@ class PotPayout(models.Model):
     )
     amount = models.CharField(
         _("amount"),
-        max_length=64,
         null=False,
         help_text=_("Payout amount."),
     )
@@ -425,28 +542,48 @@ class PotPayout(models.Model):
         max_digits=20,
         decimal_places=2,
         null=True,
+        blank=True,
         help_text=_("Payout amount in USD."),
     )
-    ft = models.ForeignKey(
-        Account,
+    token = models.ForeignKey(
+        Token,
         on_delete=models.CASCADE,
-        related_name="ft_pot_payouts",
+        related_name="pot_payouts",
         null=False,
-        help_text=_("Payout FT."),
-        db_index=True,
+        help_text=_("Payout token."),
     )
     paid_at = models.DateTimeField(
         _("paid at"),
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Payout date."),
         db_index=True,
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
+
+    ### Fetches USD prices for the Donation record and saves USD totals
+    def fetch_usd_prices(self):
+        # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
+        try:
+            token = self.token
+            price_usd = token.fetch_usd_prices_common(self.paid_at)
+            if not price_usd:
+                logger.info(
+                    f"No USD price found for token {self.token.symbol} at {self.paid_at}"
+                )
+                return
+            self.amount_paid_usd = token.format_price(self.amount) * price_usd
+            self.save()
+            logger.info(
+                f"Saved USD prices for pot payout for pot id: {self.pot.account}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to calculate and save USD prices: {e}")
 
 
 class PotPayoutChallenge(models.Model):
@@ -480,6 +617,17 @@ class PotPayoutChallenge(models.Model):
         null=False,
         help_text=_("Challenge message."),
     )
+    tx_hash = models.CharField(
+        _("transaction hash"),
+        null=True,
+        blank=True,
+        help_text=_("Transaction hash."),
+    )
+
+    class Meta:
+        verbose_name_plural = "Payout Challenges"
+
+        unique_together = (("challenger", "pot"),)
 
     class Meta:
         verbose_name_plural = "Payout Challenges"
@@ -498,6 +646,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         on_delete=models.CASCADE,
         related_name="payout_admin_responses",
         null=True,
+        blank=True,
         help_text=_("challenger being responded to."),
     )
 
@@ -506,6 +655,7 @@ class PotPayoutChallengeAdminResponse(models.Model):
         on_delete=models.CASCADE,
         related_name="payout_responses",
         null=True,
+        blank=True,
         help_text=_("Pot being challenged."),
     )
 
@@ -534,8 +684,8 @@ class PotPayoutChallengeAdminResponse(models.Model):
     )
     tx_hash = models.CharField(
         _("transaction hash"),
-        max_length=64,
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Transaction hash."),
     )
 

@@ -35,6 +35,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
+    # "alpha.potlock.io",
 ]
 
 # Env vars
@@ -58,6 +59,17 @@ REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
+
+NEAR_SOCIAL_CONTRACT_ADDRESS = (
+    "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
+)
+
+FASTNEAR_RPC_URL = (
+    "https://rpc.web4.testnet.page"
+    if ENVIRONMENT == "testnet"
+    else "https://rpc.web4.near.page"
+)
 
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
@@ -79,6 +91,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "drf_spectacular",
+    "django_extensions",
     "corsheaders",
     # "cachalot",
     "celery",
@@ -90,12 +104,14 @@ INSTALLED_APPS = [
     "lists",
     "pots",
     "tokens",
+    "nadabot",
+    "chains",
 ]
 
 DEFAULT_PAGE_SIZE = 30
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": DEFAULT_PAGE_SIZE,
     "DEFAULT_THROTTLE_CLASSES": [
         # "rest_framework.throttling.UserRateThrottle",
@@ -103,8 +119,16 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         # "user": "100/day",
-        "anon": "100/minute",
+        "anon": "500/minute",
     },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "PotLock Indexer API " + ENVIRONMENT,
+    "DESCRIPTION": "Indexed data for the PotLock protocol",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 
@@ -141,6 +165,12 @@ WSGI_APPLICATION = "base.wsgi.application"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://alpha.potlock.io",
+    "https://alpha.potlock.org",
+    "https://alpha.potlock.xyz",
+    "https://alpha.potlock.app",  # regex matching might not be advisable.
+    "http://dev.local",
+    "https://dev.local",
 ]
 
 # REDIS / CACHE CONFIGS

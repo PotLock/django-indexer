@@ -3,19 +3,26 @@
   - [Steps to run:](#steps-to-run)
     - [Env vars example](#env-vars-example)
   - [API Basics](#api-basics)
-    - [Base URL](#base-url)
-    - [Authorization](#authorization)
-    - [Error Responses](#error-responses)
-    - [Pagination](#pagination)
+      - [Base URL](#base-url)
+      - [Authorization](#authorization)
+      - [Error Responses](#error-responses)
+      - [Pagination](#pagination)
   - [API Endpoints](#api-endpoints)
     - [`Account` endpoints](#account-endpoints)
       - [✅ Get all accounts: `GET /accounts` (paginated)](#-get-all-accounts-get-accounts-paginated)
       - [✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`](#-get-account-by-id-address-get-accountsaccount_id)
+      - [✅ Get donations received for account: `GET /accounts/{ACCOUNT_ID}/donations_received` (paginated)](#-get-donations-received-for-account-get-accountsaccount_iddonations_received-paginated)
+      - [✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)](#-get-donations-sent-for-account-get-accountsaccount_iddonations_sent-paginated)
       - [✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)](#-get-pots-for-account-get-accountsaccount_idactive_pots-paginated)
+      - [✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/pot_applications` (paginated)](#-get-applications-for-account-get-accountsaccount_idpot_applications-paginated)
+      - [✅ Get registrations to lists by account: `GET /accounts/{ACCOUNT_ID}/list-registrations` (paginated)](#-get-registrations-to-lists-by-account-get-accountsaccount_idlist-registrations-paginated)
     - [`List` endpoints](#list-endpoints)
       - [✅ Get all lists: `GET /lists` (paginated)](#-get-all-lists-get-lists-paginated)
       - [✅ Get list by ID: `GET /lists/{LIST_ID}` (paginated)](#-get-list-by-id-get-listslist_id-paginated)
       - [✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)](#-get-registrations-for-list-get-listslist_idregistrations-paginated)
+      - [✅ Get random registration for list: `GET /lists/{LIST_ID}/random_registration`](#-get-random-registration-for-list-get-listslist_idrandom_registration)
+    - [Donate Contract Config endpoint](#donate-contract-config-endpoint)
+      - [✅ Get donate contract config: `GET /donate_contract_config`](#-get-donate-contract-config-get-donate_contract_config)
     - [`Donors` endpoints](#donors-endpoints)
       - [✅ Get all donors: `GET /donors` (paginated)](#-get-all-donors-get-donors-paginated)
     - [`Pots` endpoints](#pots-endpoints)
@@ -85,7 +92,7 @@ export PL_SENTRY_DSN=
 
 This is a public, read-only API and as such does not currently implement authentication or authorization.
 
-Rate limits of 100 requests/min are enforced to ensure service for all users.
+Rate limits of 500 requests/min are enforced to ensure service for all users.
 
 #### Error Responses
 
@@ -102,7 +109,7 @@ Possible Error Codes:
 
 #### Pagination
 
-Pagination available using `limit` and `offset` query params on endpoints that specify `paginated`. Default `limit` is 30.
+Pagination available using `page` and `page_size` as query param on endpoints that specify `paginated`. Default `page_size` is 30.
 
 Endpoints that support pagination will return a success response containing the following:
 
@@ -121,9 +128,30 @@ _NB: These endpoints are what is required to integrate with BOS app & replace cu
 
 #### ✅ Get account by ID (address): `GET /accounts/{ACCOUNT_ID}`
 
+#### ✅ Get donations received for account: `GET /accounts/{ACCOUNT_ID}/donations_received` (paginated)
+
+#### ✅ Get donations sent for account: `GET /accounts/{ACCOUNT_ID}/donations_sent` (paginated)
+
 #### ✅ Get pots for account: `GET /accounts/{ACCOUNT_ID}/active_pots` (paginated)
 
 Can specify `status=live` query param to retrieve only pots that are currently active (live matching round)
+
+#### ✅ Get applications for account: `GET /accounts/{ACCOUNT_ID}/pot_applications` (paginated)
+
+Can specify `status={PotApplicationStatus}` query param to retrieve applications with a given status:
+
+```py
+enum PotApplicationStatus {
+  Pending,
+  Approved,
+  Rejected,
+  InReview,
+}
+```
+
+#### ✅ Get registrations to lists by account: `GET /accounts/{ACCOUNT_ID}/list-registrations` (paginated)
+
+Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
 
 ### `List` endpoints
 
@@ -134,6 +162,15 @@ Can specify `status=live` query param to retrieve only pots that are currently a
 #### ✅ Get registrations for list: `GET /lists/{LIST_ID}/registrations` (paginated)
 
 Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
+Can also specify project category to filter by using `category` query param if desired, e.g. `category=Education`
+
+#### ✅ Get random registration for list: `GET /lists/{LIST_ID}/random_registration`
+
+Can specify status to filter by using `status` query param if desired, e.g. `status=Approved`
+
+### Donate Contract Config endpoint
+
+#### ✅ Get donate contract config: `GET /donate_contract_config`
 
 ### `Donors` endpoints
 

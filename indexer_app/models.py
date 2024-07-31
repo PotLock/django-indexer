@@ -16,6 +16,7 @@ class BlockHeight(models.Model):
         _("block timestamp"),
         help_text=_("date equivalent of the block height."),
         null=True,
+        blank=True,
     )
     updated_at = models.DateTimeField(
         _("updated at"),
