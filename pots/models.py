@@ -81,16 +81,16 @@ class PotFactory(models.Model):
                 config = response.json()
                 print(config)
                 self.protocol_fee_basis_points = config.get("protocol_fee_basis_points")
-                acct, created = Account.objects.get_or_create(id=config.get("protocol_fee_recipient_account"))
+                acct, created = Account.objects.get_or_create(defaults={"chain_id":1}, id=config.get("protocol_fee_recipient_account"))
                 self.protocol_fee_recipient = acct
                 self.require_whitelist = config.get("require_whitelist")
-                self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
+                self.owner, created = Account.objects.get_or_create(defaults={"chain_id":1}, id=config.get("owner"))
                 self.admins.clear()
                 for admin_id in config.get("admins"):
-                    self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
+                    self.admins.add(Account.objects.get_or_create(defaults={"chain_id":1}, id=admin_id)[0])
                 self.whitelisted_deployers.clear()
                 for deployer_id in config.get("whitelisted_deployers"):
-                    self.whitelisted_deployers.add(Account.objects.get_or_create(id=deployer_id)[0])
+                    self.whitelisted_deployers.add(Account.objects.get_or_create(defaults={"chain_id":1}, id=deployer_id)[0])
                 self.save()
         except Exception as e:
             logger.error(f"Failed to update factory config, Error: {e}")
@@ -323,11 +323,11 @@ class Pot(models.Model):
             else:
                 config = response.json()
                 print(config)
-                self.owner, created = Account.objects.get_or_create(id=config.get("owner"))
+                self.owner, created = Account.objects.get_or_create(defaults={"chain_id":1}, id=config.get("owner"))
                 self.admins.clear()
                 for admin_id in config.get("admins", []):
-                    self.admins.add(Account.objects.get_or_create(id=admin_id)[0])
-                self.chef, created = Account.objects.get_or_create(id=config.get("chef"))
+                    self.admins.add(Account.objects.get_or_create(defaults={"chain_id":1}, id=admin_id)[0])
+                self.chef, created = Account.objects.get_or_create(defaults={"chain_id":1}, id=config.get("chef"))
                 self.name = config.get("pot_name")
                 self.description = config.get("pot_description")
                 self.max_approved_applicants = config.get("max_projects")

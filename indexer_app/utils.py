@@ -58,8 +58,8 @@ async def handle_new_nadabot_registry(
     logger.info(f"nadabot registry init... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(id=receiverId)
-        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiverId)
+        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["owner"])
         nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
             account=registry,
             owner=owner,
@@ -70,7 +70,7 @@ async def handle_new_nadabot_registry(
 
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=admin_id)
                 await nadabot_registry.admins.aadd(admin)
     except Exception as e:
         logger.error(f"Error in registry initiialization: {e}")
@@ -82,10 +82,10 @@ async def handle_registry_blacklist_action(
     logger.info(f"Registry blacklist action....... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiverId)
         bulk_obj = []
         for acct in data["accounts"]:
-            account, _ = await Account.objects.aget_or_create(id=acct)
+            account, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=acct)
             bulk_obj.append(
                 {
                     "registry": registry,
@@ -107,7 +107,7 @@ async def handle_registry_unblacklist_action(
     logger.info(f"Registry remove blacklisted accts....... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(id=receiverId)
+        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiverId)
         entries = BlackList.objects.filter(account__in=data["accounts"])
         await entries.adelete()
     except Exception as e:
@@ -130,9 +130,9 @@ async def handle_new_pot(
         owner_id = (
             data.get("owner") or signer_id
         )  # owner is optional; if not provided, owner will be transaction signer (this logic is implemented by Pot contract's "new" method)
-        owner, _ = await Account.objects.aget_or_create(id=owner_id)
-        signer, _ = await Account.objects.aget_or_create(id=signer_id)
-        receiver, _ = await Account.objects.aget_or_create(id=receiver_id)
+        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=owner_id)
+        signer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=signer_id)
+        receiver, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiver_id)
 
         # check if pot exists
         pot = await Pot.objects.filter(account=receiver).afirst()
@@ -145,7 +145,7 @@ async def handle_new_pot(
 
         logger.info("upsert chef")
         if data.get("chef"):
-            chef, _ = await Account.objects.aget_or_create(id=data["chef"])
+            chef, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["chef"])
 
         # Create Pot object
         logger.info(f"creating pot with owner {owner_id}....")
@@ -202,7 +202,7 @@ async def handle_new_pot(
         # Add admins to the Pot
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(id=admin_id)
+                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=admin_id)
                 pot.admins.aadd(admin)
 
         defaults = {
@@ -278,7 +278,7 @@ async def handle_pot_config_update(
 
         # if data.get("admins"):
         #     for admin_id in data["admins"]:
-        #         admin, _ = await Account.objects.aget_or_create(id=admin_id)
+        #         admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=admin_id)
         #         pot.admins.aadd(admin)
         # await Pot.objects.filter(id=receiver_id).aupdate(**pot_config)
     except Exception as e:
@@ -291,14 +291,14 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         logger.info("upserting accounts...")
 
         # Upsert accounts
-        owner, _ = await Account.objects.aget_or_create(
+        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=data["owner"],
         )
-        protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(
+        protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=data["protocol_fee_recipient_account"],
         )
 
-        receiver, _ = await Account.objects.aget_or_create(
+        receiver, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=receiver_id,
         )
 
@@ -319,7 +319,7 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         # Add admins to the PotFactory
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(
+                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
                     id=admin_id,
                 )
                 await factory.admins.aadd(admin)
@@ -327,7 +327,7 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         # Add whitelisted deployers to the PotFactory
         if data.get("whitelisted_deployers"):
             for deployer_id in data["whitelisted_deployers"]:
-                deployer, _ = await Account.objects.aget_or_create(id=deployer_id)
+                deployer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=deployer_id)
                 await factory.whitelisted_deployers.aadd(deployer)
     except Exception as e:
         logger.error(f"Failed to handle new pot Factory, Error: {e}")
@@ -345,10 +345,18 @@ async def handle_new_list(
             )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
         )
 
+        logger.info("upserting involveed accts...")
+
+        await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["owner"])
+
+        await Account.objects.aget_or_create(defaults={"chain_id":1}, id=signer_id)
+
+        await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiver_id)
+
         logger.info(f"creating list..... {data}")
 
         listObject = await List.objects.acreate(
-            id=data["id"],
+            on_chain_id=data["id"],
             owner_id=data["owner"],
             default_registration_status=data["default_registration_status"],
             name=data["name"],
@@ -359,17 +367,9 @@ async def handle_new_list(
             updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
         )
 
-        logger.info("upserting involveed accts...")
-
-        await Account.objects.aget_or_create(id=data["owner"])
-
-        await Account.objects.aget_or_create(id=signer_id)
-
-        await Account.objects.aget_or_create(id=receiver_id)
-
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin_object, _ = await Account.objects.aget_or_create(
+                admin_object, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
                     id=admin_id,
                 )
                 await listObject.admins.aadd(admin_object)
@@ -421,7 +421,7 @@ async def handle_new_list_registration(
         await Account.objects.abulk_create(
             objs=[Account(**data) for data in project_list], ignore_conflicts=True
         )
-        await Account.objects.aget_or_create(id=signer_id)
+        await Account.objects.aget_or_create(defaults={"chain_id":1}, id=signer_id)
         logger.info("Upserted accounts/registrants(signer)")
     except Exception as e:
         logger.error(f"Encountered error trying to get create acct: {e}")
@@ -495,12 +495,12 @@ async def handle_pot_application(
         logger.info(f"new pot application data: {data}, {appl_data}")
 
         # Update or create the account
-        project, _ = await Account.objects.aget_or_create(
+        project, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=appl_data["project_id"],
         )
 
         # TODO: wouldn't this be the same as the project_id? should inspect
-        signer, _ = await Account.objects.aget_or_create(
+        signer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=signer_id,
         )
 
@@ -638,7 +638,7 @@ async def handle_list_upvote(
 
         logger.info(f"upvote list: {data}, {receiver_id}")
 
-        acct, _ = await Account.objects.aget_or_create(
+        acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
             id=signer_id,
         )
 
@@ -673,7 +673,7 @@ async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
         pot = await Pot.objects.aget(account=receiver_id)
-        near_acct, _ = await Account.objects.aget_or_create(id="near")
+        near_acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id="near")
         near_token, _ = await Token.objects.aget_or_create(
             account=near_acct
         )  # Pots only support native NEAR
@@ -739,7 +739,7 @@ async def handle_payout_challenge(
     data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
-        acct, _ = await Account.objects.aget_or_create(id=signer_id)
+        acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=signer_id)
         logger.info(f"challenging payout..: {data}, {receiver_id}")
         payoutChallenge = {
             "created_at": created_at,
@@ -814,7 +814,7 @@ async def handle_add_nadabot_admin(data, receiverId):
         obj = await NadabotRegistry.objects.aget(account=receiverId)
 
         for acct in data["account_ids"]:
-            user, _ = await Account.objects.aget_or_create(id=acct)
+            user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=acct)
             await obj.admins.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add nadabot admin, Error: {e}")
@@ -825,7 +825,7 @@ async def handle_add_factory_deployers(data, receiverId):
     try:
         factory = await PotFactory.objects.aget(account=receiverId)
         for acct in data["whitelisted_deployers"]:
-            user, _ = await Account.objects.aget_or_create(id=acct)
+            user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=acct)
             await factory.whitelisted_deployers.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
@@ -892,33 +892,33 @@ async def handle_new_donation(
 
     try:
         # insert donate contract which is the receiver id(because of activity relationship mainly)
-        donate_contract, _ = await Account.objects.aget_or_create(id=receiver_id)
+        donate_contract, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=receiver_id)
         # Upsert donor account
-        donor, _ = await Account.objects.aget_or_create(id=donation_data["donor_id"])
+        donor, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=donation_data["donor_id"])
         recipient = None
         referrer = None
         chef = None
 
         if donation_data.get("recipient_id"):  # direct donations have recipient_id
-            recipient, _ = await Account.objects.aget_or_create(
+            recipient, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
                 id=donation_data["recipient_id"]
             )
         if donation_data.get("project_id"):  # pot donations have project_id
-            recipient, _ = await Account.objects.aget_or_create(
+            recipient, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
                 id=donation_data["project_id"]
             )
 
         if donation_data.get("referrer_id"):
-            referrer, _ = await Account.objects.aget_or_create(
+            referrer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, 
                 id=donation_data["referrer_id"]
             )
 
         if donation_data.get("chef_id"):
-            chef, _ = await Account.objects.aget_or_create(id=donation_data["chef_id"])
+            chef, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=donation_data["chef_id"])
 
         # Upsert token account
         ft_id = donation_data.get("ft_id") or "near"
-        token_acct, token_acct_created = await Account.objects.aget_or_create(id=ft_id)
+        token_acct, token_acct_created = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=ft_id)
         token_defaults = {
             "decimals": 24,
         }
@@ -1101,8 +1101,8 @@ async def handle_new_provider(data: dict, receiverId: str, signerId: str):
     )
 
     try:
-        submitter, _ = await Account.objects.aget_or_create(id=data["submitted_by"])
-        contract, _ = await Account.objects.aget_or_create(id=data["contract_id"])
+        submitter, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["submitted_by"])
+        contract, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["contract_id"])
 
         provider_id = data["id"]
 
@@ -1147,7 +1147,7 @@ async def handle_add_stamp(data: dict, receiverId: str, signerId: str):
 
     logger.info(f"upserting accounts involved, {data['user_id']}")
 
-    user, _ = await Account.objects.aget_or_create(id=data["user_id"])
+    user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1}, id=data["user_id"])
     provider, _ = await Provider.objects.aget_or_create(on_chain_id=data["provider_id"])
 
     try:
