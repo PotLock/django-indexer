@@ -38,7 +38,7 @@ class Command(BaseCommand):
         print(f"adding {len(lists)} direct lists")
         for l in lists:
             list_id = l["id"]
-            owner, _ = Account.objects.get_or_create(id=l["owner"])
+            owner, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=l["owner"])
             list_defaults = {
                 "on_chain_id": list_id,
                 "owner": owner,
@@ -56,7 +56,7 @@ class Command(BaseCommand):
             print("created list: ", list.on_chain_id, created)
             # add admins
             for admin in l["admins"]:
-                admin_obj, _ = Account.objects.get_or_create(id=admin)
+                admin_obj, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=admin)
                 list.admins.add(admin_obj)
             # get registrations in pages
             page = 0
@@ -79,12 +79,12 @@ class Command(BaseCommand):
                 print("registrations: ", registrations)
                 print(f"adding {len(registrations)} registrations")
                 for reg in registrations:
-                    registrant, _ = Account.objects.get_or_create(
+                    registrant, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                         id=reg["registrant_id"]
                     )
                     registrar = registrant
                     if "registered_by" in reg:
-                        registrar, _ = Account.objects.get_or_create(
+                        registrar, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                             id=reg["registered_by"]
                         )
                     registration_defaults = {
@@ -129,13 +129,13 @@ class Command(BaseCommand):
             donations = donations.json()
             print(f"adding {len(donations)} direct donations")
             for donation in donations:
-                donor, _ = Account.objects.get_or_create(id=donation["donor_id"])
+                donor, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=donation["donor_id"])
                 referrer = None
-                recipient, _ = Account.objects.get_or_create(
+                recipient, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                     id=donation["recipient_id"]
                 )
                 ft_id = donation["ft_id"]
-                ft_acct, _ = Account.objects.get_or_create(id=ft_id)
+                ft_acct, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=ft_id)
                 token_defaults = {
                     "decimals": 24,
                 }
@@ -161,7 +161,7 @@ class Command(BaseCommand):
                     account=ft_acct, defaults=token_defaults
                 )
                 if donation.get("referrer_id"):
-                    referrer, _ = Account.objects.get_or_create(
+                    referrer, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                         id=donation["referrer_id"]
                     )
 
@@ -216,7 +216,7 @@ class Command(BaseCommand):
         # pot factory
         POTFACTORY_ID = "v1.potfactory.potlock.near"
         # pots
-        near_acct, _ = Account.objects.get_or_create(id="near")
+        near_acct, _ = Account.objects.get_or_create(defaults={"chain_id":1},id="near")
         url = f"{settings.FASTNEAR_RPC_URL}/account/{POTFACTORY_ID}/view/get_pots"
         response = requests.get(url)
         if response.status_code != 200:
@@ -255,10 +255,10 @@ class Command(BaseCommand):
             source_metadata = response.json()
             print("source metadata; ", source_metadata)
             # add or update pot
-            pot_acct, _ = Account.objects.get_or_create(id=pot_id)
-            owner, _ = Account.objects.get_or_create(id=config["owner"])
+            pot_acct, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=pot_id)
+            owner, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=config["owner"])
             if config.get("chef"):
-                chef, _ = Account.objects.get_or_create(id=config["chef"])
+                chef, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=config["chef"])
             pot_defaults = {
                 "pot_factory_account": POTFACTORY_ID,
                 "owner_id": config["owner"],
@@ -316,7 +316,7 @@ class Command(BaseCommand):
             print("pot created? ", created)
             print("adding admins")
             for admin in config["admins"]:
-                admin_obj, _ = Account.objects.get_or_create(id=admin)
+                admin_obj, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=admin)
                 pot.admins.add(admin_obj)
             # add activity
             activity_defaults = {
@@ -346,7 +346,7 @@ class Command(BaseCommand):
                 applications = applications.json()
                 print(f"adding {len(applications)} applications")
                 for appl in applications:
-                    applicant, _ = Account.objects.get_or_create(id=appl["project_id"])
+                    applicant, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=appl["project_id"])
                     application_defaults = {
                         "applicant": applicant,
                         "pot": pot,
@@ -399,20 +399,20 @@ class Command(BaseCommand):
                 donations = donations.json()
                 print(f"adding {len(donations)} donations")
                 for donation in donations:
-                    donor, _ = Account.objects.get_or_create(id=donation["donor_id"])
+                    donor, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=donation["donor_id"])
                     project = None
                     referrer = None
                     chef = None
                     if donation.get("project_id"):
-                        project, _ = Account.objects.get_or_create(
+                        project, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                             id=donation["project_id"]
                         )
                     if donation.get("referrer_id"):
-                        referrer, _ = Account.objects.get_or_create(
+                        referrer, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                             id=donation["referrer_id"]
                         )
                     if donation.get("chef_id"):
-                        chef, _ = Account.objects.get_or_create(id=donation["chef_id"])
+                        chef, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=donation["chef_id"])
 
                     # net_amount is 0 for some donations, so calculate it
                     net_amount = donation["net_amount"]
@@ -426,7 +426,7 @@ class Command(BaseCommand):
                         )
 
                     # pot donations always NEAR
-                    ft_acct, _ = Account.objects.get_or_create(id="near")
+                    ft_acct, _ = Account.objects.get_or_create(defaults={"chain_id":1},id="near")
                     ft_token, _ = Token.objects.get_or_create(account=ft_acct)
                     donation_defaults = {
                         "donor": donor,
@@ -480,7 +480,7 @@ class Command(BaseCommand):
                         if "paid_at" not in payout
                         else datetime.fromtimestamp(payout["paid_at"] / 1000)
                     )
-                    recipient, _ = Account.objects.get_or_create(
+                    recipient, _ = Account.objects.get_or_create(defaults={"chain_id":1},
                         id=payout["project_id"]
                     )
                     near_token, _ = Token.objects.get_or_create(account=near_acct)
@@ -512,7 +512,7 @@ class Command(BaseCommand):
                 challenges = challenges.json()
                 print(f"adding {len(challenges)} challenges")
                 for c in challenges:
-                    challenger, _ = Account.objects.get_or_create(id=c["challenger_id"])
+                    challenger, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=c["challenger_id"])
                     challenge_defaults = {
                         "challenger": challenger,
                         "pot": pot,
