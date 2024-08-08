@@ -435,7 +435,7 @@ async def handle_new_list_registration(
         defaults = {
             "signer_id": signer_id,
             "receiver_id": receiver_id,
-            "timestamp": datetime.fromtimestamp(insert_data[0]["submitted_at"] / 1000),
+            "timestamp": insert_data[0]["submitted_at"],
             "tx_hash": receipt.receipt_id,
         }
 
