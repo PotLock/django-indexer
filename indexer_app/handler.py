@@ -13,8 +13,8 @@ from nadabot.utils import match_nadabot_registry_pattern
 from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import log_memory_usage, logger
-from .utils import handle_add_nadabot_admin, handle_set_factory_configs  # handle_batch_donations,
 from .utils import (
+    handle_add_nadabot_admin,  # handle_batch_donations,
     handle_add_stamp,
     handle_default_list_status_change,
     handle_list_admin_removal,
@@ -35,6 +35,7 @@ from .utils import (
     handle_pot_config_update,
     handle_registry_blacklist_action,
     handle_registry_unblacklist_action,
+    handle_set_factory_configs,
     handle_set_payouts,
     handle_social_profile_update,
     handle_transfer_payout,
