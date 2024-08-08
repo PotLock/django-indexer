@@ -397,7 +397,7 @@ async def handle_new_list_registration(
     insert_data = []
     for dt in reg_data:
         logger.info(f"dt: {dt}")
-        project_list.append({"id": dt["registrant_id"]})
+        project_list.append({"chain_id":1, "id": dt["registrant_id"]})
         insert_data.append(
             {
                 "id": dt["id"],
