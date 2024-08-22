@@ -173,6 +173,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://dev.local",
 ]
 
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$"
+]
+
 # REDIS / CACHE CONFIGS
 
 REDIS_SCHEMA = (
