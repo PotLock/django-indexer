@@ -145,3 +145,73 @@ class Account(models.Model):
                 False  # don't save yet as we want to avoid infinite loop
             )
         super().save(*args, **kwargs)
+
+
+class ProjectStatus(models.TextChoices):
+    NEW = "NEW", _("New")
+    APPROVED = "APPROVED", _("Approved")
+    REJECTED = "REJECTED", _("Rejected")
+    COMPLETED = "COMPLETED", _("Completed")
+
+
+class ProjectContact(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    value = models.CharField(max_length=255)
+
+class ProjectContract(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    contract_address = models.CharField(max_length=255)
+
+class ProjectRepository(models.Model):
+    id = models.AutoField(primary_key=True)
+    label = models.CharField(max_length=255)
+    url = models.URLField(max_length=200)
+
+
+class ProjectFundingHistory(models.Model):
+    id = models.AutoField(primary_key=True)
+    source = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    denomination = models.CharField(max_length=255)
+    description = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+
+class Project(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    image_url = models.URLField(max_length=200)
+    video_url = models.URLField(max_length=200)
+    name = models.CharField(max_length=255)
+    overview = models.TextField()
+    owner = models.ForeignKey(Account, related_name='owned_projects', on_delete=models.CASCADE)
+    payout_address = models.ForeignKey(Account, related_name='payout_projects', on_delete=models.CASCADE)
+    contacts = models.ManyToManyField(
+        ProjectContact,
+        related_name="contact_lists",
+        help_text=_("project contacts."),
+    )
+    contracts = models.ManyToManyField(
+        ProjectContract,
+        related_name="contract_list",
+        help_text=_("project contracts."),
+    )
+    team_members = models.ManyToManyField(
+        Account,
+        related_name="team_members",
+        help_text=_("Project Team Member"),
+    )
+    repositories = models.ManyToManyField(
+        ProjectRepository,
+        related_name="repository_list",
+        help_text=_("project repositories."),
+    )
+    status = models.CharField(max_length=50, choices=ProjectStatus.choices)
+    submited_ms = models.BigIntegerField()
+    updated_ms = models.BigIntegerField(null=True, blank=True)
+    admins = models.ManyToManyField(
+        Account,
+        related_name="admin_projects",
+        help_text=_("Project Admin"),
+    )
