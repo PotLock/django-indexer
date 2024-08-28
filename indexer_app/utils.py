@@ -149,7 +149,7 @@ async def handle_new_pot(
         # Create Pot object
         logger.info(f"creating pot with owner {owner_id}....")
         pot_defaults = {
-            "pot_factory_account": predecessorId,
+            "pot_factory_id": predecessorId,
             "deployer": signer,
             "deployed_at": created_at,
             "source_metadata": data["source_metadata"],
@@ -174,7 +174,7 @@ async def handle_new_pot(
             "registry_provider": data["registry_provider"],
             "min_matching_pool_donation_amount": data[
                 "min_matching_pool_donation_amount"
-            ],
+            ] or "0",
             "sybil_wrapper_provider": data["sybil_wrapper_provider"],
             "custom_sybil_checks": data.get("custom_sybil_checks"),
             "custom_min_threshold_score": data.get("custom_min_threshold_score"),

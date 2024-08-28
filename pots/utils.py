@@ -3,7 +3,7 @@ import re
 from django.conf import settings
 
 BASE_PATTERN = (
-    r"potlock\.testnet"
+    r"v\d+\.potfactory\.potlock\.testnet"
     if settings.ENVIRONMENT == "testnet"
     else r"v\d+\.potfactory\.potlock\.near"
 )
