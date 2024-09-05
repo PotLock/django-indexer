@@ -182,9 +182,17 @@ else:
         "https://alpha.potlock.io",
         "https://alpha.potlock.org",
         "https://alpha.potlock.xyz",
-        "https://alpha.potlock.app",  # regex matching might not be advisable.
+        "https://alpha.potlock.app",
         "http://dev.local",
         "https://dev.local",
+        "https://potlock.org",
+        "https://potlock.io",
+        "https://potlock.app",
+        "https://potlock.xyz",
+        "https://landing.potlock.org",
+        "https://landing.potlock.io",
+        "https://landing.potlock.app",
+        "https://landing.potlock.xyz"
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
