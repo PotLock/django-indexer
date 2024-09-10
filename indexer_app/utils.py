@@ -200,7 +200,7 @@ async def handle_new_pot(
         if data.get("admins"):
             for admin_id in data["admins"]:
                 admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=admin_id)
-                pot.admins.aadd(admin)
+                await pot.admins.aadd(admin)
 
         defaults = {
             "signer_id": signer_id,

@@ -341,9 +341,10 @@ class Pot(models.Model):
                 self.admins.clear()
                 for admin_id in config.get("admins", []):
                     self.admins.add(Account.objects.get_or_create(defaults={"chain_id":1},id=admin_id)[0])
-                self.chef, created = Account.objects.get_or_create(defaults={"chain_id":1},
-                    id=config.get("chef")
-                )
+                if config.get("chef"):
+                    self.chef, created = Account.objects.get_or_create(defaults={"chain_id":1},
+                        id=config.get("chef")
+                    )
                 self.name = config.get("pot_name")
                 self.description = config.get("pot_description")
                 self.max_approved_applicants = config.get("max_projects")
