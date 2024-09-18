@@ -194,7 +194,15 @@ else:
         "https://landing.potlock.org",
         "https://landing.potlock.io",
         "https://landing.potlock.app",
-        "https://landing.potlock.xyz"
+        "https://landing.potlock.xyz",
+        "https://bos.potlock.org",
+        "https://app.potlock.org",
+        "https://bos.potlock.xyz",
+        "https://app.potlock.xyz",
+        "https://bos.potlock.io",
+        "https://app.potlock.io",
+        "https://bos.potlock.app",
+        "https://app.potlock.app"
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
