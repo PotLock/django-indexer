@@ -106,8 +106,8 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        # start_block = get_block_height()
-        start_block = 112682360
+        start_block = get_block_height()
+        # start_block = 112682360
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
@@ -157,7 +157,6 @@ jobs_logger = logging.getLogger("jobs")
 
 @shared_task
 def fetch_usd_prices():
-    print("In here now........")
     donations = Donation.objects.filter(
         Q(total_amount_usd__isnull=True)
         | Q(net_amount_usd__isnull=True)
