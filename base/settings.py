@@ -167,6 +167,7 @@ WSGI_APPLICATION = "base.wsgi.application"
 if ENVIRONMENT == "testnet":
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
+        "http://127.0.0.1:8080",
         "https://test.potlock.org",
         "https://test.potlock.xyz",
         "https://test.potlock.io",
@@ -179,6 +180,7 @@ if ENVIRONMENT == "testnet":
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
+        "http://127.0.0.1:8080",
         "https://alpha.potlock.io",
         "https://alpha.potlock.org",
         "https://alpha.potlock.xyz",
@@ -192,7 +194,15 @@ else:
         "https://landing.potlock.org",
         "https://landing.potlock.io",
         "https://landing.potlock.app",
-        "https://landing.potlock.xyz"
+        "https://landing.potlock.xyz",
+        "https://bos.potlock.org",
+        "https://app.potlock.org",
+        "https://bos.potlock.xyz",
+        "https://app.potlock.xyz",
+        "https://bos.potlock.io",
+        "https://app.potlock.io",
+        "https://bos.potlock.app",
+        "https://app.potlock.app"
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
