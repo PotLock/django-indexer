@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+import json
 import logging
 import time
 from pathlib import Path
@@ -8,19 +10,22 @@ from billiard.exceptions import WorkerLostError
 from celery import shared_task
 from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
-from django.db import transaction
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
 from near_lake_framework import LakeConfig, streamer
+import stellar_sdk
+from stellar_sdk.soroban_server import EventFilter, EventFilterType
+from stellar_sdk import Address, stellar_xdr, scval
 
 from accounts.models import Account
 from base.celery import SPOT_INDEXER_QUEUE_NAME
 from donations.models import Donation
+from grantpicks.models import Round, RoundDeposit, StellarEvent, ProjectContact
 from indexer_app.handler import handle_streamer_message
-from pots.models import Pot, PotPayout
+from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 
 from .logging import logger
-from .utils import get_block_height, save_block_height
+from .utils import create_or_update_round, create_round_application, get_block_height, get_ledger_sequence, process_application_to_round, process_project_event, process_rounds_deposit_event, process_vote_event, save_block_height, update_application, update_approved_projects, update_ledger_sequence
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
@@ -101,8 +106,8 @@ def listen_to_near_events():
 
     try:
         # Update below with desired network & block height
-        start_block = get_block_height()
-        # start_block = 119_568_113
+        # start_block = get_block_height()
+        start_block = 112682360
         logger.info(f"what's the start block, pray tell? {start_block-1}")
         loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
@@ -152,6 +157,7 @@ jobs_logger = logging.getLogger("jobs")
 
 @shared_task
 def fetch_usd_prices():
+    print("In here now........")
     donations = Donation.objects.filter(
         Q(total_amount_usd__isnull=True)
         | Q(net_amount_usd__isnull=True)
@@ -325,6 +331,121 @@ def update_account_statistics():
                 f"Failed to update statistics for account {account.id}: {e}"
             )
     jobs_logger.info(f"Account stats for {accounts.count()} accounts updated.")
+
+def address_to_string(obj):
+    if isinstance(obj, Address):
+        return obj.address
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+@shared_task
+def stellar_event_indexer():
+    server = stellar_sdk.SorobanServer(
+        "https://soroban-testnet.stellar.org"
+        if settings.ENVIRONMENT == "testnet" or settings.ENVIRONMENT == "local"
+        else "https://horizon.stellar.org"
+    )
+    contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT]
+    start_sequence = get_ledger_sequence()
+    # start_sequence = 12169
+    if not start_sequence:
+        start_sequence = 12169
+    jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
+    try:
+        # Fetch events for the current sequence
+        events = server.get_events(
+            start_ledger=start_sequence,
+            filters=[
+                EventFilter(
+                        event_type=EventFilterType.CONTRACT,
+                        contract_ids=contract_ids
+                    )
+            ]
+        )
+        stellar_events = []
+        for event in events.events:
+            event_name = stellar_sdk.scval.to_native(event.topic[0])
+            event_value = event.value
+            if event.value is not None:
+                event_value = stellar_sdk.scval.to_native(event.value)
+                event_value = json.loads(json.dumps(event_value, default=address_to_string))
+                print("event value:. ", event_value)
+            stellar_events.append(StellarEvent(
+                ledger_sequence=event.ledger,
+                event_type=event_name,
+                contract_id=event.contract_id,
+                ingested_at=event.ledger_close_at,
+                transaction_hash=event.transaction_hash,
+                data=event_value
+            ))
+    
+        StellarEvent.objects.bulk_create(
+            objs=stellar_events,
+            ignore_conflicts=True
+        )
+        update_ledger_sequence(events.latest_ledger, event.ledger_close_at)
+        jobs_logger.info(f"Ingested {len(stellar_events)} Stellar events from ledger {start_sequence} to {events.latest_ledger}...")
+
+    except Exception as e:
+        jobs_logger.error(f"Error processing ledger {start_sequence}: {e}")
+
+
+
+@shared_task
+def process_stellar_events():
+    unprocessed_events = StellarEvent.objects.filter(processed=False).order_by('id')
+    jobs_logger.info(f"Processing {unprocessed_events.count()} unprocessed Stellar events...")
+
+    for event in unprocessed_events:
+        try:
+            event_data = event.data
+            event_name = event.event_type
+
+            if event_name == 'c_project':
+                process_project_event(event_data)
+                event.processed = True
+            
+            elif event_name == 'c_round' or event_name == 'u_round':
+                create_or_update_round(event_data, event.contract_id, event.ingested_at)
+                # Mark event as processed
+                event.processed = True
+
+            elif event_name == 'apply_to_round':
+                process_application_to_round(event_data, event.transaction_hash)
+                # Mark event as processed
+                event.processed = True            
+
+            elif event_name == 'c_app':
+                create_round_application(event_data, event.transaction_hash)
+                event.processed = True
+
+
+            elif event_name == 'u_app': # application review and aproval
+                jobs_logger.info(f"eventulating data for event, {event_data}")
+                update_application(event_data, event.transaction_hash)
+                event.processed = True
+            
+            elif event_name == 'u_ap':
+                jobs_logger.info(f"eventulating data for approved project event, {event_data}")
+                update_approved_projects(event_data)
+                event.processed = True
+            
+            elif event_name == 'c_depo':
+                process_rounds_deposit_event(event_data, event.transaction_hash)
+                # Mark event as processed
+                event.processed = True
+
+            elif event_name == 'c_vote':
+                process_vote_event(event_data, event.transaction_hash)
+                # Mark event as processed
+                event.processed = True
+            event.save()
+
+        except Exception as e:
+            jobs_logger.error(f"Error processing Stellar event { event_name, event.id}: {e}")
+
+    jobs_logger.info(f"Finished processing Stellar events.")
+
+
 
 
 @task_revoked.connect

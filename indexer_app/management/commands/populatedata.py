@@ -260,7 +260,7 @@ class Command(BaseCommand):
             if config.get("chef"):
                 chef, _ = Account.objects.get_or_create(defaults={"chain_id":1},id=config["chef"])
             pot_defaults = {
-                "pot_factory_account": POTFACTORY_ID,
+                "pot_factory_id": POTFACTORY_ID,
                 "owner_id": config["owner"],
                 "chef_id": config["chef"],
                 "name": config["pot_name"],

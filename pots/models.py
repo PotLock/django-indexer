@@ -7,10 +7,10 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
-from accounts.models import Account, Project, ProjectContact
+from accounts.models import Account
 from base.logging import logger
 from base.utils import format_date
-from tokens.models import Token, TokenHistoricalPrice
+from tokens.models import Token
 
 
 class PotFactory(models.Model):
@@ -413,13 +413,21 @@ class PotApplication(models.Model):
         db_index=True,
     )
     round = models.ForeignKey(
-        "Round",
+        "grantpicks.Round",
         on_delete=models.CASCADE,
         related_name="applications",
         null=True,
         blank=True,
         help_text=_("Round applied to."),
         db_index=True,
+    )
+    project = models.ForeignKey(
+        "grantpicks.Project",
+        on_delete=models.CASCADE,
+        related_name="applications",
+        null=True,
+        blank=True,
+        help_text=_("Project that applied."),
     )
     applicant = models.ForeignKey(
         Account,
@@ -725,232 +733,3 @@ class PotPayoutChallengeAdminResponse(models.Model):
         verbose_name_plural = "Payout Challenge Responses"
 
         unique_together = (("challenger", "pot", "created_at"),)
-
-
-class Round(models.Model):
-    contract = models.OneToOneField(
-        Account,
-        primary_key=True,
-        related_name="round",
-        on_delete=models.CASCADE,
-        help_text=_("Round account ID."),
-    )
-    deployed_at = models.DateTimeField(
-        _("deployed at"),
-        null=False,
-        help_text=_("Round deployment date."),
-        db_index=True,
-    )
-    owner = models.ForeignKey(
-        Account,
-        on_delete=models.CASCADE,
-        related_name="owned_rounds",
-        null=False,
-        help_text=_("Round owner."),
-    )
-    admins = models.ManyToManyField(
-        Account,
-        related_name="admin_rounds",
-        help_text=_("Round admins."),
-    )
-    name = models.TextField(
-        _("name"),
-        null=False,
-        help_text=_("Round name."),
-    )
-    description = models.TextField(
-        _("description"),
-        null=False,
-        help_text=_("Round description."),
-    )
-    contacts = models.ManyToManyField(
-        ProjectContact,
-        related_name="round_contacts",
-        help_text=_("Round contacts."),
-    )
-    expected_amount = models.CharField(
-        _("expected amount"),
-        null=False,
-        help_text=_("Expected amount."),
-    )
-    
-    base_currency = models.CharField(
-        _("base currency"),
-        max_length=64,
-        null=True,
-        blank=True,
-        help_text=_("Base currency."),
-    )
-    application_start = models.DateTimeField(
-        _("application start"),
-        null=False,
-        help_text=_("Round application start date."),
-    )
-    application_end = models.DateTimeField(
-        _("application end"),
-        null=False,
-        help_text=_("Round application end date."),
-    )
-    voting_start = models.DateTimeField(
-        _("voting start"),
-        null=False,
-        help_text=_("Round voting start date."),
-    )
-    voting_end = models.DateTimeField(
-        _("voting end"),
-        null=False,
-        help_text=_("Round voting end date."),
-    )
-    use_whitelist = models.BooleanField(
-        _("use whitelist"),
-        null=False,
-        help_text=_("Use whitelist."),
-    )
-    use_vault = models.BooleanField(
-        _("use vault"),
-        null=False,
-        help_text=_("Use vault."),
-    )
-    num_picks_per_voter = models.PositiveIntegerField(
-        _("num picks per voter"),
-        null=True,
-        blank=True,
-        help_text=_("Number of picks per voter."),
-    )
-    max_participants = models.PositiveIntegerField(
-        _("max participants"),
-        null=True,
-        blank=True,
-        help_text=_("Max participants."),
-    )
-    allow_applications = models.BooleanField(
-        _("allow applications"),
-        null=False,
-        help_text=_("Allow applications."),
-    )
-    is_video_required = models.BooleanField(
-        _("is video required"),
-        null=False,
-        help_text=_("Is video required."),
-    )
-    cooldown_end = models.DateTimeField(
-        _("cooldown end"),
-        null=True,
-        blank=True,
-        help_text=_("Round cooldown end date."),
-    )
-    cooldown_period_ms = models.PositiveIntegerField(
-        _("cooldown period in ms"),
-        null=True,
-        blank=True,
-        help_text=_("Round cooldown period in ms."),
-    )
-    compliance_req_desc = models.TextField(
-        _("compliance req desc"),
-        null=False,
-        help_text=_("Compliance req desc."),
-    )
-    compliance_period_ms = models.PositiveIntegerField(
-        _("compliance period in ms"),
-        null=True,
-        blank=True,
-        help_text=_("Compliance period in ms."),
-    )
-    compliance_end = models.DateTimeField(
-        _("compliance end"),
-        null=True,
-        blank=True,
-        help_text=_("Compliance end date."),
-    )
-    allow_remaining_dist = models.BooleanField(
-        _("allow remaining dist"),
-        null=False,
-        help_text=_("Allow remaining dist."),
-    )
-    remaining_dist_address = models.CharField(
-        _("remaining dist address"),
-        max_length=255,
-        null=False,
-        help_text=_("Remaining dist address."),
-    )
-    referrer_fee_basis_points = models.PositiveIntegerField(
-        _("referrer fee basis points"),
-        null=True,
-        blank=True,
-        help_text=_("Referrer fee basis points."),
-    )
-
-
-class RoundDeposit(models.Model):
-    id = models.AutoField(
-        _("deposit id"),
-        primary_key=True,
-        help_text=_("Deposit id."),
-    )
-    round = models.ForeignKey(
-        Round,
-        on_delete=models.CASCADE,
-        related_name="deposits",
-        null=False,
-        help_text=_("Round that this deposit is for."),
-        db_index=True,
-    )
-    depositor = models.ForeignKey(
-        Account,
-        on_delete=models.CASCADE,
-        related_name="round_deposits",
-        null=False,
-        help_text=_("Deposit maker."),
-        db_index=True,
-    )
-    amount = models.CharField(
-        _("amount"),
-        null=False,
-        help_text=_("Deposit amount."),
-    )
-    amount_in_usd = models.DecimalField(
-        _("amount deposited in USD"),
-        max_digits=20,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text=_("Deposit amount in USD."),
-    )
-    token = models.ForeignKey(
-        Token,
-        on_delete=models.CASCADE,
-        related_name="round_deposits",
-        null=True,
-        help_text=_("Deposit token."),
-    )
-    deposit_at = models.DateTimeField(
-        _("deposit at"),
-        null=True,
-        blank=True,
-        help_text=_("Deposit date."),
-        db_index=True,
-    )
-    tx_hash = models.CharField(
-        _("transaction hash"),
-        null=True,
-        blank=True,
-        help_text=_("Transaction hash."),
-    )
-
-class Vote(models.Model):
-    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name='votes')
-    voter = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='votes')
-    voted_at = models.DateTimeField()
-
-    class Meta:
-        unique_together = ('round', 'voter', 'voted_at')
-
-
-
-class VotePair(models.Model):
-    vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name='pairs')
-    pair_id = models.PositiveIntegerField()
-    project = models.ForeignKey('PotApplication', on_delete=models.CASCADE, related_name='vote_pairs')
-
-    class Meta:
-        unique_together = ('vote', 'pair_id')

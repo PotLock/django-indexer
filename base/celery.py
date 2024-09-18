@@ -40,12 +40,24 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
         "options": {"queue": "beat_tasks"},
     },
+    "fetch_stellar_events_every_minute": {
+        "task": "indexer_app.tasks.stellar_event_indexer",
+        "schedule": crontab(minute="*/1"),  # Executes every 1 minutes
+        "options": {"queue": "beat_tasks"},
+    },
+    "process_stellar_event_every_minute": {
+        "task": "indexer_app.tasks.process_stellar_events",
+        "schedule": crontab(minute="*/1"),  # Executes every 1 minutes
+        "options": {"queue": "beat_tasks"},
+    },
 }
 
 app.conf.task_routes = {
     "indexer_app.tasks.update_account_statistics": {"queue": "beat_tasks"},
     "indexer_app.tasks.fetch_usd_prices": {"queue": "beat_tasks"},
     "indexer_app.tasks.update_pot_statistics": {"queue": "beat_tasks"},
+    "indexer_app.tasks.stellar_event_indexer": {"queue": "beat_tasks"},
+    "indexer_app.tasks.process_stellar_events": {"queue": "beat_tasks"},
 }
 
 SPOT_INDEXER_QUEUE_NAME = "spot_indexing"
