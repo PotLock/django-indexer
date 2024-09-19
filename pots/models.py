@@ -5,11 +5,12 @@ import requests
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
 
 from accounts.models import Account
 from base.logging import logger
 from base.utils import format_date
-from tokens.models import Token, TokenHistoricalPrice
+from tokens.models import Token
 
 
 class PotFactory(models.Model):
@@ -393,6 +394,8 @@ class PotApplicationStatus(models.TextChoices):
     APPROVED = "Approved", "Approved"
     REJECTED = "Rejected", "Rejected"
     INREVIEW = "InReview", "InReview"
+    BLACKLISTED = "Blacklisted", "Blacklisted"
+
 
 
 class PotApplication(models.Model):
@@ -405,16 +408,34 @@ class PotApplication(models.Model):
         Pot,
         on_delete=models.CASCADE,
         related_name="applications",
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Pot applied to."),
         db_index=True,
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="applications",
+        null=True,
+        blank=True,
+        help_text=_("Round applied to."),
+        db_index=True,
+    )
+    project = models.ForeignKey(
+        "grantpicks.Project",
+        on_delete=models.CASCADE,
+        related_name="applications",
+        null=True,
+        blank=True,
+        help_text=_("Project that applied."),
     )
     applicant = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
         related_name="pot_applications",
         null=False,
-        help_text=_("Account that applied to the pot."),
+        help_text=_("Account that applied to the pot or round."),
         db_index=True,
     )
     message = models.TextField(
@@ -452,11 +473,30 @@ class PotApplication(models.Model):
 
     class Meta:
         verbose_name_plural = "Pot Applications"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="pot_or_round"
+            )
+        ]
 
-        unique_together = (("pot", "applicant"),)
+    def clean(self):
+        if self.pot is None and self.round is None:
+            raise ValidationError(_("Either pot or round must be specified."))
+        if self.pot is not None and self.round is not None:
+            raise ValidationError(_("Only one of pot or round can be specified."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.applicant.id} - {self.pot}"
+        if self.pot:
+            return f"{self.applicant.id} - {self.pot}"
+        return f"{self.applicant.id} - {self.round}"
 
 
 class PotApplicationReview(models.Model):
