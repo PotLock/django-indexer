@@ -377,7 +377,7 @@ def stellar_event_indexer():
                 data=event_value
             ))
     
-        if len(stellar_events) > 1:
+        if len(stellar_events) > 0:
             StellarEvent.objects.bulk_create(
                 objs=stellar_events,
                 ignore_conflicts=True
