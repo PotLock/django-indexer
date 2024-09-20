@@ -18,7 +18,7 @@ from accounts.api import (
 )
 from base.api import StatsAPI
 from donations.api import DonationContractConfigAPI
-from grantpicks.api import ProjectListAPI, ProjectRoundVotesAPI, RoundDetailAPI, RoundsListAPI
+from grantpicks.api import ProjectListAPI, ProjectRoundVotesAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
 from lists.api import (
     ListDetailAPI,
     ListRandomRegistrationAPI,
@@ -136,5 +136,10 @@ urlpatterns = [
     path("v1/round/<int:round_id>/", RoundDetailAPI.as_view(), name="rounds_api_by_id"),
     path("v1/round/<int:round_id>/<int:project_id>/votes", ProjectRoundVotesAPI.as_view(), name="project_round_votes_api_by_id"),
     path("v1/projects", ProjectListAPI.as_view(), name="projects_api"),
+    path(
+        "v1/rounds/<str:round_id>/applications",
+        RoundApplicationsAPI.as_view(),
+        name="rounds_applications_api",
+    ),
     
 ]

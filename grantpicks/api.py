@@ -27,7 +27,7 @@ from donations.serializers import (
     PaginatedDonationsResponseSerializer,
 )
 
-from .models import Project, Round
+from .models import Project, ProjectStatus, Round
 from .serializers import (
     PAGINATED_PROJECT_EXAMPLE,
     PAGINATED_ROUND_APPLICATION_EXAMPLE,
@@ -50,6 +50,12 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
+            OpenApiParameter(
+                name="sort",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Sort by field, e.g., deployed_at, vault_total_deposits",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -66,11 +72,21 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
                     ),
                 ],
             ),
+            500: OpenApiResponse(description="Internal server error"),
         },
     )
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         rounds = Round.objects.all()
+        sort = request.query_params.get("sort", None)
+        if sort == "deployed_at":
+            rounds = rounds.order_by(
+                "-deployed_at"
+            )
+        if sort == "vault_total_deposits":
+            rounds = rounds.order_by(
+                "-vault_total_deposits"
+            )
         results = self.paginate_queryset(rounds, request, view=self)
         serializer = RoundSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
@@ -88,7 +104,7 @@ class RoundDetailAPI(APIView):
                 examples=[
                     OpenApiExample(
                         "example-1",
-                        summary="Simple round example",
+                        summary="Simple Round example",
                         description="Example response for round detail",
                         value=SIMPLE_ROUND_EXAMPLE,
                         response_only=True,
@@ -197,6 +213,18 @@ class ProjectListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter projects by status",
+            ),
+            OpenApiParameter(
+                "owner",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter projects by owner id",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -213,11 +241,30 @@ class ProjectListAPI(APIView, CustomSizePageNumberPagination):
                     ),
                 ],
             ),
+            400: OpenApiResponse(description="Invalid status value"),
+            404: OpenApiResponse(description="owner not found"),
+            500: OpenApiResponse(description="Internal server error"),
         },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         projects = Project.objects.all()
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in ProjectStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            projects = projects.filter(status=status_param)
+        project_owner = request.query_params.get("owner")
+        if project_owner:
+            try:
+                account = Account.objects.get(id=project_owner)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Account with ID {project_owner} not found."}, status=404
+                )
+            projects = projects.filter(owner=account)
         results = self.paginate_queryset(projects, request, view=self)
         serializer = ProjectSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
