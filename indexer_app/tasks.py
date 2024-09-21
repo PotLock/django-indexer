@@ -361,6 +361,7 @@ def stellar_event_indexer():
             ]
         )
         stellar_events = []
+        ledger_timestamp = datetime.now()
         for event in events.events:
             event_name = stellar_sdk.scval.to_native(event.topic[0])
             event_value = event.value
@@ -382,8 +383,9 @@ def stellar_event_indexer():
                 objs=stellar_events,
                 ignore_conflicts=True
             )
+            ledger_timestamp = event.ledger_close_at
             jobs_logger.info(f"Ingested {len(stellar_events)} Stellar events from ledger {start_sequence} to {events.latest_ledger}...")
-        update_ledger_sequence(events.latest_ledger, event.ledger_close_at)
+        update_ledger_sequence(events.latest_ledger, ledger_timestamp)
 
     except Exception as e:
         jobs_logger.error(f"Error processing ledger {start_sequence}: {e}")
