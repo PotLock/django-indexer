@@ -382,8 +382,8 @@ def stellar_event_indexer():
                 objs=stellar_events,
                 ignore_conflicts=True
             )
-            update_ledger_sequence(events.latest_ledger, event.ledger_close_at)
             jobs_logger.info(f"Ingested {len(stellar_events)} Stellar events from ledger {start_sequence} to {events.latest_ledger}...")
+        update_ledger_sequence(events.latest_ledger, event.ledger_close_at)
 
     except Exception as e:
         jobs_logger.error(f"Error processing ledger {start_sequence}: {e}")
