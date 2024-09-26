@@ -666,7 +666,7 @@ class PotPayout(models.Model):
             self.amount_paid_usd = token.format_price(self.amount) * price_usd
             self.save()
             logger.info(
-                f"Saved USD prices for pot payout for pot id: {self.pot.account}"
+                f"Saved USD prices for pot payout for pot id: {self.pot.account if self.pot else self.round}"
             )
         except Exception as e:
             logger.error(f"Failed to calculate and save USD prices: {e}")
