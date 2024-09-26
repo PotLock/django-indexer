@@ -116,8 +116,8 @@ class Token(models.Model):
                 price_data = response.json()
                 coin_data = list(
                     filter(
-                        lambda x: x["symbol"] == kwargs["symbol"]
-                        and x["platforms"].get("near-protocol"),
+                        lambda x: x["symbol"] == self.symbol
+                        and x["name"] == "Stellar",
                         price_data,
                     )
                 )

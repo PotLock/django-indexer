@@ -332,17 +332,30 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         logger.error(f"Failed to handle new pot Factory, Error: {e}")
 
 
+async def handle_new_list_and_reg(signer_id: str, receiver_id: str, status_obj: ExecutionOutcome, receipt: Receipt):
+    create_data, reg_data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
+    await handle_new_list(signer_id, receiver_id, None, create_data)
+    if reg_data:
+        await handle_new_list_registration(reg_data, receiver_id, signer_id, receipt, None)
+    pass
+
+
 async def handle_new_list(
-    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
 ):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
     try:
 
-        data = json.loads(
-            base64.b64decode(status_obj.status.get("SuccessValue")).decode(
-                "utf-8"
-            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
-        )
+        if not data:
+            data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
 
         logger.info("upserting involveed accts...")
 
@@ -376,12 +389,21 @@ async def handle_new_list(
         logger.error(f"Failed to handle new list, Error: {e}")
 
 
+async def handle_delete_list(
+    data: dict
+):
+    try:
+        logger.info(f"deleting list..... {data}")
+        lst = await List.objects.filter(on_chain_id=data["list_id"]).adelete()
+    except Exception as e:
+        logger.error(f"Failed to delete, Error: {e}")
+
 async def handle_new_list_registration(
     data: dict,
     receiver_id: str,
     signer_id: str,
     receipt: Receipt,
-    status_obj: ExecutionOutcome,
+    status_obj: ExecutionOutcome | None,
 ):
     logger.info(f"new Project data: {data}, {receiver_id}")
 
@@ -389,11 +411,14 @@ async def handle_new_list_registration(
     if receipt is None:
         return
 
-    reg_data = json.loads(
-        base64.b64decode(status_obj.status["SuccessValue"]).decode(
-            "utf-8"
-        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
-    )
+    if status_obj:
+        reg_data = json.loads(
+            base64.b64decode(status_obj.status["SuccessValue"]).decode(
+                "utf-8"
+            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+        )
+    else:
+        reg_data = data
     # Prepare data for insertion
     project_list = []
     insert_data = []
@@ -560,9 +585,7 @@ async def handle_pot_application_status_change(
         )
 
         # Retrieve the PotApplication object
-        appl = await PotApplication.objects.filter(
-            applicant_id=data["project_id"]
-        ).afirst()
+        appl = await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).afirst()
 
         if not appl:
             logger.error(
@@ -588,7 +611,7 @@ async def handle_pot_application_status_change(
         )
 
         # Update the PotApplication object
-        await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
+        await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).aupdate(
             **{"status": update_data["status"], "updated_at": updated_at}
         )
 
@@ -631,7 +654,7 @@ async def handle_default_list_status_change(
 
 
 async def handle_list_upvote(
-    data: dict, receiver_id: str, signer_id: str, receiptId: str
+    data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
 
@@ -641,11 +664,15 @@ async def handle_list_upvote(
             id=signer_id,
         )
 
-        created_at = datetime.now()
+
+        up_default = {
+            "created_at": created_at
+        }
 
         await ListUpvote.objects.aupdate_or_create(
             list_id=data.get("list_id") or receiver_id,
             account_id=signer_id,
+            defaults=up_default
         )
 
         defaults = {
@@ -791,7 +818,7 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         list_obj = await List.objects.aget(id=data["list_id"])
 
         for acct in data["admins"]:
-            list_obj.admins.remove({"admins_id": acct})  # maybe check
+            await list_obj.admins.aremove({"admins_id": acct})  # maybe check
 
         activity = {
             "signer_id": signer_id,
@@ -838,6 +865,8 @@ async def handle_set_factory_configs(data, receiverId):
         await config_update()
     except Exception as e:
         logger.error(f"Failed to update factory configs, Error: {e}")
+
+
 
 
 # # TODO: Need to abstract some actions.
@@ -1237,9 +1266,11 @@ def update_approved_projects(event_data):
             for ids in project_ids:
                 project = Project.objects.get(id=ids)
                 round_obj.approved_projects.add(project)
+            return True
 
         except Exception as e:
             logger.error(f"Error updating application for Round {round_id}: {e}")
+            return False
 
 def update_application(event_data, txhash):
     round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
@@ -1277,8 +1308,11 @@ def update_application(event_data, txhash):
                 **{"status": application_data["status"], "updated_at": updated_at}
             )
 
+            return True
+
         except Exception as e:
             logger.error(f"Error updating application for Round {round_id}: {e}")
+            return False
 
 
 
@@ -1317,9 +1351,10 @@ def process_vote_event(event_data, tx_hash):
                 )
 
             logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}")
-            return vote
+            return True
     except Exception as e:
         logger.error(f"Error processing vote for Round: {str(e)}")
+        return False
 
 
 def process_project_event(event_data):
@@ -1394,9 +1429,12 @@ def process_project_event(event_data):
             logger.info(f"Created new Project: {project.id}")
         else:
             logger.info(f"Updated existing Project: {project.id}")
+        
+        return True
 
     except Exception as e:
         logger.error(f"Error processing project event: {str(e)}")
+        return False
 
 
 
@@ -1455,8 +1493,10 @@ def create_or_update_round(event_data, contract_id, timestamp):
             round_obj.contacts.add(contact_obj)
         
         logger.info(f"Created/Updated Round: {round_id}")
+        return True
     except Exception as e:
         logger.error(f"Error processing rounds event: {str(e)}")
+        return False
 
 
 def process_application_to_round(event_data, tx_hash):
@@ -1486,8 +1526,10 @@ def process_application_to_round(event_data, tx_hash):
             }
         )
         logger.info(f"Processed application for Round: {round_id}, Applicant: {applicant_id}")
+        return True
     except Exception as e:
         logger.error(f"Error processing rounds applications event: {str(e)}")
+        return False
 
 
 
@@ -1512,8 +1554,11 @@ def create_round_application(event_data, tx_hash):
             project_id=application_data["project_id"],
             defaults=appl_defaults,
         )
+
+        return True
     except Exception as e:
         logger.error(f"Error creating applications to rounds: {str(e)}")
+        return False
 
 
 def process_rounds_deposit_event(event_data, tx_hash):
@@ -1542,7 +1587,64 @@ def process_rounds_deposit_event(event_data, tx_hash):
         round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + amount)
         round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + deposit_data["net_amount"])
         round_obj.save()
+        round_obj.update_vault_usd_equivalent()
 
         logger.info(f"Processed deposit for Round: {round_id}, Depositor: {depositor.id}, Amount: {amount}")
+        return True
     except Exception as e:
-        logger.error(f"Error creating applications to rounds: {str(e)}")
+        logger.error(f"Error processing deposits to rounds: {str(e)}")
+        return False
+
+
+
+def create_round_payout(event_data, tx_hash):
+    try:
+
+        round_id, payout_data = event_data
+        amount = payout_data["amount"]
+        recipient_id = payout_data["recipient_id"]
+        memo = payout_data.get("memo")
+
+        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain_id":2},id="stellar")
+        stellar_token, _ = Token.objects.get_or_create(
+            account=stellar_token_acct
+        ) 
+
+        payout = PotPayout(
+            round_id=round_id,
+            on_chain_id=payout_data["id"],
+            amount=amount,
+            recipient_id=recipient_id,
+            memo=memo,
+            token=stellar_token,
+            paid_at=None,
+            tx_hash=tx_hash,
+        )
+        payout.save()
+        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}.")
+        return True
+    except Exception as e:
+        logger.error(f"Error creating round payout: {str(e)}")
+        return False
+
+
+def update_round_payout(event_data, tx_hash):
+    try:
+        _, payout_data = event_data
+        payout_on_chain_id = payout_data["id"]
+        amount = payout_data["amount"]
+        paid_at_ms = payout_data.get("paid_at_ms")
+        recipient_id, _ = Account.objects.get_or_create(id=payout_data["recipient_id"])
+        memo = payout_data.get("memo")
+        payout = PotPayout.objects.get(on_chain_id=payout_on_chain_id)
+        payout.amount = amount
+        payout.paid_at = datetime.fromtimestamp(paid_at_ms / 1000)
+        payout.recipient = recipient_id
+        payout.tx_hash = tx_hash
+        payout.memo = memo
+        payout.save()
+        logger.info(f"Updated payout {payout_on_chain_id} for recipient {recipient_id} with amount {amount}.")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating Payout. {str(e)}")
+        return False

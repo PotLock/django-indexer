@@ -557,13 +557,36 @@ class PotPayout(models.Model):
         primary_key=True,
         help_text=_("Payout id."),
     )
+    on_chain_id =models.IntegerField(
+        _("contract payout id"),
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_("Payout id in contract"),
+        db_index=True
+    )
     pot = models.ForeignKey(
         Pot,
         on_delete=models.CASCADE,
         related_name="payouts",
-        null=False,
+        null=True,
         help_text=_("Pot that this payout is for."),
         db_index=True,
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout is for."),
+        db_index=True,
+    )
+    memo = models.CharField(
+        _("payout memo"),
+        null=True,
+        blank=True,
+        help_text=_("Round payout memo"),
     )
     recipient = models.ForeignKey(
         Account,
@@ -607,6 +630,28 @@ class PotPayout(models.Model):
         help_text=_("Transaction hash."),
     )
 
+    class Meta:
+        verbose_name_plural = "Pot Payouts"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="payout_pot_or_round"
+            )
+        ]
+
+    def clean(self):
+        if self.pot is None and self.round is None:
+            raise ValidationError(_("Either pot or round must be specified."))
+        if self.pot is not None and self.round is not None:
+            raise ValidationError(_("Only one of pot or round can be specified."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     ### Fetches USD prices for the Donation record and saves USD totals
     def fetch_usd_prices(self):
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
@@ -644,8 +689,17 @@ class PotPayoutChallenge(models.Model):
         Pot,
         on_delete=models.CASCADE,
         related_name="challenges",
-        null=False,
+        null=True,
         help_text=_("Pot challenged."),
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts_challenges",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout challenge is for."),
+        db_index=True,
     )
     created_at = models.DateTimeField(
         _("created at"),
@@ -668,12 +722,19 @@ class PotPayoutChallenge(models.Model):
     class Meta:
         verbose_name_plural = "Payout Challenges"
 
-        unique_together = (("challenger", "pot"),)
-
-    class Meta:
-        verbose_name_plural = "Payout Challenges"
-
-        unique_together = (("challenger", "pot"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['challenger', 'pot'],
+                name='unique_challenger_pot'
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="payout_challenge_pot_or_round"
+            )
+        ]
 
 
 class PotPayoutChallengeAdminResponse(models.Model):
@@ -698,6 +759,16 @@ class PotPayoutChallengeAdminResponse(models.Model):
         null=True,
         blank=True,
         help_text=_("Pot being challenged."),
+    )
+
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts_challenge_responses",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout challenge response is for."),
+        db_index=True,
     )
 
     admin = models.ForeignKey(

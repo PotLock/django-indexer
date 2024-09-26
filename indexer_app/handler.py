@@ -20,12 +20,14 @@ from .utils import (
     handle_add_nadabot_admin,  # handle_batch_donations,
     handle_add_stamp,
     handle_default_list_status_change,
+    handle_delete_list,
     handle_list_admin_removal,
     handle_list_registration_update,
     handle_list_upvote,
     handle_new_donation,
     handle_new_group,
     handle_new_list,
+    handle_new_list_and_reg,
     handle_new_list_registration,
     handle_new_nadabot_registry,
     handle_new_pot,
@@ -132,6 +134,10 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     if event_name == "unblacklist_account":
                         await handle_registry_unblacklist_action(
                             parsed_log.get("data")[0], receiver_id, now_datetime
+                        )
+                    if event_name == "delete_list":
+                        await handle_delete_list(
+                            parsed_log.get("data")[0]
                         )
                 except json.JSONDecodeError:
                     logger.warning(
@@ -411,7 +417,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             logger.info(f"creating list... {args_dict}, {action}")
                             if receiver_id != LISTS_CONTRACT:
                                 break
-                            await handle_new_list(signer_id, receiver_id, status_obj)
+                            await handle_new_list(signer_id, receiver_id, status_obj, None)
                             break
 
                         case "upvote":
@@ -419,7 +425,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_list_upvote(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id
+                                args_dict, receiver_id, signer_id, receipt.receipt_id, now_datetime
                             )
                             break
                         case "owner_add_admins":
@@ -443,6 +449,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 break
                             logger.info(f"updating configs.. {args_dict}")
                             await handle_set_factory_configs(args_dict, receiver_id)
+                            break
+                        case "create_list_with_registrations":
+                            logger.info(f"creating list... {args_dict}, {action}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_new_list_and_reg(signer_id, receiver_id, status_obj, receipt)
                             break
                         # TODO: handle remove upvote
 

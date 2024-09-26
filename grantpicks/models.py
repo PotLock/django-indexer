@@ -2,6 +2,10 @@ from django.db import models
 
 from django.utils.translation import gettext_lazy as _
 
+from datetime import datetime
+
+from base.logging import logger
+
 from accounts.models import Account
 from pots.models import PotApplication
 from tokens.models import Token
@@ -311,6 +315,28 @@ class Round(models.Model):
         blank=True,
         help_text=_("Round complete date."),
     )
+
+
+
+
+    def update_vault_usd_equivalent(self):
+        # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
+        try:
+            token = Token.objects.get(account_id="stellar")
+            price_usd = token.fetch_usd_prices_common(datetime.now())
+            if not price_usd:
+                logger.info(
+                    f"No USD price found for token {token.symbol} at {datetime.now()}"
+                )
+                return
+            self.vault_total_deposits_usd = token.format_price(self.vault_total_deposits) * price_usd
+            self.current_vault_balance_usd = token.format_price(self.current_vault_balance) * price_usd
+            self.save()
+            logger.info(
+                f"Saved USD prices for round vault for round id: {self.id}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to calculate and  stellar vault USD prices: {e}")
 
 
 class RoundDeposit(models.Model):

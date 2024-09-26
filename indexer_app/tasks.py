@@ -25,7 +25,7 @@ from indexer_app.handler import handle_streamer_message
 from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 
 from .logging import logger
-from .utils import create_or_update_round, create_round_application, get_block_height, get_ledger_sequence, process_application_to_round, process_project_event, process_rounds_deposit_event, process_vote_event, save_block_height, update_application, update_approved_projects, update_ledger_sequence
+from .utils import create_or_update_round, create_round_application, create_round_payout, get_block_height, get_ledger_sequence, process_application_to_round, process_project_event, process_rounds_deposit_event, process_vote_event, save_block_height, update_application, update_approved_projects, update_ledger_sequence, update_round_payout
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
@@ -403,43 +403,41 @@ def process_stellar_events():
             event_name = event.event_type
 
             if event_name == 'c_project':
-                process_project_event(event_data)
-                event.processed = True
+                event.processed = process_project_event(event_data)
             
             elif event_name == 'c_round' or event_name == 'u_round':
-                create_or_update_round(event_data, event.contract_id, event.ingested_at)
+                
                 # Mark event as processed
-                event.processed = True
+                event.processed = create_or_update_round(event_data, event.contract_id, event.ingested_at)
 
             elif event_name == 'apply_to_round':
-                process_application_to_round(event_data, event.transaction_hash)
+                
                 # Mark event as processed
-                event.processed = True            
+                event.processed = process_application_to_round(event_data, event.transaction_hash)            
 
             elif event_name == 'c_app':
-                create_round_application(event_data, event.transaction_hash)
-                event.processed = True
+                
+                event.processed = create_round_application(event_data, event.transaction_hash)
 
 
-            elif event_name == 'u_app': # application review and aproval
-                jobs_logger.info(f"eventulating data for event, {event_data}")
-                update_application(event_data, event.transaction_hash)
-                event.processed = True
+            elif event_name == 'u_app': # application review and aproval                
+                event.processed = update_application(event_data, event.transaction_hash)
             
-            elif event_name == 'u_ap':
-                jobs_logger.info(f"eventulating data for approved project event, {event_data}")
-                update_approved_projects(event_data)
-                event.processed = True
+            elif event_name == 'u_ap':                
+                event.processed = update_approved_projects(event_data)
             
             elif event_name == 'c_depo':
-                process_rounds_deposit_event(event_data, event.transaction_hash)
-                # Mark event as processed
-                event.processed = True
+                
+                event.processed = process_rounds_deposit_event(event_data, event.transaction_hash)
 
             elif event_name == 'c_vote':
-                process_vote_event(event_data, event.transaction_hash)
-                # Mark event as processed
-                event.processed = True
+                
+                event.processed = process_vote_event(event_data, event.transaction_hash)
+            elif event_name == "c_pay":
+                event.processed = create_round_payout(event_data, event.transaction_hash)
+            elif event_name == "u_pay":
+                
+                event.processed = update_round_payout(event_data, event.transaction_hash)
             event.save()
 
         except Exception as e:
