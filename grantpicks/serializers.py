@@ -53,6 +53,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'admins',
         ]
 
+
 class RoundSerializer(ModelSerializer):
     current_vault_balance_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
     vault_total_deposits_usd = TwoDecimalPlacesField(max_digits=20, decimal_places=2)
@@ -103,6 +104,7 @@ class RoundSerializer(ModelSerializer):
     remaining_dist_address = AccountSerializer()
     admins = AccountSerializer(many=True)
     remaining_dist_by = AccountSerializer()
+    contacts = ProjectContactSerializer(many=True, required=False)
 
 
 class RoundApplicationSerializer(ModelSerializer):
@@ -135,7 +137,13 @@ SIMPLE_PROJECT_EXAMPLE = {
     "overview": "This project aims to do something impactful.",
     "owner": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
     "payout_address": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
-    "contacts": [],
+    "contacts": [
+        {
+            "id": 2,
+            "name": "Email",
+            "value": "dvorak@gmail.com"
+        }
+    ],
     "contracts": [],
     "team_members": [],
     "repositories": [],
@@ -149,7 +157,13 @@ SIMPLE_ROUND_EXAMPLE = {
     "id": 1,
     "name": "InteractGrant TO Apply V1",
     "owner": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
-    "contacts": [],
+    "contacts": [
+        {
+            "id": 2,
+            "name": "Email",
+            "value": "dvorak@gmail.com"
+        }
+    ],
     "use_vault": True,
     "description": "This is a test round",
     "use_whitelist": False,
