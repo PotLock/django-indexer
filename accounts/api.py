@@ -23,8 +23,8 @@ from donations.serializers import (
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
-from lists.models import ListRegistration, ListRegistrationStatus
-from lists.serializers import PAGINATED_LIST_REGISTRATION_EXAMPLE, ListRegistrationSerializer, PaginatedListRegistrationsResponseSerializer
+from lists.models import List, ListRegistration, ListRegistrationStatus
+from lists.serializers import PAGINATED_LIST_EXAMPLE, PAGINATED_LIST_REGISTRATION_EXAMPLE, ListRegistrationSerializer, ListSerializer, PaginatedListRegistrationsResponseSerializer, PaginatedListsResponseSerializer
 from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 from pots.serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
@@ -441,3 +441,46 @@ class AccountListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
         results = self.paginate_queryset(registrations, request, view=self)
         serializer = ListRegistrationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+
+class AccountUpvotedListsAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedListsResponseSerializer,
+                description="Returns a paginated list of user upvoted lists",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for lists",
+                        value=PAGINATED_LIST_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            404: OpenApiResponse(description="Account not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+        upvoted_lists = List.objects.filter(upvotes__account=account)
+        results = self.paginate_queryset(upvoted_lists, request, view=self)
+        serializer = ListSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+

@@ -5,7 +5,7 @@ from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from base.serializers import TwoDecimalPlacesField
 
 from .models import Project, ProjectContact, ProjectContract, ProjectRepository, Round, Vote, VotePair
-from pots.models import PotApplication
+from pots.models import PotApplication, PotApplicationReview
 
 
 
@@ -107,6 +107,21 @@ class RoundSerializer(ModelSerializer):
     contacts = ProjectContactSerializer(many=True, required=False)
 
 
+class ApplicationReviewSerializer(ModelSerializer):
+    reviewer = AccountSerializer()
+    class Meta:
+        model = PotApplicationReview
+        fields = [
+            "reviewer",
+            "notes",
+            "status",
+            "reviewed_at",
+            "tx_hash"
+        ]
+
+
+
+
 class RoundApplicationSerializer(ModelSerializer):
 
     class Meta:
@@ -118,11 +133,13 @@ class RoundApplicationSerializer(ModelSerializer):
             "project",
             "message",
             "status",
+            "reviews",
             "submitted_at",
             "updated_at",
             "tx_hash",
         ]
 
+    reviews = ApplicationReviewSerializer(many=True)
     round = RoundSerializer()
     applicant = AccountSerializer()
     project = ProjectSerializer()

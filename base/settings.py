@@ -58,13 +58,26 @@ REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
-POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
-NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
+# POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "staging" else "potlock.near")
+# NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
+NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "staging" else "nadabot.near")
 STELLAR_CONTRACT_ID = "CBP5F3C5SPPJRNRJSOOQQKUGX2CE2G6BRV34MOEBHNFGBRQ5ZSXNGWAB" if ENVIRONMENT == "testnet" else "CBP5F3C5SPPJRNRJSOOQQKUGX2CE2G6BRV34MOEBHNFGBRQ5ZSXNGWAB"
 STELLAR_PROJECTS_REGISTRY_CONTRACT = "CBYUL5Y4GTIZAST3W2LVYKFTYNJA3EUG3MN4W2TTFONV6VXEACMRLBEP"
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
+
+# TODO: split settigns file by enviroment
+if ENVIRONMENT == "testnet":
+    POTLOCK_PATTERN = r'\.potlock\.testnet$'
+    NADABOT_PATTERN = r'\.nadabot\.testnet$'
+elif ENVIRONMENT == "staging":
+    POTLOCK_PATTERN = r'\.staging\.potlock\.near$'
+    NADABOT_PATTERN = r'\.staging\.nadabot\.near$'
+else:  # mainnet/prod
+    POTLOCK_PATTERN = r'(?<!\.staging)\.potlock\.near$'
+    NADABOT_PATTERN = r'(?<!\.staging)\.nadabot\.near$'
 
 FASTNEAR_RPC_URL = (
     "https://rpc.web4.testnet.page"
@@ -208,7 +221,8 @@ else:
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$"
+    "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$",
+    "^https?:\/\/.*\.?grantpicks\.com$"
 ]
 
 # REDIS / CACHE CONFIGS

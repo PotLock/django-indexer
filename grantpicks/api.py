@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, Count, Sum
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -20,14 +20,16 @@ from accounts.serializers import (
 )
 from api.pagination import pagination_parameters
 from api.pagination import CustomSizePageNumberPagination
+from base.api import StatsResponseSerializer
 from donations.models import Donation
 from donations.serializers import (
     PAGINATED_DONATION_EXAMPLE,
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
+from pots.models import PotPayout
 
-from .models import Project, ProjectStatus, Round
+from .models import Project, ProjectStatus, Round, Vote
 from .serializers import (
     PAGINATED_PROJECT_EXAMPLE,
     PAGINATED_ROUND_APPLICATION_EXAMPLE,
@@ -268,3 +270,109 @@ class ProjectListAPI(APIView, CustomSizePageNumberPagination):
         results = self.paginate_queryset(projects, request, view=self)
         serializer = ProjectSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+
+class AccountProjectListAPI(APIView, CustomSizePageNumberPagination):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=PaginatedProjectsResponseSerializer,
+                description="Returns a paginated list of a user's owned projects",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for projects",
+                        value=PAGINATED_PROJECT_EXAMPLE,
+                        response_only=True,
+                    ),
+                ],
+            ),
+            400: OpenApiResponse(description="Invalid status value"),
+            404: OpenApiResponse(description="owner not found"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        account_id = kwargs.get("account_id")
+
+        try:
+            account = Account.objects.get(id=account_id)
+        except Account.DoesNotExist:
+            return Response(
+                {"message": f"Account with ID {account_id} not found."}, status=404
+            )
+        projects = Project.objects.filter(owner=account)
+        results = self.paginate_queryset(projects, request, view=self)
+        serializer = ProjectSerializer(results, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class ProjectStatsAPI(APIView):
+    def dispatch(self, request, *args, **kwargs):
+        return super(ProjectStatsAPI, self).dispatch(request, *args, **kwargs)
+
+    
+    @method_decorator(
+        cache_page(60 * 5)
+    )
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("project_id", str, OpenApiParameter.PATH),
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH),
+            *pagination_parameters,
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Returns project statistics data",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for project statistics data",
+                        value={
+                            "total_fund_received": 87.2,
+                            "rounds_participated": 2,
+                            "total_votes": 2,
+                        },
+                        response_only=True,
+                    ),
+                ],
+            ),
+            500: OpenApiResponse(description="Internal server error"),
+        }
+    )
+    def get(self, request: Request, *args, **kwargs):
+        project_id = kwargs.get("project_id")
+        owner_address = kwargs.get("account_id")
+        project = Project.objects.get(id=project_id)
+
+        total_donations_usd = (
+            Donation.objects.all().aggregate(Sum("total_amount_usd"))[
+                "total_amount_usd__sum"
+            ]
+            or 0
+        )
+        total_fund_received = (
+            PotPayout.objects.filter(paid_at__isnull=False, recipient_id=owner_address).aggregate(
+                Sum("amount_paid_usd")
+            )["amount_paid_usd__sum"]
+            or 0
+        )
+        rounds = project.rounds_approved_in.count()
+        total_votes = Vote.objects.filter(pairs__project=project).aggregate(total_votes=Count('id'))['total_votes']
+
+        return Response(
+            {
+                "total_funds_received": total_fund_received,
+                "rounds_participated": rounds,
+                "total_votes": total_votes,
+            }
+        )

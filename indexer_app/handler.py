@@ -13,7 +13,7 @@ from stellar_sdk.soroban_rpc import GetEventsResponse
 from base.utils import convert_ns_to_utc
 from grantpicks.models import StellarEvent
 from nadabot.utils import match_nadabot_registry_pattern
-from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
+from pots.utils import is_relevant_account, match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import log_memory_usage, logger
 from .utils import (
@@ -88,9 +88,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             receiver_id = receipt_execution_outcome.receipt.receiver_id
             if (
                 receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
-                and not receiver_id.endswith(
-                    (settings.POTLOCK_TLA, settings.NADABOT_TLA)
-                )
+                and not is_relevant_account(receiver_id)
             ):
                 continue
             # 1. HANDLE LOGS
