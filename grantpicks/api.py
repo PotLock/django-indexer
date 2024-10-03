@@ -39,11 +39,10 @@ from .serializers import (
     PaginatedProjectsResponseSerializer,
     PaginatedRoundApplicationsResponseSerializer,
     PaginatedRoundsResponseSerializer,
-    PaginatedVotePairResponseSerializer,
+    PaginatedVotesResponseSerializer,
     ProjectSerializer,
     RoundApplicationSerializer,
     RoundSerializer,
-    VotePairSerializer,
     VoteSerializer,
 )
 
@@ -175,7 +174,7 @@ class ProjectRoundVotesAPI(APIView, CustomSizePageNumberPagination):
         ],
         responses={
             200: OpenApiResponse(
-                response=PaginatedVotePairResponseSerializer,  # Update to use the appropriate serializer
+                response=PaginatedVotesResponseSerializer,  # Update to use the appropriate serializer
                 description="Returns votes for a project in the round",
                 examples=[
                     OpenApiExample(

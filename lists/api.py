@@ -14,6 +14,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import Account
 from api.pagination import pagination_parameters
 from api.pagination import CustomSizePageNumberPagination
 
@@ -34,6 +35,12 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
+            OpenApiParameter(
+                "account",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter lists by account",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -50,12 +57,22 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
                     ),
                 ],
             ),
+            404: OpenApiResponse(description="Account not found"),
             500: OpenApiResponse(description="Internal server error"),
         },
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all()
+        account_id = request.query_params.get("account")
+        if account_id:
+            try:
+                account = Account.objects.get(id=account_id)
+                lists = lists.filter(owner=account)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Account with ID {account_id} not found."}, status=404
+                )
         results = self.paginate_queryset(lists, request, view=self)
         serializer = ListSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

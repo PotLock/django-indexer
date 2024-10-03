@@ -266,9 +266,22 @@ class PaginatedRoundApplicationsResponseSerializer(serializers.Serializer):
 
 
 
+class VotePairSerializer(serializers.ModelSerializer):
+    project = ProjectSerializer()
+
+    class Meta:
+        model = VotePair
+        fields = [
+            'pair_id',
+            'project',
+        ]
+
+
+
 class VoteSerializer(serializers.ModelSerializer):
     round = serializers.PrimaryKeyRelatedField(queryset=Round.objects.all())
     voter = AccountSerializer()
+    pairs = VotePairSerializer(many=True)
 
     class Meta:
         model = Vote
@@ -276,6 +289,7 @@ class VoteSerializer(serializers.ModelSerializer):
             'id',
             'round',
             'voter',
+            'pairs',
             'tx_hash',
             'voted_at',
         ]
@@ -288,19 +302,6 @@ class PaginatedVotesResponseSerializer(serializers.Serializer):
     previous = serializers.CharField(allow_null=True) 
     results = VoteSerializer(many=True)
 
-
-
-class VotePairSerializer(serializers.ModelSerializer):
-    vote = VoteSerializer() 
-    project = ProjectSerializer()
-
-    class Meta:
-        model = VotePair
-        fields = [
-            'vote',
-            'pair_id',
-            'project',
-        ]
 
 class PaginatedVotePairResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField() 

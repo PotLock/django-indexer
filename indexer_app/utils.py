@@ -669,8 +669,10 @@ async def handle_list_upvote(
             "created_at": created_at
         }
 
+        list_obj = List.objects.get(on_chain_id=data.get("list_id"))
+
         await ListUpvote.objects.aupdate_or_create(
-            list_id=data.get("list_id") or receiver_id,
+            list=list_obj,
             account_id=signer_id,
             defaults=up_default
         )
