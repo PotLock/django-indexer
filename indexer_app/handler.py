@@ -40,6 +40,7 @@ from .utils import (
     handle_pot_config_update,
     handle_registry_blacklist_action,
     handle_registry_unblacklist_action,
+    handle_remove_upvote,
     handle_set_factory_configs,
     handle_set_payouts,
     handle_social_profile_update,
@@ -424,6 +425,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 break
                             await handle_list_upvote(
                                 args_dict, receiver_id, signer_id, receipt.receipt_id, now_datetime
+                            )
+                            break
+                        case "remove_upvote":
+                            logger.info(f"removing upvote... {args_dict}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_remove_upvote(
+                                args_dict, receiver_id, signer_id
                             )
                             break
                         case "owner_add_admins":

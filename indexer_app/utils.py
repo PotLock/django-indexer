@@ -669,7 +669,7 @@ async def handle_list_upvote(
             "created_at": created_at
         }
 
-        list_obj = List.objects.get(on_chain_id=data.get("list_id"))
+        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
 
         await ListUpvote.objects.aupdate_or_create(
             list=list_obj,
@@ -693,6 +693,23 @@ async def handle_list_upvote(
         )
     except Exception as e:
         logger.error(f"Failed to upvote list, Error: {e}")
+
+
+
+async def handle_remove_upvote(
+    data: dict, receiver_id: str, signer_id: str
+):
+    try:
+
+        logger.info(f"remove upvote from list: {data}, {receiver_id}")
+        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
+        await ListUpvote.objects.filter(list=list_obj, account_id=signer_id).adelete()
+
+        logger.info(
+            f"Upvote removed successfully"
+        )
+    except Exception as e:
+        logger.error(f"Failed to remove upvote from list, Error: {e}")
 
 
 async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
