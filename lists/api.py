@@ -61,7 +61,7 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all()
         account_id = request.query_params.get("account")
@@ -152,7 +152,7 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
