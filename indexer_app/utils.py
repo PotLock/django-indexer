@@ -422,6 +422,7 @@ async def handle_new_list_registration(
     # Prepare data for insertion
     project_list = []
     insert_data = []
+    parent_list = await List.objects.aget(on_chain_id=reg_data[0]["list_id"])
     for dt in reg_data:
         logger.info(f"dt: {dt}")
         project_list.append({"chain_id":1, "id": dt["registrant_id"]})
@@ -429,7 +430,7 @@ async def handle_new_list_registration(
             {
                 "id": dt["id"],
                 "registrant_id": dt["registrant_id"],
-                "list_id": dt["list_id"],
+                "list_id": parent_list.id,
                 "status": dt["status"],
                 "submitted_at": datetime.fromtimestamp(dt["submitted_ms"] / 1000),
                 "updated_at": datetime.fromtimestamp(dt["updated_ms"] / 1000),
