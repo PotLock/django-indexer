@@ -854,6 +854,16 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         logger.error(f"Failed to remove list admin, Error: {e}")
 
 
+async def handle_list_owner_change(data):
+    try:
+        logger.info(f"changing owner... ...: {data}")
+        await List.objects.filter(id=data["list_id"]).aupdate(**{
+            "owner": data["new_owner_id"]
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to change list owner, Error: {e}")
+
 async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
     try:

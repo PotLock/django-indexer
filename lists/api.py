@@ -106,10 +106,10 @@ class ListDetailAPI(APIView):
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
-            list_obj = List.objects.get(id=list_id)
+            list_obj = List.objects.get(on_chain_id=list_id)
         except List.DoesNotExist:
             return Response(
-                {"message": f"List with ID {list_id} not found."}, status=404
+                {"message": f"List with onchain ID {list_id} not found."}, status=404
             )
         serializer = ListSerializer(list_obj)
         return Response(serializer.data)
@@ -156,10 +156,10 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
-            list_obj = List.objects.prefetch_related('registrations').get(id=list_id)
+            list_obj = List.objects.prefetch_related('registrations').get(on_chain_id=list_id)
         except List.DoesNotExist:
             return Response(
-                {"message": f"List with ID {list_id} not found."}, status=404
+                {"message": f"List with on chain ID {list_id} not found."}, status=404
             )
 
         registrations = list_obj.registrations.select_related().all()
@@ -214,10 +214,10 @@ class ListRandomRegistrationAPI(APIView):
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
-            list_obj = List.objects.get(id=list_id)
+            list_obj = List.objects.get(on_chain_id=list_id)
         except List.DoesNotExist:
             return Response(
-                {"message": f"List with ID {list_id} not found."}, status=404
+                {"message": f"List on chain ID {list_id} not found."}, status=404
             )
 
         registrations = list_obj.registrations.all()

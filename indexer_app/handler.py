@@ -22,6 +22,7 @@ from .utils import (
     handle_default_list_status_change,
     handle_delete_list,
     handle_list_admin_removal,
+    handle_list_owner_change,
     handle_list_registration_update,
     handle_list_upvote,
     handle_new_donation,
@@ -96,6 +97,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             log_data = []
             receipt = receipt_execution_outcome.receipt
             signer_id = receipt.receipt["Action"]["signer_id"]
+            LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
 
             log_processing_start = time.time()
             for log_index, log in enumerate(
@@ -138,6 +140,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         await handle_delete_list(
                             parsed_log.get("data")[0]
                         )
+                    if event_name == "owner_transfer":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_owner_change(
+                            parsed_log.get("data")[0]
+                        )
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -164,8 +172,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     # consider logging failures to logging service; for now, just skip
             #     print("here we are...")
             #     continue
-            method_call_processing_start = time.time()
-            LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
+            # method_call_processing_start = time.time()
             DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 
             for index, action in enumerate(
