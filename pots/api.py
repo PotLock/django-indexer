@@ -144,6 +144,13 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "status",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by application status",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -172,6 +179,13 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
         applications = pot.applications.all()
+        status_param = request.query_params.get("status")
+        if status_param:
+            if status_param not in PotApplicationStatus.values:
+                return Response(
+                    {"message": f"Invalid status value: {status_param}"}, status=400
+                )
+            applications = applications.filter(status=status_param)
         results = self.paginate_queryset(applications, request, view=self)
         serializer = PotApplicationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
