@@ -389,6 +389,43 @@ async def handle_new_list(
         logger.error(f"Failed to handle new list, Error: {e}")
 
 
+
+async def handle_list_update(
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
+):
+    try:
+
+        if not data:
+            data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
+
+
+        logger.info(f"updating list..... {data}")
+
+        listObject = await List.objects.filter(on_chain_id=data["id"]).aupdate(
+            owner_id=data["owner"],
+            default_registration_status=data["default_registration_status"],
+            name=data["name"],
+            description=data["description"],
+            cover_image_url=data["cover_image_url"],
+            admin_only_registrations=data["admin_only_registrations"],
+            created_at=datetime.fromtimestamp(data["created_at"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+        )
+
+        # if data.get("admins"):
+        #     for admin_id in data["admins"]:
+        #         admin_object, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        #             id=admin_id,
+        #         )
+        #         await listObject.admins.aadd(admin_object)
+    except Exception as e:
+        logger.error(f"Failed to handle list update, Error: {e}")
+
+
 async def handle_delete_list(
     data: dict
 ):
@@ -848,7 +885,7 @@ async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
     try:
 
         logger.info(f"updating admin...: {data}, {receiver_id}")
-        list_obj = await List.objects.aget(id=data["list_id"])
+        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
 
         for acct in data["admins"]:
             acct_obj = await Account.objects.aget(id=acct)

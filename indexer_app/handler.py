@@ -25,6 +25,7 @@ from .utils import (
     handle_list_owner_change,
     handle_list_registration_removal,
     handle_list_registration_update,
+    handle_list_update,
     handle_list_upvote,
     handle_new_donation,
     handle_new_group,
@@ -151,6 +152,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         if receiver_id != LISTS_CONTRACT:
                             continue
                         await handle_list_admin_ops(
+                            parsed_log.get("data")[0], receiver_id, signer_id, receipt.receipt_id
+                        )
+                    if event_name == "update_lis":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_update(
                             parsed_log.get("data")[0], receiver_id, signer_id, receipt.receipt_id
                         )
                 except json.JSONDecodeError:
@@ -433,6 +440,13 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_new_list(signer_id, receiver_id, status_obj, None)
+                            break
+
+                        case "update_list":
+                            logger.info(f"updating list... {args_dict}, {action}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_list_update(signer_id, receiver_id, status_obj, None)
                             break
 
                         case "upvote":
