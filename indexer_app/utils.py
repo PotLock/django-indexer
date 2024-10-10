@@ -888,11 +888,12 @@ async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
         list_obj = await List.objects.aget(on_chain_id=data["list_id"])
 
         for acct in data["admins"]:
-            acct_obj = await Account.objects.aget(id=acct)
-            if not await list_obj.admins.acontains(acct_obj):
-                await list_obj.admins.aadd(acct_obj)
-        for admin in list_obj.admins.all():
-            if not admin.id in data:
+            admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            contains = await list_obj.admins.acontains(admin)
+            if not contains:
+                await list_obj.admins.aadd(admin)
+        async for admin in list_obj.admins.all():
+            if not admin.id in data["admins"]:
                 await list_obj.admins.aremove(admin)
 
         activity = {
