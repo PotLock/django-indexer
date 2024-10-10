@@ -474,6 +474,19 @@ async def handle_new_list_registration(
         logger.error(f"Encountered error trying to insert activity: {e}")
 
 
+async def handle_list_registration_removal(
+    data: dict,
+    receiver_id: str,
+):
+    logger.info(f"list reg removal: {data}, {receiver_id}")
+    
+    try:
+        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
+        await list_obj.registrations.filter(id=data["registration_id"]).adelete()
+        
+    except Exception as e:
+        logger.error(f"Encountered error trying to remove reg: {e}")
+
 async def handle_list_registration_update(
     data: dict, receiver_id: str, status_obj: ExecutionOutcome
 ):
@@ -831,14 +844,19 @@ async def handle_payout_challenge_response(
         logger.error(f"Failed to handle admin challeneg response, Error: {e}")
 
 
-async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
+async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
     try:
 
-        logger.info(f"removing admin...: {data}, {receiver_id}")
+        logger.info(f"updating admin...: {data}, {receiver_id}")
         list_obj = await List.objects.aget(id=data["list_id"])
 
         for acct in data["admins"]:
-            await list_obj.admins.aremove({"admins_id": acct})  # maybe check
+            acct_obj = await Account.objects.aget(id=acct)
+            if not await list_obj.admins.acontains(acct_obj):
+                await list_obj.admins.aadd(acct_obj)
+        for admin in list_obj.admins.all():
+            if not admin.id in data:
+                await list_obj.admins.aremove(admin)
 
         activity = {
             "signer_id": signer_id,
@@ -848,7 +866,7 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         }
 
         activity, activity_created = await Activity.objects.aupdate_or_create(
-            type="Remove_List_Admin", defaults=activity
+            type="List_Admin_Ops", defaults=activity
         )
     except Exception as e:
         logger.error(f"Failed to remove list admin, Error: {e}")

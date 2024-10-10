@@ -183,6 +183,8 @@ if ENVIRONMENT == "testnet":
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:8080",
+        "http://dev.local",
+        "https://dev.local",
         "https://test.potlock.org",
         "https://test.potlock.xyz",
         "https://test.potlock.io",

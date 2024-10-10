@@ -21,8 +21,9 @@ from .utils import (
     handle_add_stamp,
     handle_default_list_status_change,
     handle_delete_list,
-    handle_list_admin_removal,
+    handle_list_admin_ops,
     handle_list_owner_change,
+    handle_list_registration_removal,
     handle_list_registration_update,
     handle_list_upvote,
     handle_new_donation,
@@ -145,6 +146,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             continue
                         await handle_list_owner_change(
                             parsed_log.get("data")[0]
+                        )
+                    if event_name == "update_admins":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_admin_ops(
+                            parsed_log.get("data")[0], receiver_id, signer_id, receipt.receipt_id
                         )
                 except json.JSONDecodeError:
                     logger.warning(
@@ -345,6 +352,19 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
+                        case (
+                            "unregister"
+                        ):  # TODO: listen for create_registration event instead of method call
+                            logger.info(
+                                f"registrations revoke incoming: {args_dict}, {action}"
+                            )
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_list_registration_removal(
+                                args_dict, receiver_id
+                            )
+                            break
+
                         case "chef_set_application_status":
                             logger.info(
                                 f"application status change incoming: {args_dict}"
@@ -405,17 +425,6 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             logger.info(f"fulfilling payouts..... {args_dict}")
                             await handle_transfer_payout(
                                 args_dict, receiver_id, receipt.receipt_id, now_datetime
-                            )
-                            break
-
-                        case (
-                            "owner_remove_admins"
-                        ):  # TODO: use update_admins event instead of method call to handle all cases
-                            logger.info(f"attempting to remove admins....: {args_dict}")
-                            if receiver_id != LISTS_CONTRACT:
-                                break
-                            await handle_list_admin_removal(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id
                             )
                             break
 
