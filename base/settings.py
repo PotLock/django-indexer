@@ -28,13 +28,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # TODO: update before prod release
-SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
+SECRET_KEY = os.environ.get("PL_DJANGO_SECRET_KEY", "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju")
 
 ALLOWED_HOSTS = [
     "ec2-100-27-57-47.compute-1.amazonaws.com",
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
+    "api.potlock.io"
     # "alpha.potlock.io",
 ]
 
@@ -59,11 +60,11 @@ REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
 # POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
-POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "staging" else "potlock.near")
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
-NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "staging" else "nadabot.near")
-STELLAR_CONTRACT_ID = "CBP5F3C5SPPJRNRJSOOQQKUGX2CE2G6BRV34MOEBHNFGBRQ5ZSXNGWAB" if ENVIRONMENT == "testnet" else "CBP5F3C5SPPJRNRJSOOQQKUGX2CE2G6BRV34MOEBHNFGBRQ5ZSXNGWAB"
-STELLAR_PROJECTS_REGISTRY_CONTRACT = "CBYUL5Y4GTIZAST3W2LVYKFTYNJA3EUG3MN4W2TTFONV6VXEACMRLBEP"
+NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
+STELLAR_CONTRACT_ID = "CCVVNTUD6CFPKZ2C4JAZIQGCAK2S6D6KPP5IELGHTHHJPYV2B62GPJTK" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = "CAUINLSA42RCTY35UFGOM2NLKMSRM6FW6NP7AR4GTUZHUQZZWB6CRBSJ" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
@@ -72,7 +73,7 @@ NEAR_SOCIAL_CONTRACT_ADDRESS = (
 if ENVIRONMENT == "testnet":
     POTLOCK_PATTERN = r'\.potlock\.testnet$'
     NADABOT_PATTERN = r'\.nadabot\.testnet$'
-elif ENVIRONMENT == "staging":
+elif ENVIRONMENT == "dev":
     POTLOCK_PATTERN = r'\.staging\.potlock\.near$'
     NADABOT_PATTERN = r'\.staging\.nadabot\.near$'
 else:  # mainnet/prod
