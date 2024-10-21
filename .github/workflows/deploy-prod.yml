@@ -32,8 +32,8 @@ jobs:
         id: vars
         run: |
           echo "DATETIME=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
-          echo "FILENAME=django-indexer-${DATETIME}.zip" >> $GITHUB_ENV
-          echo "S3_BUCKET=django-indexer" >> $GITHUB_ENV
+          echo "FILENAME=django-indexer-prod-${DATETIME}.zip" >> $GITHUB_ENV
+          echo "S3_BUCKET=django-indexer-prod" >> $GITHUB_ENV
 
       - name: Create zip of repository
         run: zip -r "${{ env.FILENAME }}" .
