@@ -347,7 +347,7 @@ def stellar_event_indexer():
     start_sequence = get_ledger_sequence()
     # start_sequence = 12169
     if not start_sequence:
-        start_sequence = 12169
+        start_sequence = 552451
     jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
     try:
         # Fetch events for the current sequence

@@ -50,18 +50,30 @@ poetry run python manage.py showmigrations >> "$LOG_FILE" 2>&1  # Logging full o
 PENDING_MIGRATIONS=$(poetry run python manage.py showmigrations | grep "\[ \]" | wc -l)  # Count unapplied migrations
 
 if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
-    echo "Migrations found; stopping services..." >> "$LOG_FILE"
-    sudo systemctl stop gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    # echo "Migrations found; stopping services..." >> "$LOG_FILE"
+    # sudo systemctl stop gunicorn celery-indexer-worker celery-beat-worker celery-beat
 
     echo 'Applying migrations...' >> "$LOG_FILE"
     poetry run python manage.py migrate >> "$LOG_FILE" 2>&1
 
-    echo 'Starting services...' >> "$LOG_FILE"
-    sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    # echo 'Starting services...' >> "$LOG_FILE"
+    # sudo systemctl start gunicorn celery-indexer-worker celery-beat-worker celery-beat
 else
-    echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
-    poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
-    sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker celery-beat
+    echo 'No migrations found.' >> "$LOG_FILE"
+    # echo 'No migrations found. Running collectstatic and restarting services...' >> "$LOG_FILE"
+    # poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
+    # sudo systemctl restart gunicorn celery-indexer-worker celery-beat-worker celery-beat
 fi
+
+# Collect static
+echo 'Running collectstatic...' >> "$LOG_FILE"
+poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
+
+# Gracefully reload Gunicorn to apply the changes without downtime
+echo 'Reloading Gunicorn...' >> "$LOG_FILE"
+sudo systemctl kill --signal=HUP gunicorn
+
+echo 'Restarting services...' >> "$LOG_FILE"
+sudo systemctl restart celery-indexer-worker celery-beat-worker celery-beat
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"

@@ -1,0 +1,51 @@
+name: Prod deploy to EC2 on Push
+
+on:
+  push:
+    branches: [prod]
+
+env:
+  AWS_REGION: "us-east-1"
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+jobs:
+  DeployToCodeDeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::471112976510:role/GitHubAction-AssumeRoleWithAction
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Generate appspec.yml for prod
+        run: cp appspec.yml appspec.yml
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          echo "DATETIME=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+          echo "FILENAME=django-indexer-${DATETIME}.zip" >> $GITHUB_ENV
+          echo "S3_BUCKET=django-indexer" >> $GITHUB_ENV
+
+      - name: Create zip of repository
+        run: zip -r "${{ env.FILENAME }}" .
+
+      - name: Upload repository to S3
+        run: aws s3 cp "${{ env.FILENAME }}" "s3://${{ env.S3_BUCKET }}/"
+
+      - name: Create CodeDeploy Deployment
+        id: deploy
+        run: |
+          aws deploy create-deployment \
+            --application-name django-indexer \
+            --deployment-group-name django-indexer-prod \
+            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --s3-location bucket=${{ env.S3_BUCKET }},bundleType=zip,key=${{ env.FILENAME }}
