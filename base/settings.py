@@ -32,6 +32,7 @@ SECRET_KEY = os.environ.get("PL_DJANGO_SECRET_KEY", "django-insecure-=r_v_es6w6r
 
 ALLOWED_HOSTS = [
     "ec2-100-27-57-47.compute-1.amazonaws.com",
+    "ec2-44-208-38-31.compute-1.amazonaws.com",
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
