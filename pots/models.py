@@ -5,11 +5,12 @@ import requests
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
 
 from accounts.models import Account
 from base.logging import logger
 from base.utils import format_date
-from tokens.models import Token, TokenHistoricalPrice
+from tokens.models import Token
 
 
 class PotFactory(models.Model):
@@ -393,6 +394,8 @@ class PotApplicationStatus(models.TextChoices):
     APPROVED = "Approved", "Approved"
     REJECTED = "Rejected", "Rejected"
     INREVIEW = "InReview", "InReview"
+    BLACKLISTED = "Blacklisted", "Blacklisted"
+
 
 
 class PotApplication(models.Model):
@@ -405,16 +408,34 @@ class PotApplication(models.Model):
         Pot,
         on_delete=models.CASCADE,
         related_name="applications",
-        null=False,
+        null=True,
+        blank=True,
         help_text=_("Pot applied to."),
         db_index=True,
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="applications",
+        null=True,
+        blank=True,
+        help_text=_("Round applied to."),
+        db_index=True,
+    )
+    project = models.ForeignKey(
+        "grantpicks.Project",
+        on_delete=models.CASCADE,
+        related_name="applications",
+        null=True,
+        blank=True,
+        help_text=_("Project that applied."),
     )
     applicant = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
         related_name="pot_applications",
         null=False,
-        help_text=_("Account that applied to the pot."),
+        help_text=_("Account that applied to the pot or round."),
         db_index=True,
     )
     message = models.TextField(
@@ -452,11 +473,30 @@ class PotApplication(models.Model):
 
     class Meta:
         verbose_name_plural = "Pot Applications"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="pot_or_round"
+            )
+        ]
 
-        unique_together = (("pot", "applicant"),)
+    def clean(self):
+        if self.pot is None and self.round is None:
+            raise ValidationError(_("Either pot or round must be specified."))
+        if self.pot is not None and self.round is not None:
+            raise ValidationError(_("Only one of pot or round can be specified."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.applicant.id} - {self.pot}"
+        if self.pot:
+            return f"{self.applicant.id} - {self.pot}"
+        return f"{self.applicant.id} - {self.round}"
 
 
 class PotApplicationReview(models.Model):
@@ -517,13 +557,36 @@ class PotPayout(models.Model):
         primary_key=True,
         help_text=_("Payout id."),
     )
+    on_chain_id =models.IntegerField(
+        _("contract payout id"),
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_("Payout id in contract"),
+        db_index=True
+    )
     pot = models.ForeignKey(
         Pot,
         on_delete=models.CASCADE,
         related_name="payouts",
-        null=False,
+        null=True,
         help_text=_("Pot that this payout is for."),
         db_index=True,
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout is for."),
+        db_index=True,
+    )
+    memo = models.CharField(
+        _("payout memo"),
+        null=True,
+        blank=True,
+        help_text=_("Round payout memo"),
     )
     recipient = models.ForeignKey(
         Account,
@@ -567,6 +630,28 @@ class PotPayout(models.Model):
         help_text=_("Transaction hash."),
     )
 
+    class Meta:
+        verbose_name_plural = "Pot Payouts"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="payout_pot_or_round"
+            )
+        ]
+
+    def clean(self):
+        if self.pot is None and self.round is None:
+            raise ValidationError(_("Either pot or round must be specified."))
+        if self.pot is not None and self.round is not None:
+            raise ValidationError(_("Only one of pot or round can be specified."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     ### Fetches USD prices for the Donation record and saves USD totals
     def fetch_usd_prices(self):
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
@@ -581,7 +666,7 @@ class PotPayout(models.Model):
             self.amount_paid_usd = token.format_price(self.amount) * price_usd
             self.save()
             logger.info(
-                f"Saved USD prices for pot payout for pot id: {self.pot.account}"
+                f"Saved USD prices for pot payout for pot id: {self.pot.account if self.pot else self.round}"
             )
         except Exception as e:
             logger.error(f"Failed to calculate and save USD prices: {e}")
@@ -604,8 +689,17 @@ class PotPayoutChallenge(models.Model):
         Pot,
         on_delete=models.CASCADE,
         related_name="challenges",
-        null=False,
+        null=True,
         help_text=_("Pot challenged."),
+    )
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts_challenges",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout challenge is for."),
+        db_index=True,
     )
     created_at = models.DateTimeField(
         _("created at"),
@@ -628,12 +722,19 @@ class PotPayoutChallenge(models.Model):
     class Meta:
         verbose_name_plural = "Payout Challenges"
 
-        unique_together = (("challenger", "pot"),)
-
-    class Meta:
-        verbose_name_plural = "Payout Challenges"
-
-        unique_together = (("challenger", "pot"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['challenger', 'pot'],
+                name='unique_challenger_pot'
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(pot__isnull=False) & models.Q(round__isnull=True) |
+                    models.Q(pot__isnull=True) & models.Q(round__isnull=False)
+                ),
+                name="payout_challenge_pot_or_round"
+            )
+        ]
 
 
 class PotPayoutChallengeAdminResponse(models.Model):
@@ -658,6 +759,16 @@ class PotPayoutChallengeAdminResponse(models.Model):
         null=True,
         blank=True,
         help_text=_("Pot being challenged."),
+    )
+
+    round = models.ForeignKey(
+        "grantpicks.Round",
+        on_delete=models.CASCADE,
+        related_name="payouts_challenge_responses",
+        null=True,
+        blank=True,
+        help_text=_("Round that this payout challenge response is for."),
+        db_index=True,
     )
 
     admin = models.ForeignKey(

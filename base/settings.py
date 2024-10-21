@@ -28,13 +28,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # TODO: update before prod release
-SECRET_KEY = "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju"
+SECRET_KEY = os.environ.get("PL_DJANGO_SECRET_KEY", "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju")
 
 ALLOWED_HOSTS = [
     "ec2-100-27-57-47.compute-1.amazonaws.com",
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
+    "api.potlock.io"
     # "alpha.potlock.io",
 ]
 
@@ -58,12 +59,26 @@ REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 
-POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
-NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
-
+# POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
+POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
+# NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
+NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
+STELLAR_CONTRACT_ID = "CCVVNTUD6CFPKZ2C4JAZIQGCAK2S6D6KPP5IELGHTHHJPYV2B62GPJTK" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = "CAUINLSA42RCTY35UFGOM2NLKMSRM6FW6NP7AR4GTUZHUQZZWB6CRBSJ" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
+
+# TODO: split settigns file by enviroment
+if ENVIRONMENT == "testnet":
+    POTLOCK_PATTERN = r'\.potlock\.testnet$'
+    NADABOT_PATTERN = r'\.nadabot\.testnet$'
+elif ENVIRONMENT == "dev":
+    POTLOCK_PATTERN = r'\.staging\.potlock\.near$'
+    NADABOT_PATTERN = r'\.staging\.nadabot\.near$'
+else:  # mainnet/prod
+    POTLOCK_PATTERN = r'(?<!\.staging)\.potlock\.near$'
+    NADABOT_PATTERN = r'(?<!\.staging)\.nadabot\.near$'
 
 FASTNEAR_RPC_URL = (
     "https://rpc.web4.testnet.page"
@@ -106,6 +121,7 @@ INSTALLED_APPS = [
     "tokens",
     "nadabot",
     "chains",
+    "grantpicks"
 ]
 
 DEFAULT_PAGE_SIZE = 30
@@ -168,6 +184,8 @@ if ENVIRONMENT == "testnet":
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:8080",
+        "http://dev.local",
+        "https://dev.local",
         "https://test.potlock.org",
         "https://test.potlock.xyz",
         "https://test.potlock.io",
@@ -206,7 +224,8 @@ else:
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$"
+    "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$",
+    "^https?:\/\/.*\.?grantpicks\.com$"
 ]
 
 # REDIS / CACHE CONFIGS

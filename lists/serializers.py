@@ -3,7 +3,13 @@ from rest_framework.serializers import ModelSerializer, SerializerMethodField
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 
-from .models import List, ListRegistration
+from .models import List, ListRegistration, ListUpvote
+
+
+class ListUpvoteSerializer(ModelSerializer):
+    class Meta:
+        model = ListUpvote
+        fields = '__all__'
 
 
 class ListSerializer(ModelSerializer):
@@ -16,6 +22,8 @@ class ListSerializer(ModelSerializer):
             "admins",
             "name",
             "description",
+            "upvotes",
+            "registrations_count",
             "cover_image_url",
             "admin_only_registrations",
             "default_registration_status",
@@ -25,6 +33,11 @@ class ListSerializer(ModelSerializer):
 
     owner = AccountSerializer()
     admins = AccountSerializer(many=True)
+    upvotes = ListUpvoteSerializer(many=True)
+    registrations_count = SerializerMethodField()
+    
+    def get_registrations_count(self, obj):
+        return obj.registrations.count()
 
     # def get_owner(self, obj):
     #     return AccountSerializer(obj.owner).data

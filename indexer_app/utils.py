@@ -7,13 +7,14 @@ import requests
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
-from django.forms.models import model_to_dict
+from django.db import transaction
 from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
 
 from accounts.models import Account
 from activities.models import Activity
 from donations.models import Donation
+from grantpicks.models import Project, ProjectContact, ProjectContract, ProjectFundingHistory, ProjectRepository, ProjectStatus, Round, RoundDeposit, Vote, VotePair
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
 from nadabot.models import BlackList, Group, NadabotRegistry, Provider, Stamp
@@ -21,6 +22,7 @@ from pots.models import (
     Pot,
     PotApplication,
     PotApplicationReview,
+    PotApplicationStatus,
     PotFactory,
     PotPayout,
     PotPayoutChallenge,
@@ -330,17 +332,30 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         logger.error(f"Failed to handle new pot Factory, Error: {e}")
 
 
+async def handle_new_list_and_reg(signer_id: str, receiver_id: str, status_obj: ExecutionOutcome, receipt: Receipt):
+    create_data, reg_data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
+    await handle_new_list(signer_id, receiver_id, None, create_data)
+    if reg_data:
+        await handle_new_list_registration(reg_data, receiver_id, signer_id, receipt, None)
+    pass
+
+
 async def handle_new_list(
-    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
 ):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
     try:
 
-        data = json.loads(
-            base64.b64decode(status_obj.status.get("SuccessValue")).decode(
-                "utf-8"
-            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
-        )
+        if not data:
+            data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
 
         logger.info("upserting involveed accts...")
 
@@ -374,12 +389,58 @@ async def handle_new_list(
         logger.error(f"Failed to handle new list, Error: {e}")
 
 
+
+async def handle_list_update(
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
+):
+    try:
+
+        if not data:
+            data = json.loads(
+                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+                    "utf-8"
+                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+            )
+
+
+        logger.info(f"updating list..... {data}")
+
+        listObject = await List.objects.filter(on_chain_id=data["id"]).aupdate(
+            owner_id=data["owner"],
+            default_registration_status=data["default_registration_status"],
+            name=data["name"],
+            description=data["description"],
+            cover_image_url=data["cover_image_url"],
+            admin_only_registrations=data["admin_only_registrations"],
+            created_at=datetime.fromtimestamp(data["created_at"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+        )
+
+        # if data.get("admins"):
+        #     for admin_id in data["admins"]:
+        #         admin_object, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        #             id=admin_id,
+        #         )
+        #         await listObject.admins.aadd(admin_object)
+    except Exception as e:
+        logger.error(f"Failed to handle list update, Error: {e}")
+
+
+async def handle_delete_list(
+    data: dict
+):
+    try:
+        logger.info(f"deleting list..... {data}")
+        lst = await List.objects.filter(on_chain_id=data["list_id"]).adelete()
+    except Exception as e:
+        logger.error(f"Failed to delete, Error: {e}")
+
 async def handle_new_list_registration(
     data: dict,
     receiver_id: str,
     signer_id: str,
     receipt: Receipt,
-    status_obj: ExecutionOutcome,
+    status_obj: ExecutionOutcome | None,
 ):
     logger.info(f"new Project data: {data}, {receiver_id}")
 
@@ -387,14 +448,18 @@ async def handle_new_list_registration(
     if receipt is None:
         return
 
-    reg_data = json.loads(
-        base64.b64decode(status_obj.status["SuccessValue"]).decode(
-            "utf-8"
-        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
-    )
+    if status_obj:
+        reg_data = json.loads(
+            base64.b64decode(status_obj.status["SuccessValue"]).decode(
+                "utf-8"
+            )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+        )
+    else:
+        reg_data = data
     # Prepare data for insertion
     project_list = []
     insert_data = []
+    parent_list = await List.objects.aget(on_chain_id=reg_data[0]["list_id"])
     for dt in reg_data:
         logger.info(f"dt: {dt}")
         project_list.append({"chain_id":1, "id": dt["registrant_id"]})
@@ -402,7 +467,7 @@ async def handle_new_list_registration(
             {
                 "id": dt["id"],
                 "registrant_id": dt["registrant_id"],
-                "list_id": dt["list_id"],
+                "list_id": parent_list.id,
                 "status": dt["status"],
                 "submitted_at": datetime.fromtimestamp(dt["submitted_ms"] / 1000),
                 "updated_at": datetime.fromtimestamp(dt["updated_ms"] / 1000),
@@ -445,6 +510,19 @@ async def handle_new_list_registration(
     except Exception as e:
         logger.error(f"Encountered error trying to insert activity: {e}")
 
+
+async def handle_list_registration_removal(
+    data: dict,
+    receiver_id: str,
+):
+    logger.info(f"list reg removal: {data}, {receiver_id}")
+    
+    try:
+        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
+        await list_obj.registrations.filter(id=data["registration_id"]).adelete()
+        
+    except Exception as e:
+        logger.error(f"Encountered error trying to remove reg: {e}")
 
 async def handle_list_registration_update(
     data: dict, receiver_id: str, status_obj: ExecutionOutcome
@@ -558,9 +636,7 @@ async def handle_pot_application_status_change(
         )
 
         # Retrieve the PotApplication object
-        appl = await PotApplication.objects.filter(
-            applicant_id=data["project_id"]
-        ).afirst()
+        appl = await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).afirst()
 
         if not appl:
             logger.error(
@@ -579,14 +655,14 @@ async def handle_pot_application_status_change(
         }
 
         await PotApplicationReview.objects.aupdate_or_create(
-            application_id=appl.id,
+            application=appl,
             reviewer_id=signer_id,
             reviewed_at=updated_at,
             defaults=defaults,
         )
 
         # Update the PotApplication object
-        await PotApplication.objects.filter(applicant_id=data["project_id"]).aupdate(
+        await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).aupdate(
             **{"status": update_data["status"], "updated_at": updated_at}
         )
 
@@ -629,7 +705,7 @@ async def handle_default_list_status_change(
 
 
 async def handle_list_upvote(
-    data: dict, receiver_id: str, signer_id: str, receiptId: str
+    data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
 
@@ -639,11 +715,17 @@ async def handle_list_upvote(
             id=signer_id,
         )
 
-        created_at = datetime.now()
+
+        up_default = {
+            "created_at": created_at
+        }
+
+        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
 
         await ListUpvote.objects.aupdate_or_create(
-            list_id=data.get("list_id") or receiver_id,
+            list=list_obj,
             account_id=signer_id,
+            defaults=up_default
         )
 
         defaults = {
@@ -662,6 +744,23 @@ async def handle_list_upvote(
         )
     except Exception as e:
         logger.error(f"Failed to upvote list, Error: {e}")
+
+
+
+async def handle_remove_upvote(
+    data: dict, receiver_id: str, signer_id: str
+):
+    try:
+
+        logger.info(f"remove upvote from list: {data}, {receiver_id}")
+        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
+        await ListUpvote.objects.filter(list=list_obj, account_id=signer_id).adelete()
+
+        logger.info(
+            f"Upvote removed successfully"
+        )
+    except Exception as e:
+        logger.error(f"Failed to remove upvote from list, Error: {e}")
 
 
 async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
@@ -782,14 +881,20 @@ async def handle_payout_challenge_response(
         logger.error(f"Failed to handle admin challeneg response, Error: {e}")
 
 
-async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
+async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
     try:
 
-        logger.info(f"removing admin...: {data}, {receiver_id}")
-        list_obj = await List.objects.aget(id=data["list_id"])
+        logger.info(f"updating admin...: {data}, {receiver_id}")
+        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
 
         for acct in data["admins"]:
-            list_obj.admins.remove({"admins_id": acct})  # maybe check
+            admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            contains = await list_obj.admins.acontains(admin)
+            if not contains:
+                await list_obj.admins.aadd(admin)
+        async for admin in list_obj.admins.all():
+            if not admin.id in data["admins"]:
+                await list_obj.admins.aremove(admin)
 
         activity = {
             "signer_id": signer_id,
@@ -799,11 +904,21 @@ async def handle_list_admin_removal(data, receiver_id, signer_id, receiptId):
         }
 
         activity, activity_created = await Activity.objects.aupdate_or_create(
-            type="Remove_List_Admin", defaults=activity
+            type="List_Admin_Ops", defaults=activity
         )
     except Exception as e:
         logger.error(f"Failed to remove list admin, Error: {e}")
 
+
+async def handle_list_owner_change(data):
+    try:
+        logger.info(f"changing owner... ...: {data}")
+        await List.objects.filter(id=data["list_id"]).aupdate(**{
+            "owner": data["new_owner_id"]
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to change list owner, Error: {e}")
 
 async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
@@ -836,6 +951,8 @@ async def handle_set_factory_configs(data, receiverId):
         await config_update()
     except Exception as e:
         logger.error(f"Failed to update factory configs, Error: {e}")
+
+
 
 
 # # TODO: Need to abstract some actions.
@@ -1207,3 +1324,414 @@ def get_block_height() -> int:
     record = BlockHeight.objects.filter(id=1).first()
     if record:
         return record.block_height
+    return 130852956
+    
+
+
+def update_ledger_sequence(sequence, timestamp: datetime):
+    BlockHeight.objects.update_or_create(
+        id=2,
+        defaults={
+            "block_height": sequence,
+            "block_timestamp": timestamp,
+            "updated_at": timezone.now(),
+        },
+    )
+
+def get_ledger_sequence() -> int:
+    record = BlockHeight.objects.filter(id=2).first()
+    if record:
+        return record.block_height
+
+
+def update_approved_projects(event_data):
+    round_id, project_ids = event_data[0], event_data[1]
+
+    with transaction.atomic():
+        try:
+            round_obj = Round.objects.get(on_chain_id=round_id)
+            for ids in project_ids:
+                project = Project.objects.get(id=ids)
+                round_obj.approved_projects.add(project)
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating application for Round {round_id}: {e}")
+            return False
+
+def update_application(event_data, txhash):
+    round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
+
+    with transaction.atomic():
+        try:
+            round_obj = Round.objects.get(on_chain_id=round_id)
+            applicant = Account.objects.get(id=application_data['applicant_id'])
+
+            reviewer = Account.objects.get(id=reviewer_id)
+
+            status = PotApplicationStatus[application_data['status'][0].upper()]
+            submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
+            updated_at = datetime.fromtimestamp(application_data['updated_ms'] / 1000)
+
+            defaults = {
+                "notes": application_data.get("review_notes"),
+                "status": application_data['status'][0],
+                "tx_hash": txhash,
+            }
+            
+            appl = PotApplication.objects.filter(
+                applicant_id=application_data["applicant_id"]
+            ).first()
+
+            PotApplicationReview.objects.update_or_create(
+                application_id=appl.id,
+                reviewer=reviewer,
+                reviewed_at=updated_at,
+                defaults=defaults,
+            )
+
+            # Update the PotApplication object
+            PotApplication.objects.filter(applicant_id=application_data["applicant_id"]).update(
+                **{"status": application_data["status"], "updated_at": updated_at}
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating application for Round {round_id}: {e}")
+            return False
+
+
+
+def process_vote_event(event_data, tx_hash):
+    try:
+        with transaction.atomic():
+            
+            round_id, vote_data = event_data[0], event_data[1]
+
+            round_obj = Round.objects.get(on_chain_id=round_id)
+            voter, _ = Account.objects.get_or_create(id=vote_data['voter'])
+            voted_at = datetime.fromtimestamp(vote_data['voted_ms'] / 1000)
+
+            # Create or update the Vote
+            vote, created = Vote.objects.update_or_create(
+                round=round_obj,
+                voter=voter,
+                defaults={
+                    'tx_hash': tx_hash,
+                    'voted_at': voted_at
+                }
+            )
+
+            # Process vote pairs
+            for pick in vote_data['picks']:
+                pair_id = pick['pair_id']
+                project_id = pick['project_id']
+                
+                # Assuming project_id corresponds to PotApplication id
+                project_voted = Project.objects.get(id=project_id)
+                
+                VotePair.objects.update_or_create(
+                    vote=vote,
+                    pair_id=pair_id,
+                    defaults={'project': project_voted}
+                )
+
+            logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}")
+            return True
+    except Exception as e:
+        logger.error(f"Error processing vote for Round: {str(e)}")
+        return False
+
+
+def process_project_event(event_data):
+    try:
+        # Extract project data
+        project_data = event_data
+
+        # Create or get the owner Account
+        owner, _ = Account.objects.get_or_create(id=project_data['owner'])
+
+        # Create or get the payout Account
+        payout_address, _ = Account.objects.get_or_create(id=project_data['payout_address'])
+
+        # Create the Project
+        project, created = Project.objects.update_or_create(
+            on_chain_id=project_data['id'],
+            defaults={
+                'image_url': project_data['image_url'],
+                'video_url': project_data['video_url'],
+                'name': project_data['name'],
+                'overview': project_data['overview'],
+                'owner': owner,
+                'payout_address': payout_address,
+                'status': ProjectStatus("NEW").name,
+                'submited_ms': project_data['submited_ms'],
+                'updated_ms': project_data['updated_ms'],
+            }
+        )
+
+        for contact_data in project_data['contacts']:
+            contact, _ = ProjectContact.objects.get_or_create(
+                name=contact_data['name'],
+                value=contact_data['value']
+            )
+            project.contacts.add(contact)
+
+        for contract_data in project_data['contracts']:
+            contract, _ = ProjectContract.objects.get_or_create(
+                name=contract_data['name'],
+                contract_address=contract_data['contract_address']
+            )
+            project.contracts.add(contract)
+
+        # Create and associate ProjectRepositories
+        for repo_data in project_data['repositories']:
+            repo, _ = ProjectRepository.objects.get_or_create(
+                label=repo_data['label'],
+                url=repo_data['url']
+            )
+            project.repositories.add(repo)
+
+        for funding_data in project_data['funding_histories']:
+            ProjectFundingHistory.objects.create(
+                source=funding_data['source'],
+                amount=funding_data['amount'],
+                denomination=funding_data['denomiation'],  # Note: There's a typo in the event data
+                description=funding_data['description'],
+                timestamp=timezone.datetime.fromtimestamp(funding_data['funded_ms'] / 1000)
+            )
+
+        # Associate admins
+        for admin_address in project_data['admins']:
+            admin, _ = Account.objects.get_or_create(id=admin_address)
+            project.admins.add(admin)
+
+        # Associate team members
+        for team_member_data in project_data['team_members']:
+            team_member, _ = Account.objects.get_or_create(id=team_member_data['value'])
+            project.team_members.add(team_member)
+
+        if created:
+            logger.info(f"Created new Project: {project.id}")
+        else:
+            logger.info(f"Updated existing Project: {project.id}")
+        
+        return True
+
+    except Exception as e:
+        logger.error(f"Error processing project event: {str(e)}")
+        return False
+
+
+
+def create_or_update_round(event_data, contract_id, timestamp):
+    try:
+        # Create Round
+        round_id = event_data.get('id')
+        owner_address = event_data.get('owner')
+        owner, _ = Account.objects.get_or_create(id=owner_address)
+        factory_contract, _ = Account.objects.get_or_create(id=contract_id)
+        remaining_dist_address = event_data.get('remaining_dist_address')
+        remaining_dist_address_obj, _ = Account.objects.get_or_create(id=remaining_dist_address)
+
+        round_obj, created = Round.objects.update_or_create(
+            on_chain_id=round_id,
+            defaults={
+                'owner': owner,
+                'factory_contract': factory_contract,
+                'name': event_data.get('name'),
+                'description': event_data.get('description'),
+                'expected_amount': event_data.get('expected_amount'),
+                'application_start': datetime.fromtimestamp(event_data.get('application_start_ms') / 1000) if event_data.get('application_start_ms') else None,
+                'application_end': datetime.fromtimestamp(event_data.get('application_end_ms') / 1000) if event_data.get('application_end_ms') else None,
+                'voting_start': datetime.fromtimestamp(event_data.get('voting_start_ms') / 1000),
+                'voting_end': datetime.fromtimestamp(event_data.get('voting_end_ms') / 1000),
+                'use_whitelist': event_data.get('use_whitelist'),
+                'use_vault': event_data.get('use_vault'),
+                'num_picks_per_voter': event_data.get('num_picks_per_voter'),
+                'max_participants': event_data.get('max_participants'),
+                'allow_applications': event_data.get('allow_applications'),
+                'allow_remaining_dist': event_data.get('allow_remaining_dist'),
+                'compliance_end': datetime.fromtimestamp(event_data.get('compliance_end_ms') / 1000) if event_data.get('compliance_end_ms') else None,
+                'compliance_period_ms': event_data.get('compliance_period_ms'),
+                'compliance_req_desc': event_data.get('compliance_req_desc'),
+                'cooldown_end': datetime.fromtimestamp(event_data.get('cooldown_end_ms') / 1000) if event_data.get('cooldown_end_ms') else None,
+                'cooldown_period_ms': event_data.get('cooldown_period_ms'),
+                'is_video_required': event_data.get('is_video_required'),
+                'referrer_fee_basis_points': event_data.get('referrer_fee_basis_points'),
+                'remaining_dist_address_id': remaining_dist_address,
+                'remaining_dist_at_ms': datetime.fromtimestamp(event_data.get('remaining_dist_at_ms') / 1000) if event_data.get('remaining_dist_at_ms') else None,
+                'remaining_dist_by_id': event_data.get('remaining_dist_by'),
+                'remaining_dist_memo': event_data.get('remaining_dist_memo'),
+                'round_complete': datetime.fromtimestamp(event_data.get('round_complete_ms') / 1000) if event_data.get('round_complete_ms') else None,
+                'vault_total_deposits': event_data.get('vault_total_deposits'),
+                'current_vault_balance': event_data.get('current_vault_balance'),
+                'deployed_at': timestamp
+            }
+        )
+
+        # Create contacts for the round
+        for contact in event_data.get('contacts', []):
+            contact_obj, created = ProjectContact.objects.update_or_create(
+                name=contact['name'],
+                value=contact['value']
+            )
+            round_obj.contacts.add(contact_obj)
+        
+        logger.info(f"Created/Updated Round: {round_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error processing rounds event: {str(e)}")
+        return False
+
+
+def process_application_to_round(event_data, tx_hash):
+    try:
+        # Process application to Round
+        round_id, application_data = event_data[0], event_data[1]
+        applicant_id = application_data.get('applicant_id')
+        status = PotApplicationStatus[application_data['status'][0].upper()]
+        submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
+        updated_at = (
+            datetime.fromtimestamp(application_data['updated_ms'] / 1000)
+            if application_data['updated_ms'] else None
+        )
+
+        round_obj = Round.objects.get(on_chain_id=round_id)
+        applicant, _ = Account.objects.get_or_create(id=applicant_id)
+
+        pot_application, created = PotApplication.objects.update_or_create(
+            round=round_obj,
+            applicant=applicant,
+            defaults={
+                'message': application_data['applicant_note'],
+                'status': status,
+                'submitted_at': submitted_at,
+                'updated_at': updated_at,
+                'tx_hash': tx_hash
+            }
+        )
+        logger.info(f"Processed application for Round: {round_id}, Applicant: {applicant_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error processing rounds applications event: {str(e)}")
+        return False
+
+
+
+def create_round_application(event_data, tx_hash):
+    try:
+
+        round_id, application_data = event_data[0], event_data[1]
+        applicant, _ = Account.objects.get_or_create(id=application_data["applicant_id"])
+        round_obj = Round.objects.get(on_chain_id=round_id)
+        logger.info(f"Creating application for round: {round_id}")
+        
+        appl_defaults = {
+            "message": application_data["applicant_note"],
+            "submitted_at": datetime.fromtimestamp(application_data["submited_ms"] / 1000),
+            "status": application_data["status"][0],
+            "tx_hash": tx_hash,
+        }
+        
+        PotApplication.objects.update_or_create(
+            applicant=applicant,
+            round=round_obj,
+            project_id=application_data["project_id"],
+            defaults=appl_defaults,
+        )
+
+        return True
+    except Exception as e:
+        logger.error(f"Error creating applications to rounds: {str(e)}")
+        return False
+
+
+def process_rounds_deposit_event(event_data, tx_hash):
+    try:
+
+        # Process deposit event
+        round_id, deposit_data = event_data
+        round_obj = Round.objects.get(on_chain_id=round_id)
+        amount = deposit_data["total_amount"]
+        depositor, _ = Account.objects.get_or_create(id=deposit_data["depositor_id"])
+        
+        # Create or update a RoundDeposit object
+        deposit, created = RoundDeposit.objects.update_or_create(
+            round=round_obj,
+            on_chain_id=deposit_data["deposit_id"],
+            depositor=depositor,
+            defaults={
+                'amount': amount,
+                'protocol_fee': deposit_data["protocol_fee"],
+                'referrer_fee': deposit_data["referrer_fee"],
+                'tx_hash': tx_hash,
+                'deposit_at': datetime.fromtimestamp(deposit_data["deposited_at"] / 1000),
+            }
+        )
+        
+        round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + amount)
+        round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + deposit_data["net_amount"])
+        round_obj.save()
+        round_obj.update_vault_usd_equivalent()
+
+        logger.info(f"Processed deposit for Round: {round_id}, Depositor: {depositor.id}, Amount: {amount}")
+        return True
+    except Exception as e:
+        logger.error(f"Error processing deposits to rounds: {str(e)}")
+        return False
+
+
+
+def create_round_payout(event_data, tx_hash):
+    try:
+
+        round_id, payout_data = event_data
+        amount = payout_data["amount"]
+        recipient_id = payout_data["recipient_id"]
+        memo = payout_data.get("memo")
+
+        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain_id":2},id="stellar")
+        stellar_token, _ = Token.objects.get_or_create(
+            account=stellar_token_acct
+        ) 
+
+        payout = PotPayout(
+            round_id=round_id,
+            on_chain_id=payout_data["id"],
+            amount=amount,
+            recipient_id=recipient_id,
+            memo=memo,
+            token=stellar_token,
+            paid_at=None,
+            tx_hash=tx_hash,
+        )
+        payout.save()
+        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}.")
+        return True
+    except Exception as e:
+        logger.error(f"Error creating round payout: {str(e)}")
+        return False
+
+
+def update_round_payout(event_data, tx_hash):
+    try:
+        _, payout_data = event_data
+        payout_on_chain_id = payout_data["id"]
+        amount = payout_data["amount"]
+        paid_at_ms = payout_data.get("paid_at_ms")
+        recipient_id, _ = Account.objects.get_or_create(id=payout_data["recipient_id"])
+        memo = payout_data.get("memo")
+        payout = PotPayout.objects.get(on_chain_id=payout_on_chain_id)
+        payout.amount = amount
+        payout.paid_at = datetime.fromtimestamp(paid_at_ms / 1000)
+        payout.recipient = recipient_id
+        payout.tx_hash = tx_hash
+        payout.memo = memo
+        payout.save()
+        logger.info(f"Updated payout {payout_on_chain_id} for recipient {recipient_id} with amount {amount}.")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating Payout. {str(e)}")
+        return False

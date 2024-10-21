@@ -13,11 +13,13 @@ from accounts.api import (
     AccountListRegistrationsAPI,
     AccountPayoutsReceivedAPI,
     AccountPotApplicationsAPI,
+    AccountUpvotedListsAPI,
     AccountsListAPI,
     DonorsAPI,
 )
 from base.api import StatsAPI
 from donations.api import DonationContractConfigAPI
+from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
 from lists.api import (
     ListDetailAPI,
     ListRandomRegistrationAPI,
@@ -82,6 +84,11 @@ urlpatterns = [
         AccountListRegistrationsAPI.as_view(),
         name="accounts_api_by_id_registrations",
     ),
+    path(
+        "v1/accounts/<str:account_id>/upvoted-lists",
+        AccountUpvotedListsAPI.as_view(),
+        name="accounts_api_upvoted_lists",
+    ),
     # donate contract config
     path(
         "v1/donate_contract_config",
@@ -129,4 +136,18 @@ urlpatterns = [
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),
+
+    # grantpicks
+    path("v1/rounds", RoundsListAPI.as_view(), name="rounds_api"),
+    path("v1/round/<int:round_id>/", RoundDetailAPI.as_view(), name="rounds_api_by_id"),
+    path("v1/round/<int:round_id>/<int:project_id>/votes", ProjectRoundVotesAPI.as_view(), name="project_round_votes_api_by_id"),
+    path("v1/projects", ProjectListAPI.as_view(), name="projects_api"),
+    path(
+        "v1/rounds/<str:round_id>/applications",
+        RoundApplicationsAPI.as_view(),
+        name="rounds_applications_api",
+    ),
+    path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
+    path("v1/<str:account_id>/<int:project_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_api"),
+    
 ]

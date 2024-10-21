@@ -7,22 +7,30 @@ from datetime import datetime
 from django.conf import settings
 from django.core.cache import cache
 from near_lake_framework import near_primitives
+from stellar_sdk.soroban_rpc import GetEventsResponse
+
 
 from base.utils import convert_ns_to_utc
+from grantpicks.models import StellarEvent
 from nadabot.utils import match_nadabot_registry_pattern
-from pots.utils import match_pot_factory_pattern, match_pot_subaccount_pattern
+from pots.utils import is_relevant_account, match_pot_factory_pattern, match_pot_subaccount_pattern
 
 from .logging import log_memory_usage, logger
 from .utils import (
     handle_add_nadabot_admin,  # handle_batch_donations,
     handle_add_stamp,
     handle_default_list_status_change,
-    handle_list_admin_removal,
+    handle_delete_list,
+    handle_list_admin_ops,
+    handle_list_owner_change,
+    handle_list_registration_removal,
     handle_list_registration_update,
+    handle_list_update,
     handle_list_upvote,
     handle_new_donation,
     handle_new_group,
     handle_new_list,
+    handle_new_list_and_reg,
     handle_new_list_registration,
     handle_new_nadabot_registry,
     handle_new_pot,
@@ -35,6 +43,7 @@ from .utils import (
     handle_pot_config_update,
     handle_registry_blacklist_action,
     handle_registry_unblacklist_action,
+    handle_remove_upvote,
     handle_set_factory_configs,
     handle_set_payouts,
     handle_social_profile_update,
@@ -83,15 +92,14 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             receiver_id = receipt_execution_outcome.receipt.receiver_id
             if (
                 receiver_id != settings.NEAR_SOCIAL_CONTRACT_ADDRESS
-                and not receiver_id.endswith(
-                    (settings.POTLOCK_TLA, settings.NADABOT_TLA)
-                )
+                and not is_relevant_account(receiver_id)
             ):
                 continue
             # 1. HANDLE LOGS
             log_data = []
             receipt = receipt_execution_outcome.receipt
             signer_id = receipt.receipt["Action"]["signer_id"]
+            LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
 
             log_processing_start = time.time()
             for log_index, log in enumerate(
@@ -130,6 +138,28 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         await handle_registry_unblacklist_action(
                             parsed_log.get("data")[0], receiver_id, now_datetime
                         )
+                    if event_name == "delete_list":
+                        await handle_delete_list(
+                            parsed_log.get("data")[0]
+                        )
+                    if event_name == "owner_transfer":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_owner_change(
+                            parsed_log.get("data")[0]
+                        )
+                    if event_name == "update_admins":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_admin_ops(
+                            parsed_log.get("data")[0], receiver_id, signer_id, receipt.receipt_id
+                        )
+                    if event_name == "update_lis":
+                        if receiver_id != LISTS_CONTRACT:
+                            continue
+                        await handle_list_update(
+                            parsed_log.get("data")[0], receiver_id, signer_id, receipt.receipt_id
+                        )
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -156,8 +186,7 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
             #     # consider logging failures to logging service; for now, just skip
             #     print("here we are...")
             #     continue
-            method_call_processing_start = time.time()
-            LISTS_CONTRACT = "lists." + settings.POTLOCK_TLA
+            # method_call_processing_start = time.time()
             DONATE_CONTRACT = "donate." + settings.POTLOCK_TLA
 
             for index, action in enumerate(
@@ -330,6 +359,19 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
+                        case (
+                            "unregister"
+                        ):  # TODO: listen for create_registration event instead of method call
+                            logger.info(
+                                f"registrations revoke incoming: {args_dict}, {action}"
+                            )
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_list_registration_removal(
+                                args_dict, receiver_id
+                            )
+                            break
+
                         case "chef_set_application_status":
                             logger.info(
                                 f"application status change incoming: {args_dict}"
@@ -393,22 +435,18 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             )
                             break
 
-                        case (
-                            "owner_remove_admins"
-                        ):  # TODO: use update_admins event instead of method call to handle all cases
-                            logger.info(f"attempting to remove admins....: {args_dict}")
-                            if receiver_id != LISTS_CONTRACT:
-                                break
-                            await handle_list_admin_removal(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id
-                            )
-                            break
-
                         case "create_list":
                             logger.info(f"creating list... {args_dict}, {action}")
                             if receiver_id != LISTS_CONTRACT:
                                 break
-                            await handle_new_list(signer_id, receiver_id, status_obj)
+                            await handle_new_list(signer_id, receiver_id, status_obj, None)
+                            break
+
+                        case "update_list":
+                            logger.info(f"updating list... {args_dict}, {action}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_list_update(signer_id, receiver_id, status_obj, None)
                             break
 
                         case "upvote":
@@ -416,7 +454,15 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             if receiver_id != LISTS_CONTRACT:
                                 break
                             await handle_list_upvote(
-                                args_dict, receiver_id, signer_id, receipt.receipt_id
+                                args_dict, receiver_id, signer_id, receipt.receipt_id, now_datetime
+                            )
+                            break
+                        case "remove_upvote":
+                            logger.info(f"removing upvote... {args_dict}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_remove_upvote(
+                                args_dict, receiver_id, signer_id
                             )
                             break
                         case "owner_add_admins":
@@ -440,6 +486,12 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                                 break
                             logger.info(f"updating configs.. {args_dict}")
                             await handle_set_factory_configs(args_dict, receiver_id)
+                            break
+                        case "create_list_with_registrations":
+                            logger.info(f"creating list... {args_dict}, {action}")
+                            if receiver_id != LISTS_CONTRACT:
+                                break
+                            await handle_new_list_and_reg(signer_id, receiver_id, status_obj, receipt)
                             break
                         # TODO: handle remove upvote
 
