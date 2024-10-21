@@ -25,8 +25,8 @@ jobs:
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Generate appspec.yml for prod
-        run: cp appspec.yml appspec.yml
+      # - name: Generate appspec.yml for prod
+      #   run: cp appspec.yml appspec.yml
 
       - name: Set environment variables
         id: vars
