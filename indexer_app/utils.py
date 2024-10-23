@@ -1324,7 +1324,6 @@ def get_block_height() -> int:
     record = BlockHeight.objects.filter(id=1).first()
     if record:
         return record.block_height
-    return 130852956
     
 
 
