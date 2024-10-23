@@ -344,6 +344,8 @@ def stellar_event_indexer():
         else "https://horizon.stellar.org"
     )
     contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT]
+    if contract_ids == ['', '']:
+        return
     start_sequence = get_ledger_sequence()
     # start_sequence = 12169
     if not start_sequence:
