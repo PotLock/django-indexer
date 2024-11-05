@@ -1574,7 +1574,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
 
         round_obj, created = Round.objects.update_or_create(
             on_chain_id=round_id,
-            chain=Chain.objects.get(id=chain_id),
+            chain=Chain.objects.get(name=chain_id),
             defaults={
                 'owner': owner,
                 'factory_contract': factory_contract,
