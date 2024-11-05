@@ -101,7 +101,6 @@ class Round(models.Model):
     on_chain_id = models.IntegerField(
         _("contract round ID"),
         null=False,
-        unique=True,
         help_text=_("Round ID in contract"),
     )
     chain = models.ForeignKey(
@@ -326,6 +325,9 @@ class Round(models.Model):
         help_text=_("Round complete date."),
     )
 
+    class Meta:
+        unique_together = ('chain', 'on_chain_id')
+
 
 
 
@@ -357,7 +359,6 @@ class Round(models.Model):
         super().save(*args, **kwargs)
 
 
-
 class RoundDeposit(models.Model):
     id = models.AutoField(
         _("deposit id"),
@@ -367,7 +368,6 @@ class RoundDeposit(models.Model):
     on_chain_id = models.IntegerField(
         _("contract deposit ID"),
         null=False,
-        unique=True,
         help_text=_("Deposit ID in contract"),
     )
     round = models.ForeignKey(
@@ -435,6 +435,9 @@ class RoundDeposit(models.Model):
         blank=True,
         help_text=_("Transaction hash."),
     )
+
+    class Meta:
+        unique_together = ('round', 'on_chain_id')
 
 class Vote(models.Model):
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name='votes')

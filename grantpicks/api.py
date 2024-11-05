@@ -57,6 +57,12 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
                 location=OpenApiParameter.QUERY,
                 description="Sort by field, e.g., deployed_at, vault_total_deposits",
             ),
+            OpenApiParameter(
+                "chain",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter projects by chain",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -79,6 +85,10 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         rounds = Round.objects.all()
+        chain_param = request.query_params.get("chain")
+        if chain_param:
+            # chain = Chain.objects.get(name=chain_param)
+            rounds = rounds.filter(chain_id=chain_param)
         sort = request.query_params.get("sort", None)
         if sort == "deployed_at":
             rounds = rounds.order_by(
