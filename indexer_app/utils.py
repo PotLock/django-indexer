@@ -1353,7 +1353,7 @@ def update_approved_projects(event_data, chain_id="stellar"):
             chain = Chain.objects.get(name=chain_id)
             round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
             for ids in project_ids:
-                project = Project.objects.get(id=ids)
+                project = Project.objects.get(on_chain_id=ids)
                 round_obj.approved_projects.add(project.owner)
             return True
 
@@ -1443,7 +1443,7 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                     project_id = pick['voted_project']
                 else:
                     pair_id = pick['pair_id']
-                    project_id = Project.objects.get(id=pick['project_id']).owner.id
+                    project_id = Project.objects.get(on_chain_id=pick['project_id']).owner.id
 
                 # Assuming project_id corresponds to PotApplication id
                 
