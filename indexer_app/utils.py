@@ -1671,7 +1671,10 @@ def create_round_application(event_data, tx_hash, chain_id="stellar"):
         chain = Chain.objects.get(name=chain_id)
         applicant, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=application_data["applicant_id"])
         round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
-        status = PotApplicationStatus[application_data['status'].upper()]
+        if chain_id == "NEAR":
+            status = PotApplicationStatus[application_data['status'].upper()]
+        else:
+            status = PotApplicationStatus[application_data['status'][0].upper()]
         logger.info(f"Creating application for round: {round_id}")
         
         appl_defaults = {
@@ -1746,9 +1749,9 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
         memo = payout_data.get("memo")
 
         chain = Chain.objects.get(name=chain_id)
-        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id="stellar")
-        stellar_token, _ = Token.objects.get_or_create(
-            account=stellar_token_acct
+        token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id=chain_id.lower())
+        token, _ = Token.objects.get_or_create(
+            account=token_acct
         ) 
 
         payout = PotPayout(
@@ -1757,7 +1760,7 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
             amount=amount,
             recipient_id=recipient_id,
             memo=memo,
-            token=stellar_token,
+            token=token,
             paid_at=None,
             tx_hash=tx_hash,
         )
