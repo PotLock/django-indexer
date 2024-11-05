@@ -1550,7 +1550,8 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
     try:
         logger.info(f"create_or_update_round: {event_data}, {contract_id}, {chain_id}")
         # Create Round
-        # event_data = event_data.get('round_detail')
+        if chain_id == "NEAR":
+            event_data = event_data.get('round_detail')
         round_id = event_data.get('id')
         owner_address = event_data.get('owner')
         chain = Chain.objects.get(name=chain_id)
