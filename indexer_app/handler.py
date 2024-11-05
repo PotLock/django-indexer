@@ -172,35 +172,35 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                     if event_name == "create_round" or event_name == "round_updated":
                         create_or_update_round_async = sync_to_async(create_or_update_round)
                         await create_or_update_round_async(
-                            parsed_log.get("data")[0], receiver_id, now_datetime, 1
+                            parsed_log.get("data")[0], receiver_id, now_datetime, "NEAR"
                         )
                     if event_name == "deposit":
                         round_depo = sync_to_async(process_rounds_deposit_event)
-                        await round_depo(parsed_log.get("data")[0], receipt.receipt_id, 1)
+                        await round_depo(parsed_log.get("data")[0], receipt.receipt_id, "NEAR")
                     if event_name == "application_created":
                         create_round_application_async = sync_to_async(create_round_application)
                         await create_round_application_async(
-                            parsed_log.get("data")[0], receipt.receipt_id, 1
+                            parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
                         )
                     if event_name == "application_updated":
                         update_application_async = sync_to_async(update_application)
                         await update_application_async(
-                            parsed_log.get("data")[0], receipt.receipt_id, signer_id, 1
+                            parsed_log.get("data")[0], receipt.receipt_id, signer_id, "NEAR"
                         )
                     if event_name == "vote":
                         process_vote_event_async = sync_to_async(process_vote_event)
                         await process_vote_event_async(
-                            parsed_log.get("data")[0], receipt.receipt_id, 1
+                            parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
                         )
                     if event_name == "payouts_set":
                         create_round_payout_aync = sync_to_async(create_round_payout)
                         await create_round_payout_aync(
-                            parsed_log.get("data")[0], receipt.receipt_id, 1
+                            parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
                         )
                     if event_name == "payout_processed":
                         update_round_payout_aync = sync_to_async(update_round_payout)
                         await update_round_payout_aync(
-                            parsed_log.get("data")[0], receipt.receipt_id, 1
+                            parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
                         )
                     if event_name == "payouts_challenge_created":
                         pass

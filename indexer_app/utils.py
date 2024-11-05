@@ -1345,12 +1345,13 @@ def get_ledger_sequence() -> int:
         return record.block_height
 
 
-def update_approved_projects(event_data, chain_id=2):
+def update_approved_projects(event_data, chain_id="stellar"):
     round_id, project_ids = event_data[0], event_data[1]
 
     with transaction.atomic():
         try:
-            round_obj = Round.objects.get(on_chain_id=round_id, chain_id=chain_id)
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
             for ids in project_ids:
                 project = Project.objects.get(id=ids)
                 round_obj.approved_projects.add(project.owner)
@@ -1360,7 +1361,7 @@ def update_approved_projects(event_data, chain_id=2):
             logger.error(f"Error updating application for Round {round_id}: {e}")
             return False
 
-def update_application(event_data, txhash, reviewer_id=None, chain_id=2):
+def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar"):
     if type(event_data) == list:
         round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
     else:
@@ -1369,10 +1370,11 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id=2):
 
     with transaction.atomic():
         try:
-            round_obj = Round.objects.get(on_chain_id=round_id, chain_id=chain_id)
-            applicant = Account.objects.get(id=application_data['applicant_id'], chain_id=chain_id)
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
+            applicant = Account.objects.get(id=application_data['applicant_id'], chain=chain)
 
-            reviewer = Account.objects.get(id=reviewer_id, chain_id=chain_id)
+            reviewer = Account.objects.get(id=reviewer_id, chain=chain)
 
             status = PotApplicationStatus[application_data['status'].upper()]
             submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
@@ -1408,7 +1410,7 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id=2):
 
 
 
-def process_vote_event(event_data, tx_hash, chain_id=2):
+def process_vote_event(event_data, tx_hash, chain_id="stellar"):
     try:
         with transaction.atomic():
             if type(event_data) == list:
@@ -1417,8 +1419,9 @@ def process_vote_event(event_data, tx_hash, chain_id=2):
                 event_data = event_data['vote']
                 round_id, vote_data = event_data.get("round_id", 2), event_data
 
-            round_obj = Round.objects.get(on_chain_id=round_id, chain_id=chain_id)
-            voter, _ = Account.objects.get_or_create(id=vote_data['voter'], chain_id=chain_id)
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
+            voter, _ = Account.objects.get_or_create(id=vote_data['voter'], chain=chain)
             voted_at = datetime.fromtimestamp(vote_data['voted_ms'] / 1000)
 
             # Create or update the Vote
@@ -1458,18 +1461,20 @@ def process_vote_event(event_data, tx_hash, chain_id=2):
         return False
 
 
-def process_project_event(event_data, chain_id=2):
+def process_project_event(event_data, chain_id="stellar"):
     try:
         # Extract project data
         project_data = event_data
 
         logger.info(f"process_project_event: {project_data}, {chain_id}")
 
+        chain = Chain.objects.get(name=chain_id)
+
         # Create or get the owner Account
-        owner, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=project_data['owner'])
+        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['owner'])
 
         # Create or get the payout Account
-        payout_address, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=project_data['payout_address'])
+        payout_address, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['payout_address'])
 
         # Create the Project
         project, created = Project.objects.update_or_create(
@@ -1541,22 +1546,23 @@ def process_project_event(event_data, chain_id=2):
 
 
 
-def create_or_update_round(event_data, contract_id, timestamp, chain_id=2):
+def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar"):
     try:
         logger.info(f"create_or_update_round: {event_data}, {contract_id}, {chain_id}")
         # Create Round
         # event_data = event_data.get('round_detail')
         round_id = event_data.get('id')
         owner_address = event_data.get('owner')
-        owner, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=owner_address)
-        factory_contract, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=contract_id)
+        chain = Chain.objects.get(name=chain_id)
+        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=owner_address)
+        factory_contract, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=contract_id)
         remaining_dist_address = event_data.get('remaining_dist_address', event_data.get('remaining_funds_redistribution_recipient'))
         if remaining_dist_address:
-            remaining_dist_address_obj, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=remaining_dist_address)
+            remaining_dist_address_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_address)
 
         remaining_dist_by = event_data.get('remaining_dist_by', event_data.get('remaining_funds_redistributed_by'))
         if remaining_dist_by:
-            remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=remaining_dist_by)
+            remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
 
         near_round_cp = event_data.get('round_complete')
         if near_round_cp:
@@ -1653,7 +1659,7 @@ def process_application_to_round(event_data, tx_hash):
 
 
 
-def create_round_application(event_data, tx_hash, chain_id=2):
+def create_round_application(event_data, tx_hash, chain_id="stellar"):
     try:
         logger.info(f"create_round_application: {event_data}, {tx_hash}, {chain_id}")
         if type(event_data) == list:
@@ -1661,8 +1667,9 @@ def create_round_application(event_data, tx_hash, chain_id=2):
         else:
             event_data = event_data['application']
             round_id, application_data = event_data["round_id"], event_data
-        applicant, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=application_data["applicant_id"])
-        round_obj = Round.objects.get(on_chain_id=round_id, chain_id=chain_id)
+        chain = Chain.objects.get(name=chain_id)
+        applicant, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=application_data["applicant_id"])
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         status = PotApplicationStatus[application_data['status'].upper()]
         logger.info(f"Creating application for round: {round_id}")
         
@@ -1687,7 +1694,7 @@ def create_round_application(event_data, tx_hash, chain_id=2):
         return False
 
 
-def process_rounds_deposit_event(event_data, tx_hash, chain_id=2):
+def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
     try:
         logger.info(f"process_rounds_deposit_event: {event_data}, {tx_hash}, {chain_id}")
         # Process deposit event
@@ -1696,9 +1703,10 @@ def process_rounds_deposit_event(event_data, tx_hash, chain_id=2):
         else:
             event_data = event_data['deposit']
             round_id, deposit_data = event_data["round_id"], event_data
-        round_obj = Round.objects.get(on_chain_id=round_id, chain_id=chain_id)
+        chain = Chain.objects.get(name=chain_id)
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         amount = deposit_data["total_amount"]
-        depositor, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=deposit_data["depositor_id"])
+        depositor, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=deposit_data["depositor_id"])
         
         # Create or update a RoundDeposit object
         deposit, created = RoundDeposit.objects.update_or_create(
@@ -1728,7 +1736,7 @@ def process_rounds_deposit_event(event_data, tx_hash, chain_id=2):
 
 
 
-def create_round_payout(event_data, tx_hash, chain_id=2):
+def create_round_payout(event_data, tx_hash, chain_id="stellar"):
     try:
         logger.info(f"create_round_payout: {event_data}, {tx_hash}, {chain_id}")
         round_id, payout_data = event_data
@@ -1736,7 +1744,8 @@ def create_round_payout(event_data, tx_hash, chain_id=2):
         recipient_id = payout_data["recipient_id"]
         memo = payout_data.get("memo")
 
-        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id},id="stellar")
+        chain = Chain.objects.get(name=chain_id)
+        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id="stellar")
         stellar_token, _ = Token.objects.get_or_create(
             account=stellar_token_acct
         ) 
@@ -1759,14 +1768,15 @@ def create_round_payout(event_data, tx_hash, chain_id=2):
         return False
 
 
-def update_round_payout(event_data, tx_hash, chain_id=2):
+def update_round_payout(event_data, tx_hash, chain_id="stellar"):
     try:
         logger.info(f"update_round_payout: {event_data}, {tx_hash}, {chain_id}")
         _, payout_data = event_data
         payout_on_chain_id = payout_data["id"]
         amount = payout_data["amount"]
         paid_at_ms = payout_data.get("paid_at_ms")
-        recipient_id, _ = Account.objects.get_or_create(defaults={"chain_id":chain_id}, id=payout_data["recipient_id"])
+        chain = Chain.objects.get(name=chain_id)
+        recipient_id, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=payout_data["recipient_id"])
         memo = payout_data.get("memo")
         payout = PotPayout.objects.get(on_chain_id=payout_on_chain_id)
         payout.amount = amount
