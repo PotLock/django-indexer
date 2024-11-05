@@ -1438,7 +1438,7 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
 
             # Process vote pairs
             for pick in vote_data['picks']:
-                if chain_id == 1:
+                if chain_id == "NEAR":
                     pair_id = pick['pair_id']
                     project_id = pick['voted_project']
                 else:
