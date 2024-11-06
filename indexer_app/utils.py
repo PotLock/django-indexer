@@ -1565,13 +1565,11 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
         if remaining_dist_by:
             remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
 
-        near_round_cp = event_data.get('round_complete')
-        if near_round_cp:
-            round_time_stamp = timestamp
-        elif event_data.get('round_complete_ms'):
-            round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms') / 1000)
+        round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
+        if chain_id == "NEAR":
+            use_vault = True
         else:
-            round_time_stamp = None
+            use_vault = event_data.get('use_vault', False)
 
         round_obj, created = Round.objects.update_or_create(
             on_chain_id=round_id,
@@ -1588,7 +1586,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 'voting_start': datetime.fromtimestamp(event_data.get('voting_start_ms') / 1000),
                 'voting_end': datetime.fromtimestamp(event_data.get('voting_end_ms') / 1000),
                 'use_whitelist': event_data.get('use_whitelist'),
-                'use_vault': event_data.get('use_vault', False),
+                'use_vault': use_vault,
                 'num_picks_per_voter': event_data.get('num_picks_per_voter'),
                 'max_participants': event_data.get('max_participants'),
                 'allow_applications': event_data.get('allow_applications'),
