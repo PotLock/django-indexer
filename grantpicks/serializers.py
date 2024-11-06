@@ -142,7 +142,7 @@ class RoundApplicationSerializer(ModelSerializer):
     reviews = ApplicationReviewSerializer(many=True)
     round = RoundSerializer()
     applicant = AccountSerializer()
-    project = ProjectSerializer()
+    project = AccountSerializer()
 
 
 SIMPLE_PROJECT_EXAMPLE = {
