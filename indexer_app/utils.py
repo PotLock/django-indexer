@@ -1565,7 +1565,10 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
         if remaining_dist_by:
             remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
 
-        round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
+        if event_data.get('round_complete_ms', event_data.get('round_complete')):   
+            round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
+        else:
+            round_time_stamp = None
         if chain_id == "NEAR":
             use_vault = True
         else:
