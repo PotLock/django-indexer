@@ -140,7 +140,7 @@ urlpatterns = [
     # grantpicks
     path("v1/rounds", RoundsListAPI.as_view(), name="rounds_api"),
     path("v1/round/<int:round_id>/", RoundDetailAPI.as_view(), name="rounds_api_by_id"),
-    path("v1/round/<int:round_id>/<int:project_id>/votes", ProjectRoundVotesAPI.as_view(), name="project_round_votes_api_by_id"),
+    path("v1/round/<int:round_id>/<str:project_id>/votes", ProjectRoundVotesAPI.as_view(), name="project_round_votes_api_by_id"),
     path("v1/projects", ProjectListAPI.as_view(), name="projects_api"),
     path(
         "v1/rounds/<str:round_id>/applications",
