@@ -1449,18 +1449,19 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
             data = response.json()
             return data
         else:
-            logger.error(f"Failed to fetch pair data from NEAR: {response.status_code}")
+            logger.error(f"Failed to fetch pair data from NEAR: {response}")
             return None
 
 
 def process_vote_event(event_data, tx_hash, chain_id="stellar"):
     try:
+        logger.info(f"process_vote_event: {event_data}, {tx_hash}, {chain_id}")
         with transaction.atomic():
             if type(event_data) == list:
                 round_id, vote_data = event_data[0], event_data[1]
             else:
-                event_data = event_data['vote']
-                round_id, vote_data = event_data.get("round_id", 2), event_data
+                # vote_event_data = event_data['vote']
+                round_id, vote_data = event_data.get("round_id", 2), event_data['vote']
 
             chain = Chain.objects.get(name=chain_id)
             round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
