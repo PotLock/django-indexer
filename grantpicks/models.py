@@ -458,7 +458,15 @@ class Vote(models.Model):
 class VotePair(models.Model):
     vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name='pairs')
     pair_id = models.PositiveIntegerField()
-    project = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='vote_pairs')
+    projects = models.ManyToManyField(Account, related_name='vote_pairs_included_in')
+    voted_project = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE, 
+        related_name='vote_pairs_voted_for_in', 
+        null=True,
+        blank=True
+    )
+    #old_project = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='vote_pairs')
 
     class Meta:
         unique_together = ('vote', 'pair_id')

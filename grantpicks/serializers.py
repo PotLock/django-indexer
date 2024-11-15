@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer, ProjectInPairSerializer
 from base.serializers import TwoDecimalPlacesField
 
 from .models import Project, ProjectContact, ProjectContract, ProjectRepository, Round, Vote, VotePair
@@ -267,32 +267,33 @@ class PaginatedRoundApplicationsResponseSerializer(serializers.Serializer):
 
 
 class VotePairSerializer(serializers.ModelSerializer):
-    project = ProjectSerializer()
+    project_1 = AccountSerializer()
+    project_2 = AccountSerializer()
+    voted_project = AccountSerializer()
 
     class Meta:
         model = VotePair
         fields = [
             'pair_id',
-            'project',
+            'project_1',
+            'project_2',
+            'voted_project',
         ]
 
 
 
 class VoteSerializer(serializers.ModelSerializer):
-    round = serializers.PrimaryKeyRelatedField(queryset=Round.objects.all())
-    voter = AccountSerializer()
-    pairs = VotePairSerializer(many=True)
+    voter = AccountSerializer(source='vote.voter')
+    winner = ProjectInPairSerializer(source='voted_project')
+    pair = serializers.SerializerMethodField()
+    voted_date = serializers.DateTimeField(source='vote.voted_at')
 
     class Meta:
-        model = Vote
-        fields = [
-            'id',
-            'round',
-            'voter',
-            'pairs',
-            'tx_hash',
-            'voted_at',
-        ]
+        model = VotePair
+        fields = ['voter', 'pair_id', 'winner', 'pair', 'voted_date']
+
+    def get_pair(self, obj):
+        return [ProjectInPairSerializer(project).data for project in obj.projects.all()]
 
 
 

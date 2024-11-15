@@ -29,7 +29,7 @@ from donations.serializers import (
 )
 from pots.models import PotPayout
 
-from .models import Project, ProjectStatus, Round, Vote
+from .models import Project, ProjectStatus, Round, Vote, VotePair
 from .serializers import (
     PAGINATED_PROJECT_EXAMPLE,
     PAGINATED_ROUND_APPLICATION_EXAMPLE,
@@ -211,10 +211,20 @@ class ProjectRoundVotesAPI(APIView, CustomSizePageNumberPagination):
 
         # Retrieve votes for the specified project in the round
 
-        votes = round_obj.votes.filter(pairs__project_id=project_id)  # Adjust the filter as needed
+        # votes = round_obj.votes.filter(pairs__project_id=project_id)  # Adjust the filter as needed
         # vote_pairs = project.vote_pairs.all()
-        results = self.paginate_queryset(votes, request, view=self)
-        serializer = VoteSerializer(results, many=True)  # Use the appropriate serializer for votes
+        vote_pairs = VotePair.objects.filter(
+            vote__round=round_obj,
+            projects=project_id
+        ).select_related(
+            'vote',
+            'vote__voter',
+            'voted_project'
+        ).prefetch_related('projects')
+        # results = self.paginate_queryset(votes, request, view=self)
+        results = self.paginate_queryset(vote_pairs, request, view=self)
+        # serializer = VoteSerializer(results, many=True)  # Use the appropriate serializer for votes
+        serializer = VoteSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
 
 

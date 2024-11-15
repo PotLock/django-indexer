@@ -69,7 +69,7 @@ STELLAR_PROJECTS_REGISTRY_CONTRACT = "CDOR6NBGSIE6ARJZHRAJAEDN2NG4QS67LSQRMJETVX
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
-
+NEAR_GRANTPICKS_CONTRACT_ID = "v2.grantpicks.potlock.testnet" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 # TODO: split settigns file by enviroment
 if ENVIRONMENT == "testnet":
     POTLOCK_PATTERN = r'\.potlock\.testnet$'

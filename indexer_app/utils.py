@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import datetime
 from math import log
+from typing import Dict
 
 import requests
 from asgiref.sync import sync_to_async
@@ -10,6 +11,7 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
+import stellar_sdk
 
 from accounts.models import Account
 from activities.models import Activity
@@ -1409,6 +1411,47 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
             return False
 
 
+def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
+    if chain_id == "stellar":
+        server = stellar_sdk.SorobanServer(
+            "https://soroban-testnet.stellar.org"
+            if settings.ENVIRONMENT == "testnet" or settings.ENVIRONMENT == "local"
+            else "https://horizon.stellar.org"
+        )
+
+        contract_id = settings.STELLAR_CONTRACT_ID
+        function_name = "get_pair_by_index"
+        parameters = [stellar_sdk.scval.to_uint128(round_id), stellar_sdk.scval.to_uint32(pair_id)]
+        public_key = "GDRZ47PQ43TA7GCBW22HHRM6FHN644KF23HFNZ76I46HPNBD5Q7YEYLJ"
+        acct = server.load_account(public_key)
+
+        pair_result = server.simulate_transaction(
+            transaction_envelope=stellar_sdk.TransactionBuilder(
+                source_account=acct,
+            ).append_invoke_contract_function_op(
+                contract_id,
+                function_name,
+                parameters
+            )
+            .set_timeout(30)
+            .build()
+        )        
+
+        
+        if pair_result.results:
+            xdr = pair_result.results[0].xdr
+            data = stellar_sdk.scval.to_native(xdr)
+            return data
+    else:
+        url = f"https://rpc.web4.testnet.page/account/{settings.NEAR_GRANTPICKS_CONTRACT_ID}/view/get_pair_by_id?round_id.json={round_id}&pair_id.json={pair_id}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            logger.error(f"Failed to fetch pair data from NEAR: {response.status_code}")
+            return None
+
 
 def process_vote_event(event_data, tx_hash, chain_id="stellar"):
     try:
@@ -1441,18 +1484,31 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                 if chain_id == "NEAR":
                     pair_id = pick['pair_id']
                     project_id = pick['voted_project']
+                    
+                    
                 else:
                     pair_id = pick['pair_id']
                     project_id = Project.objects.get(on_chain_id=pick['project_id']).owner.id
+                
+                pair_data = get_pair_projects(pair_id, round_id, chain_id)
+                logger.info(f"pair data from contract...:,{pair_data}")
+                if pair_data:
+                    project_id_1, project_id_2 = pair_data.get('projects')
+                    project_1 = Project.objects.get(on_chain_id=project_id_1).owner.id
+                    project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
+                    
 
                 # Assuming project_id corresponds to PotApplication id
                 
+
                 
-                VotePair.objects.update_or_create(
+                vp, created = VotePair.objects.update_or_create(
                     vote=vote,
                     pair_id=pair_id,
-                    defaults={'project_id': project_id}
+                    defaults={'voted_project_id': project_id}
                 )
+                vp.projects.add(project_1)
+                vp.projects.add(project_2)
 
             logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}, Project: {project_id}")
             return True
