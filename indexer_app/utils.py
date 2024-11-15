@@ -1494,12 +1494,12 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                 logger.info(f"pair data from contract...:,{pair_data}")
                 if pair_data:
                     project_id_1, project_id_2 = pair_data.get('projects')
-                    project_1 = Project.objects.get(on_chain_id=project_id_1).owner.id
-                    project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
-                    
-
-                # Assuming project_id corresponds to PotApplication id
-                
+                    if chain_id == "stellar":
+                        project_1 = Project.objects.get(on_chain_id=project_id_1).owner.id
+                        project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
+                    else:
+                        project_1 = project_id_1
+                        project_2 = project_id_2                
 
                 
                 vp, created = VotePair.objects.update_or_create(
