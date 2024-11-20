@@ -1378,7 +1378,11 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
 
             reviewer = Account.objects.get(id=reviewer_id, chain=chain)
 
-            status = PotApplicationStatus[application_data['status'].upper()]
+            if chain_id == "NEAR":
+                status = PotApplicationStatus[application_data['status'].upper()]
+            else:
+                status = PotApplicationStatus[application_data['status'][0].upper()]
+
             submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
             updated_at = datetime.fromtimestamp(application_data['updated_ms'] / 1000)
 
@@ -1810,10 +1814,11 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
         token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id=chain_id.lower())
         token, _ = Token.objects.get_or_create(
             account=token_acct
-        ) 
+        )
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
 
         payout = PotPayout(
-            round_id=round_id,
+            round=round_obj,
             on_chain_id=payout_data["id"],
             amount=amount,
             recipient_id=recipient_id,
@@ -1823,7 +1828,7 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
             tx_hash=tx_hash,
         )
         payout.save()
-        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}.")
+        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}, on chain {chain_id}")
         return True
     except Exception as e:
         logger.error(f"Error creating round payout: {str(e)}")
