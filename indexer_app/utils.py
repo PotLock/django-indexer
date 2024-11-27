@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import datetime
 from math import log
+from typing import Dict
 
 import requests
 from asgiref.sync import sync_to_async
@@ -10,9 +11,11 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
+import stellar_sdk
 
 from accounts.models import Account
 from activities.models import Activity
+from chains.models import Chain
 from donations.models import Donation
 from grantpicks.models import Project, ProjectContact, ProjectContract, ProjectFundingHistory, ProjectRepository, ProjectStatus, Round, RoundDeposit, Vote, VotePair
 from indexer_app.models import BlockHeight
@@ -1324,6 +1327,7 @@ def get_block_height() -> int:
     record = BlockHeight.objects.filter(id=1).first()
     if record:
         return record.block_height
+    return 178243042
     
 
 
@@ -1343,43 +1347,53 @@ def get_ledger_sequence() -> int:
         return record.block_height
 
 
-def update_approved_projects(event_data):
+def update_approved_projects(event_data, chain_id="stellar"):
     round_id, project_ids = event_data[0], event_data[1]
 
     with transaction.atomic():
         try:
-            round_obj = Round.objects.get(on_chain_id=round_id)
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
             for ids in project_ids:
-                project = Project.objects.get(id=ids)
-                round_obj.approved_projects.add(project)
+                project = Project.objects.get(on_chain_id=ids)
+                round_obj.approved_projects.add(project.owner)
             return True
 
         except Exception as e:
             logger.error(f"Error updating application for Round {round_id}: {e}")
             return False
 
-def update_application(event_data, txhash):
-    round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
+def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar"):
+    if type(event_data) == list:
+        round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
+    else:
+        event_data = event_data['application']
+        round_id, application_data, reviewer_id = event_data["round_id"], event_data, reviewer_id
 
     with transaction.atomic():
         try:
-            round_obj = Round.objects.get(on_chain_id=round_id)
-            applicant = Account.objects.get(id=application_data['applicant_id'])
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
+            applicant = Account.objects.get(id=application_data['applicant_id'], chain=chain)
 
-            reviewer = Account.objects.get(id=reviewer_id)
+            reviewer = Account.objects.get(id=reviewer_id, chain=chain)
 
-            status = PotApplicationStatus[application_data['status'][0].upper()]
+            if chain_id == "NEAR":
+                status = PotApplicationStatus[application_data['status'].upper()]
+            else:
+                status = PotApplicationStatus[application_data['status'][0].upper()]
+
             submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
             updated_at = datetime.fromtimestamp(application_data['updated_ms'] / 1000)
 
             defaults = {
-                "notes": application_data.get("review_notes"),
-                "status": application_data['status'][0],
+                "notes": application_data.get("review_note"),
+                "status": status,
                 "tx_hash": txhash,
             }
             
             appl = PotApplication.objects.filter(
-                applicant_id=application_data["applicant_id"]
+                applicant=applicant
             ).first()
 
             PotApplicationReview.objects.update_or_create(
@@ -1390,8 +1404,8 @@ def update_application(event_data, txhash):
             )
 
             # Update the PotApplication object
-            PotApplication.objects.filter(applicant_id=application_data["applicant_id"]).update(
-                **{"status": application_data["status"], "updated_at": updated_at}
+            PotApplication.objects.filter(applicant=applicant, round=round_obj).update(
+                **{"status": status, "updated_at": updated_at}
             )
 
             return True
@@ -1401,15 +1415,61 @@ def update_application(event_data, txhash):
             return False
 
 
+def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
+    if chain_id == "stellar":
+        server = stellar_sdk.SorobanServer(
+            "https://soroban-testnet.stellar.org"
+            if settings.ENVIRONMENT == "testnet" or settings.ENVIRONMENT == "local"
+            else "https://horizon.stellar.org"
+        )
 
-def process_vote_event(event_data, tx_hash):
+        contract_id = settings.STELLAR_CONTRACT_ID
+        function_name = "get_pair_by_index"
+        parameters = [stellar_sdk.scval.to_uint128(round_id), stellar_sdk.scval.to_uint32(pair_id)]
+        public_key = "GDRZ47PQ43TA7GCBW22HHRM6FHN644KF23HFNZ76I46HPNBD5Q7YEYLJ"
+        acct = server.load_account(public_key)
+
+        pair_result = server.simulate_transaction(
+            transaction_envelope=stellar_sdk.TransactionBuilder(
+                source_account=acct,
+            ).append_invoke_contract_function_op(
+                contract_id,
+                function_name,
+                parameters
+            )
+            .set_timeout(30)
+            .build()
+        )        
+
+        
+        if pair_result.results:
+            xdr = pair_result.results[0].xdr
+            data = stellar_sdk.scval.to_native(xdr)
+            return data
+    else:
+        url = f"https://rpc.web4.testnet.page/account/{settings.NEAR_GRANTPICKS_CONTRACT_ID}/view/get_pair_by_id?round_id.json={round_id}&pair_id.json={pair_id}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            logger.error(f"Failed to fetch pair data from NEAR: {response}")
+            return None
+
+
+def process_vote_event(event_data, tx_hash, chain_id="stellar"):
     try:
+        logger.info(f"process_vote_event: {event_data}, {tx_hash}, {chain_id}")
         with transaction.atomic():
-            
-            round_id, vote_data = event_data[0], event_data[1]
+            if type(event_data) == list:
+                round_id, vote_data = event_data[0], event_data[1]
+            else:
+                # vote_event_data = event_data['vote']
+                round_id, vote_data = event_data.get("round_id", 2), event_data['vote']
 
-            round_obj = Round.objects.get(on_chain_id=round_id)
-            voter, _ = Account.objects.get_or_create(id=vote_data['voter'])
+            chain = Chain.objects.get(name=chain_id)
+            round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
+            voter, _ = Account.objects.get_or_create(id=vote_data['voter'], chain=chain)
             voted_at = datetime.fromtimestamp(vote_data['voted_ms'] / 1000)
 
             # Create or update the Vote
@@ -1422,37 +1482,60 @@ def process_vote_event(event_data, tx_hash):
                 }
             )
 
+
+
             # Process vote pairs
             for pick in vote_data['picks']:
-                pair_id = pick['pair_id']
-                project_id = pick['project_id']
+                if chain_id == "NEAR":
+                    pair_id = pick['pair_id']
+                    project_id = pick['voted_project']
+                    
+                    
+                else:
+                    pair_id = pick['pair_id']
+                    project_id = Project.objects.get(on_chain_id=pick['project_id']).owner.id
                 
-                # Assuming project_id corresponds to PotApplication id
-                project_voted = Project.objects.get(id=project_id)
+                pair_data = get_pair_projects(pair_id, round_id, chain_id)
+                logger.info(f"pair data from contract...:,{pair_data}")
+                if pair_data:
+                    project_id_1, project_id_2 = pair_data.get('projects')
+                    if chain_id == "stellar":
+                        project_1 = Project.objects.get(on_chain_id=project_id_1).owner.id
+                        project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
+                    else:
+                        project_1 = project_id_1
+                        project_2 = project_id_2                
+
                 
-                VotePair.objects.update_or_create(
+                vp, created = VotePair.objects.update_or_create(
                     vote=vote,
                     pair_id=pair_id,
-                    defaults={'project': project_voted}
+                    defaults={'voted_project_id': project_id}
                 )
+                vp.projects.add(project_1)
+                vp.projects.add(project_2)
 
-            logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}")
+            logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}, Project: {project_id}")
             return True
     except Exception as e:
         logger.error(f"Error processing vote for Round: {str(e)}")
         return False
 
 
-def process_project_event(event_data):
+def process_project_event(event_data, chain_id="stellar"):
     try:
         # Extract project data
         project_data = event_data
 
+        logger.info(f"process_project_event: {project_data}, {chain_id}")
+
+        chain = Chain.objects.get(name=chain_id)
+
         # Create or get the owner Account
-        owner, _ = Account.objects.get_or_create(id=project_data['owner'])
+        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['owner'])
 
         # Create or get the payout Account
-        payout_address, _ = Account.objects.get_or_create(id=project_data['payout_address'])
+        payout_address, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['payout_address'])
 
         # Create the Project
         project, created = Project.objects.update_or_create(
@@ -1496,7 +1579,7 @@ def process_project_event(event_data):
             ProjectFundingHistory.objects.create(
                 source=funding_data['source'],
                 amount=funding_data['amount'],
-                denomination=funding_data['denomiation'],  # Note: There's a typo in the event data
+                denomination=funding_data['denomination'],  # Note: There's a typo in the event data
                 description=funding_data['description'],
                 timestamp=timezone.datetime.fromtimestamp(funding_data['funded_ms'] / 1000)
             )
@@ -1524,21 +1607,41 @@ def process_project_event(event_data):
 
 
 
-def create_or_update_round(event_data, contract_id, timestamp):
+def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar"):
     try:
+        logger.info(f"create_or_update_round: {event_data}, {contract_id}, {chain_id}")
         # Create Round
+        if chain_id == "NEAR":
+            event_data = event_data.get('round_detail')
         round_id = event_data.get('id')
         owner_address = event_data.get('owner')
-        owner, _ = Account.objects.get_or_create(id=owner_address)
-        factory_contract, _ = Account.objects.get_or_create(id=contract_id)
-        remaining_dist_address = event_data.get('remaining_dist_address')
-        remaining_dist_address_obj, _ = Account.objects.get_or_create(id=remaining_dist_address)
+        chain = Chain.objects.get(name=chain_id)
+        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=owner_address)
+        factory_contract, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=contract_id)
+        remaining_dist_address = event_data.get('remaining_dist_address', event_data.get('remaining_funds_redistribution_recipient'))
+        if remaining_dist_address:
+            remaining_dist_address_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_address)
+
+        remaining_dist_by = event_data.get('remaining_dist_by', event_data.get('remaining_funds_redistributed_by'))
+        if remaining_dist_by:
+            remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
+
+        if event_data.get('round_complete_ms', event_data.get('round_complete')):   
+            round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
+        else:
+            round_time_stamp = None
+        if chain_id == "NEAR":
+            use_vault = True
+        else:
+            use_vault = event_data.get('use_vault', False)
 
         round_obj, created = Round.objects.update_or_create(
             on_chain_id=round_id,
+            chain=chain,
             defaults={
                 'owner': owner,
                 'factory_contract': factory_contract,
+                'chain': chain,
                 'name': event_data.get('name'),
                 'description': event_data.get('description'),
                 'expected_amount': event_data.get('expected_amount'),
@@ -1547,23 +1650,23 @@ def create_or_update_round(event_data, contract_id, timestamp):
                 'voting_start': datetime.fromtimestamp(event_data.get('voting_start_ms') / 1000),
                 'voting_end': datetime.fromtimestamp(event_data.get('voting_end_ms') / 1000),
                 'use_whitelist': event_data.get('use_whitelist'),
-                'use_vault': event_data.get('use_vault'),
+                'use_vault': use_vault,
                 'num_picks_per_voter': event_data.get('num_picks_per_voter'),
                 'max_participants': event_data.get('max_participants'),
                 'allow_applications': event_data.get('allow_applications'),
-                'allow_remaining_dist': event_data.get('allow_remaining_dist'),
+                'allow_remaining_dist': event_data.get('allow_remaining_dist', event_data.get('allow_remaining_funds_redistribution')),
                 'compliance_end': datetime.fromtimestamp(event_data.get('compliance_end_ms') / 1000) if event_data.get('compliance_end_ms') else None,
                 'compliance_period_ms': event_data.get('compliance_period_ms'),
-                'compliance_req_desc': event_data.get('compliance_req_desc'),
+                'compliance_req_desc': event_data.get('compliance_req_desc', event_data.get('compliance_requirement_description')),
                 'cooldown_end': datetime.fromtimestamp(event_data.get('cooldown_end_ms') / 1000) if event_data.get('cooldown_end_ms') else None,
                 'cooldown_period_ms': event_data.get('cooldown_period_ms'),
-                'is_video_required': event_data.get('is_video_required'),
+                'is_video_required': event_data.get('is_video_required') or event_data.get('application_requires_video', False) ,
                 'referrer_fee_basis_points': event_data.get('referrer_fee_basis_points'),
                 'remaining_dist_address_id': remaining_dist_address,
                 'remaining_dist_at_ms': datetime.fromtimestamp(event_data.get('remaining_dist_at_ms') / 1000) if event_data.get('remaining_dist_at_ms') else None,
-                'remaining_dist_by_id': event_data.get('remaining_dist_by'),
-                'remaining_dist_memo': event_data.get('remaining_dist_memo'),
-                'round_complete': datetime.fromtimestamp(event_data.get('round_complete_ms') / 1000) if event_data.get('round_complete_ms') else None,
+                'remaining_dist_by_id': remaining_dist_by,
+                'remaining_dist_memo': event_data.get('remaining_dist_memo', event_data.get('remaining_funds_redistribution_memo')),
+                'round_complete': round_time_stamp,
                 'vault_total_deposits': event_data.get('vault_total_deposits'),
                 'current_vault_balance': event_data.get('current_vault_balance'),
                 'deployed_at': timestamp
@@ -1590,7 +1693,7 @@ def process_application_to_round(event_data, tx_hash):
         # Process application to Round
         round_id, application_data = event_data[0], event_data[1]
         applicant_id = application_data.get('applicant_id')
-        status = PotApplicationStatus[application_data['status'][0].upper()]
+        status = PotApplicationStatus[application_data['status'].upper()]
         submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
         updated_at = (
             datetime.fromtimestamp(application_data['updated_ms'] / 1000)
@@ -1619,25 +1722,35 @@ def process_application_to_round(event_data, tx_hash):
 
 
 
-def create_round_application(event_data, tx_hash):
+def create_round_application(event_data, tx_hash, chain_id="stellar"):
     try:
-
-        round_id, application_data = event_data[0], event_data[1]
-        applicant, _ = Account.objects.get_or_create(id=application_data["applicant_id"])
-        round_obj = Round.objects.get(on_chain_id=round_id)
+        logger.info(f"create_round_application: {event_data}, {tx_hash}, {chain_id}")
+        if type(event_data) == list:
+            round_id, application_data = event_data[0], event_data[1]
+        else:
+            event_data = event_data['application']
+            round_id, application_data = event_data["round_id"], event_data
+        chain = Chain.objects.get(name=chain_id)
+        applicant, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=application_data["applicant_id"])
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
+        if chain_id == "NEAR":
+            status = PotApplicationStatus[application_data['status'].upper()]
+        else:
+            status = PotApplicationStatus[application_data['status'][0].upper()]
         logger.info(f"Creating application for round: {round_id}")
         
         appl_defaults = {
             "message": application_data["applicant_note"],
             "submitted_at": datetime.fromtimestamp(application_data["submited_ms"] / 1000),
-            "status": application_data["status"][0],
+            "status": status,
             "tx_hash": tx_hash,
         }
+
         
         PotApplication.objects.update_or_create(
             applicant=applicant,
             round=round_obj,
-            project_id=application_data["project_id"],
+            project=applicant,
             defaults=appl_defaults,
         )
 
@@ -1647,31 +1760,37 @@ def create_round_application(event_data, tx_hash):
         return False
 
 
-def process_rounds_deposit_event(event_data, tx_hash):
+def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
     try:
-
+        logger.info(f"process_rounds_deposit_event: {event_data}, {tx_hash}, {chain_id}")
         # Process deposit event
-        round_id, deposit_data = event_data
-        round_obj = Round.objects.get(on_chain_id=round_id)
+        if type(event_data) == list:
+            round_id, deposit_data = event_data
+        else:
+            event_data = event_data['deposit']
+            round_id, deposit_data = event_data["round_id"], event_data
+        chain = Chain.objects.get(name=chain_id)
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         amount = deposit_data["total_amount"]
-        depositor, _ = Account.objects.get_or_create(id=deposit_data["depositor_id"])
+        depositor, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=deposit_data["depositor_id"])
         
         # Create or update a RoundDeposit object
         deposit, created = RoundDeposit.objects.update_or_create(
             round=round_obj,
-            on_chain_id=deposit_data["deposit_id"],
+            on_chain_id=deposit_data.get("deposit_id", deposit_data.get("id")),
             depositor=depositor,
             defaults={
                 'amount': amount,
                 'protocol_fee': deposit_data["protocol_fee"],
                 'referrer_fee': deposit_data["referrer_fee"],
+                'memo': deposit_data["memo"],
                 'tx_hash': tx_hash,
                 'deposit_at': datetime.fromtimestamp(deposit_data["deposited_at"] / 1000),
             }
         )
         
-        round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + amount)
-        round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + deposit_data["net_amount"])
+        round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + int(amount))
+        round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + int(deposit_data["net_amount"]))
         round_obj.save()
         round_obj.update_vault_usd_equivalent()
 
@@ -1683,44 +1802,48 @@ def process_rounds_deposit_event(event_data, tx_hash):
 
 
 
-def create_round_payout(event_data, tx_hash):
+def create_round_payout(event_data, tx_hash, chain_id="stellar"):
     try:
-
+        logger.info(f"create_round_payout: {event_data}, {tx_hash}, {chain_id}")
         round_id, payout_data = event_data
         amount = payout_data["amount"]
         recipient_id = payout_data["recipient_id"]
         memo = payout_data.get("memo")
 
-        stellar_token_acct, _ = Account.objects.get_or_create(defaults={"chain_id":2},id="stellar")
-        stellar_token, _ = Token.objects.get_or_create(
-            account=stellar_token_acct
-        ) 
+        chain = Chain.objects.get(name=chain_id)
+        token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id=chain_id.lower())
+        token, _ = Token.objects.get_or_create(
+            account=token_acct
+        )
+        round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
 
         payout = PotPayout(
-            round_id=round_id,
+            round=round_obj,
             on_chain_id=payout_data["id"],
             amount=amount,
             recipient_id=recipient_id,
             memo=memo,
-            token=stellar_token,
+            token=token,
             paid_at=None,
             tx_hash=tx_hash,
         )
         payout.save()
-        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}.")
+        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}, on chain {chain_id}")
         return True
     except Exception as e:
         logger.error(f"Error creating round payout: {str(e)}")
         return False
 
 
-def update_round_payout(event_data, tx_hash):
+def update_round_payout(event_data, tx_hash, chain_id="stellar"):
     try:
+        logger.info(f"update_round_payout: {event_data}, {tx_hash}, {chain_id}")
         _, payout_data = event_data
         payout_on_chain_id = payout_data["id"]
         amount = payout_data["amount"]
         paid_at_ms = payout_data.get("paid_at_ms")
-        recipient_id, _ = Account.objects.get_or_create(id=payout_data["recipient_id"])
+        chain = Chain.objects.get(name=chain_id)
+        recipient_id, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=payout_data["recipient_id"])
         memo = payout_data.get("memo")
         payout = PotPayout.objects.get(on_chain_id=payout_on_chain_id)
         payout.amount = amount

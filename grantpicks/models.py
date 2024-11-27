@@ -7,6 +7,7 @@ from datetime import datetime
 from base.logging import logger
 
 from accounts.models import Account
+from chains.models import Chain
 from pots.models import PotApplication
 from tokens.models import Token
 
@@ -100,8 +101,16 @@ class Round(models.Model):
     on_chain_id = models.IntegerField(
         _("contract round ID"),
         null=False,
-        unique=True,
         help_text=_("Round ID in contract"),
+    )
+    chain = models.ForeignKey(
+        Chain,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="rounds",
+        related_query_name="round",
+        help_text=_("Blockchain this round was created on."),
     )
     factory_contract = models.ForeignKey(
         Account,
@@ -198,7 +207,7 @@ class Round(models.Model):
         help_text=_("Max participants."),
     )
     approved_projects = models.ManyToManyField(
-        Project,
+        Account,
         related_name="rounds_approved_in",
         help_text=_("Projects Approved for round."),
     )
@@ -316,6 +325,9 @@ class Round(models.Model):
         help_text=_("Round complete date."),
     )
 
+    class Meta:
+        unique_together = ('chain', 'on_chain_id')
+
 
 
 
@@ -337,6 +349,14 @@ class Round(models.Model):
             )
         except Exception as e:
             logger.error(f"Failed to calculate and  stellar vault USD prices: {e}")
+        
+    
+    def save(self, *args, **kwargs):
+        if self._state.adding:  # If the account is being created (not updated)
+            if not self.chain_id:
+                # default to stellar chain when none is provided
+                self.chain = Chain.objects.get(name="stellar")
+        super().save(*args, **kwargs)
 
 
 class RoundDeposit(models.Model):
@@ -348,7 +368,6 @@ class RoundDeposit(models.Model):
     on_chain_id = models.IntegerField(
         _("contract deposit ID"),
         null=False,
-        unique=True,
         help_text=_("Deposit ID in contract"),
     )
     round = models.ForeignKey(
@@ -404,12 +423,21 @@ class RoundDeposit(models.Model):
         help_text=_("Deposit date."),
         db_index=True,
     )
+    memo = models.TextField(
+        _("memo"),
+        null=True,
+        blank=True,
+        help_text=_("Deposit memo."),
+    )
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
         blank=True,
         help_text=_("Transaction hash."),
     )
+
+    class Meta:
+        unique_together = ('round', 'on_chain_id')
 
 class Vote(models.Model):
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name='votes')
@@ -430,7 +458,15 @@ class Vote(models.Model):
 class VotePair(models.Model):
     vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name='pairs')
     pair_id = models.PositiveIntegerField()
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='vote_pairs')
+    projects = models.ManyToManyField(Account, related_name='vote_pairs_included_in')
+    voted_project = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE, 
+        related_name='vote_pairs_voted_for_in', 
+        null=True,
+        blank=True
+    )
+    #old_project = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='vote_pairs')
 
     class Meta:
         unique_together = ('vote', 'pair_id')

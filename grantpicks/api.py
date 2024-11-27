@@ -29,7 +29,7 @@ from donations.serializers import (
 )
 from pots.models import PotPayout
 
-from .models import Project, ProjectStatus, Round, Vote
+from .models import Project, ProjectStatus, Round, Vote, VotePair
 from .serializers import (
     PAGINATED_PROJECT_EXAMPLE,
     PAGINATED_ROUND_APPLICATION_EXAMPLE,
@@ -57,6 +57,12 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
                 location=OpenApiParameter.QUERY,
                 description="Sort by field, e.g., deployed_at, vault_total_deposits",
             ),
+            OpenApiParameter(
+                "chain",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter projects by chain",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -79,6 +85,10 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         rounds = Round.objects.all()
+        chain_param = request.query_params.get("chain")
+        if chain_param:
+            # chain = Chain.objects.get(name=chain_param)
+            rounds = rounds.filter(chain_id=chain_param)
         sort = request.query_params.get("sort", None)
         if sort == "deployed_at":
             rounds = rounds.order_by(
@@ -201,10 +211,20 @@ class ProjectRoundVotesAPI(APIView, CustomSizePageNumberPagination):
 
         # Retrieve votes for the specified project in the round
 
-        votes = round_obj.votes.filter(pairs__project_id=project_id)  # Adjust the filter as needed
+        # votes = round_obj.votes.filter(pairs__project_id=project_id)  # Adjust the filter as needed
         # vote_pairs = project.vote_pairs.all()
-        results = self.paginate_queryset(votes, request, view=self)
-        serializer = VoteSerializer(results, many=True)  # Use the appropriate serializer for votes
+        vote_pairs = VotePair.objects.filter(
+            vote__round=round_obj,
+            projects=project_id
+        ).select_related(
+            'vote',
+            'vote__voter',
+            'voted_project'
+        ).prefetch_related('projects')
+        # results = self.paginate_queryset(votes, request, view=self)
+        results = self.paginate_queryset(vote_pairs, request, view=self)
+        # serializer = VoteSerializer(results, many=True)  # Use the appropriate serializer for votes
+        serializer = VoteSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
 
 
