@@ -64,12 +64,12 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
 NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
-STELLAR_CONTRACT_ID = "CCVVNTUD6CFPKZ2C4JAZIQGCAK2S6D6KPP5IELGHTHHJPYV2B62GPJTK" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
-STELLAR_PROJECTS_REGISTRY_CONTRACT = "CAUINLSA42RCTY35UFGOM2NLKMSRM6FW6NP7AR4GTUZHUQZZWB6CRBSJ" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_CONTRACT_ID = "CBMCMOS3KX2R3AFOG3SZFPOFSX2ASMIC3TWF5FTIQTQSLZ6G3RUBQUM5" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = "CDOR6NBGSIE6ARJZHRAJAEDN2NG4QS67LSQRMJETVX6GHEJELLVPXWJQ" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
-
+NEAR_GRANTPICKS_CONTRACT_ID = "v2.grantpicks.potlock.testnet" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 # TODO: split settigns file by enviroment
 if ENVIRONMENT == "testnet":
     POTLOCK_PATTERN = r'\.potlock\.testnet$'

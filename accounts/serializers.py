@@ -51,6 +51,12 @@ class NearSocialProfileDataSerializer(serializers.Serializer):
         help_text="JSON-stringified array of team member account ID strings",
     )
 
+class ProjectInPairSerializer(serializers.ModelSerializer):
+    project_id = serializers.CharField(source='id')
+
+    class Meta:
+        model = Account
+        fields = ['project_id']
 
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:

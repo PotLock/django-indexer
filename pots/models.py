@@ -423,7 +423,7 @@ class PotApplication(models.Model):
         db_index=True,
     )
     project = models.ForeignKey(
-        "grantpicks.Project",
+        Account,
         on_delete=models.CASCADE,
         related_name="applications",
         null=True,

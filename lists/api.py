@@ -1,6 +1,6 @@
 import random
 
-from django.db.models import Exists, OuterRef
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -132,6 +132,12 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
                 OpenApiParameter.QUERY,
                 description="Filter registrations by category",
             ),
+            OpenApiParameter(
+                "search",
+                str,
+                OpenApiParameter.QUERY,
+                description="Search registrants by name or account ID",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -165,6 +171,7 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
         registrations = list_obj.registrations.select_related().all()
         status_param = request.query_params.get("status")
         category_param = request.query_params.get("category")
+        search_param = request.query_params.get("search")
         if status_param:
             if status_param not in ListRegistrationStatus.values:
                 return Response(
@@ -175,6 +182,10 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
             category_regex_pattern = rf'\[.*?"{category_param}".*?\]'
             registrations = registrations.filter(
                 registrant__near_social_profile_data__plCategories__iregex=category_regex_pattern
+            )
+        if search_param:
+            registrations = registrations.filter(
+                Q(registrant__id__icontains=search_param) | Q(registrant__near_social_profile_data__name__icontains=search_param)
             )
         results = self.paginate_queryset(registrations, request, view=self)
         serializer = ListRegistrationSerializer(results, many=True)
