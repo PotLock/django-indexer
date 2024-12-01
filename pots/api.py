@@ -29,8 +29,6 @@ from donations.serializers import (
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
-from pots.util import SQLiteReader
-
 from .models import Pot, PotApplication, PotApplicationStatus, PotFactory
 from .serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
