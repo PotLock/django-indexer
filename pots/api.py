@@ -1,3 +1,5 @@
+import os
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -11,6 +13,7 @@ from drf_spectacular.utils import (
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import json
 
 from accounts.models import Account
 from accounts.serializers import (
@@ -26,6 +29,7 @@ from donations.serializers import (
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
+from pots.util import SQLiteReader
 
 from .models import Pot, PotApplication, PotApplicationStatus, PotFactory
 from .serializers import (
@@ -42,6 +46,7 @@ from .serializers import (
     PotFactorySerializer,
     PotPayoutSerializer,
     PotSerializer,
+    MpdaoVoterSerializer,
 )
 
 
@@ -308,3 +313,55 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
         results = self.paginate_queryset(payouts, request, view=self)
         serializer = PotPayoutSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+class MpdaoUsers(APIView):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("voter_id", str, OpenApiParameter.PATH, description="NEAR account ID of the voter"),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=MpdaoVoterSerializer,
+                description="Returns voter details",
+            ),
+            404: OpenApiResponse(description="Voter not found"),
+            500: OpenApiResponse(description="File read error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        voter_id = request.query_params.get("voter")
+        try:
+            # Read JSON file
+            json_path = os.path.join(settings.BASE_DIR, 'pots', 'last-snapshot-AllVoters.json')
+            with open(json_path, 'r') as file:
+                all_voters = json.load(file)
+
+            # Find voter by ID
+            voter = next(
+                (voter for voter in all_voters if voter['voter_id'] == voter_id), 
+                None
+            )
+
+            if not voter:
+                return Response(
+                    {"message": f"Voter with ID {voter_id} not found"}, 
+                    status=404
+                )
+
+            serializer = MpdaoVoterSerializer(voter)
+            return Response(serializer.data)
+
+        except FileNotFoundError:
+            return Response(
+                {"message": "Voters snapshot file not found"}, 
+                status=500
+            )
+        except Exception as e:
+            return Response(
+                {"message": f"Error processing voter data: {str(e)}"}, 
+                status=500
+            )
+        

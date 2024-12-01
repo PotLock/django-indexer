@@ -27,6 +27,7 @@ from lists.api import (
     ListsListAPI,
 )
 from pots.api import (
+    MpdaoUsers,
     PotApplicationsAPI,
     PotDetailAPI,
     PotDonationsAPI,
@@ -149,5 +150,11 @@ urlpatterns = [
     ),
     path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
     path("v1/<str:account_id>/<int:project_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_api"),
+
+    path(
+        "v1/mpdao/voter-info",
+        MpdaoUsers.as_view(),
+        name="mpdao_api",
+    ),
     
 ]
