@@ -154,6 +154,13 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
                 required=False,
                 description="Filter by application status",
             ),
+            OpenApiParameter(
+                "search",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Search by applicant name or account ID",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -182,6 +189,15 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
         applications = pot.applications.all()
+        
+        search_param = request.query_params.get("search")
+        if search_param:
+            applications = applications.filter(
+                Q(applicant__id__icontains=search_param) |
+                Q(applicant__name__icontains=search_param)
+            )
+
+        # Handle status filter
         status_param = request.query_params.get("status")
         if status_param:
             if status_param not in PotApplicationStatus.values:
@@ -189,6 +205,7 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
                     {"message": f"Invalid status value: {status_param}"}, status=400
                 )
             applications = applications.filter(status=status_param)
+
         results = self.paginate_queryset(applications, request, view=self)
         serializer = PotApplicationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
@@ -280,6 +297,13 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "search",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Search by recipient name or account ID",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -308,6 +332,14 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
         payouts = pot.payouts.all()
+
+        search_param = request.query_params.get("search")
+        if search_param:
+            payouts = payouts.filter(
+                Q(recipient__id__icontains=search_param) |
+                Q(recipient__name__icontains=search_param)
+            )
+
         results = self.paginate_queryset(payouts, request, view=self)
         serializer = PotPayoutSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
