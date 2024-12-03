@@ -349,7 +349,7 @@ class MpdaoUsers(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("voter_id", str, OpenApiParameter.QUERY, description="NEAR account ID of the voter"),
+            OpenApiParameter("voter_id", str, OpenApiParameter.QUERY, required=False, description="NEAR account ID of the voter"),
         ],
         responses={
             200: OpenApiResponse(
