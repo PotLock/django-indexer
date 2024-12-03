@@ -362,7 +362,7 @@ class MpdaoUsers(APIView):
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
-        voter_id = request.query_params.get("voter")
+        voter_id = request.query_params.get("voter_id")
         try:
             # Read JSON file
             json_path = os.path.join(settings.BASE_DIR, 'pots', 'last-snapshot-AllVoters.json')
