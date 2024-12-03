@@ -194,7 +194,7 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
         if search_param:
             applications = applications.filter(
                 Q(applicant__id__icontains=search_param) |
-                Q(applicant__name__icontains=search_param)
+                Q(applicant__near_social_profile_data__name__icontains=search_param)
             )
 
         # Handle status filter
@@ -337,7 +337,7 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
         if search_param:
             payouts = payouts.filter(
                 Q(recipient__id__icontains=search_param) |
-                Q(recipient__name__icontains=search_param)
+                Q(recipient__near_social_profile_data__name__icontains=search_param)
             )
 
         results = self.paginate_queryset(payouts, request, view=self)
@@ -349,7 +349,7 @@ class MpdaoUsers(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("voter_id", str, OpenApiParameter.PATH, description="NEAR account ID of the voter"),
+            OpenApiParameter("voter_id", str, OpenApiParameter.QUERY, description="NEAR account ID of the voter"),
         ],
         responses={
             200: OpenApiResponse(
