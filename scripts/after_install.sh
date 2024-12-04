@@ -71,9 +71,9 @@ poetry run python manage.py collectstatic --noinput >> "$LOG_FILE" 2>&1
 
 # Gracefully reload Gunicorn to apply the changes without downtime
 echo 'Reloading Gunicorn...' >> "$LOG_FILE"
-sudo systemctl kill --signal=HUP gunicorn
+sudo systemctl kill --signal=HUP gunicorn-prod
 
 echo 'Restarting services...' >> "$LOG_FILE"
-sudo systemctl restart celery-indexer-worker celery-beat-worker celery-beat
+sudo systemctl restart celery-indexer-worker-prod celery-beat-worker-prod celery-beat-prod
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - after_install.sh completed" >> "$LOG_FILE"

@@ -5,7 +5,7 @@ from django.conf import settings
 BASE_PATTERN = (
     r"v\d+\.potfactory\.potlock\.testnet"
     if settings.ENVIRONMENT == "testnet"
-    else r"v\d+\.potfactory\.potlock\.near"
+    else (r"staging\.potfactory\.potlock\.near" if settings.ENVIRONMENT == "dev" else r"v\d+\.potfactory\.potlock\.near")
 )
 
 

@@ -227,7 +227,7 @@ class Round(models.Model):
         blank=True,
         help_text=_("Round cooldown end date."),
     )
-    cooldown_period_ms = models.PositiveIntegerField(
+    cooldown_period_ms = models.PositiveBigIntegerField(
         _("cooldown period in ms"),
         null=True,
         blank=True,
@@ -238,7 +238,7 @@ class Round(models.Model):
         null=False,
         help_text=_("Compliance req desc."),
     )
-    compliance_period_ms = models.PositiveIntegerField(
+    compliance_period_ms = models.PositiveBigIntegerField(
         _("compliance period in ms"),
         null=True,
         blank=True,
