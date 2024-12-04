@@ -177,10 +177,8 @@ async def handle_new_pot(
                 data["public_round_end_ms"] / 1000
             ),
             "registry_provider": data["registry_provider"],
-            "min_matching_pool_donation_amount": data[
-                "min_matching_pool_donation_amount"
-            ] or "0",
-            "sybil_wrapper_provider": data["sybil_wrapper_provider"],
+            "min_matching_pool_donation_amount": data.get("min_matching_pool_donation_amount") or "0",
+            "sybil_wrapper_provider": data.get("sybil_wrapper_provider"),
             "custom_sybil_checks": data.get("custom_sybil_checks"),
             "custom_min_threshold_score": data.get("custom_min_threshold_score"),
             "referral_fee_matching_pool_basis_points": data[
@@ -195,7 +193,7 @@ async def handle_new_pot(
             "matching_pool_donations_count": 0,
             "total_public_donations": "0",
             "public_donations_count": 0,
-            "cooldown_period_ms": None,
+            "cooldown_period_ms": data.get("cooldown_end_ms"),
             "all_paid_out": False,
             "protocol_config_provider": data["protocol_config_provider"],
         }
