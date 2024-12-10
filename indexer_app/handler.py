@@ -188,10 +188,11 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             parsed_log.get("data")[0], receipt.receipt_id, signer_id, "NEAR"
                         )
                     if event_name == "vote":
-                        process_vote_event_async = sync_to_async(process_vote_event)
-                        await process_vote_event_async(
-                            parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
-                        )
+                        if receiver_id == settings.NEAR_GRANTPICKS_CONTRACT_ID:
+                            process_vote_event_async = sync_to_async(process_vote_event)
+                            await process_vote_event_async(
+                                parsed_log.get("data")[0], receipt.receipt_id, "NEAR"
+                            )
                     if event_name == "payouts_set":
                         create_round_payout_aync = sync_to_async(create_round_payout)
                         await create_round_payout_aync(
