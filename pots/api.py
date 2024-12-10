@@ -1,3 +1,5 @@
+import os
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -11,6 +13,7 @@ from drf_spectacular.utils import (
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import json
 
 from accounts.models import Account
 from accounts.serializers import (
@@ -26,7 +29,6 @@ from donations.serializers import (
     DonationSerializer,
     PaginatedDonationsResponseSerializer,
 )
-
 from .models import Pot, PotApplication, PotApplicationStatus, PotFactory
 from .serializers import (
     PAGINATED_PAYOUT_EXAMPLE,
@@ -42,6 +44,7 @@ from .serializers import (
     PotFactorySerializer,
     PotPayoutSerializer,
     PotSerializer,
+    MpdaoVoterSerializer,
 )
 
 
@@ -151,6 +154,13 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
                 required=False,
                 description="Filter by application status",
             ),
+            OpenApiParameter(
+                "search",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Search by applicant name or account ID",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -179,6 +189,15 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
         applications = pot.applications.all()
+        
+        search_param = request.query_params.get("search")
+        if search_param:
+            applications = applications.filter(
+                Q(applicant__id__icontains=search_param) |
+                Q(applicant__near_social_profile_data__name__icontains=search_param)
+            )
+
+        # Handle status filter
         status_param = request.query_params.get("status")
         if status_param:
             if status_param not in PotApplicationStatus.values:
@@ -186,6 +205,7 @@ class PotApplicationsAPI(APIView, CustomSizePageNumberPagination):
                     {"message": f"Invalid status value: {status_param}"}, status=400
                 )
             applications = applications.filter(status=status_param)
+
         results = self.paginate_queryset(applications, request, view=self)
         serializer = PotApplicationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
@@ -277,6 +297,13 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("pot_id", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "search",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="Search by recipient name or account ID",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -305,6 +332,66 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
         payouts = pot.payouts.all()
+
+        search_param = request.query_params.get("search")
+        if search_param:
+            payouts = payouts.filter(
+                Q(recipient__id__icontains=search_param) |
+                Q(recipient__near_social_profile_data__name__icontains=search_param)
+            )
+
         results = self.paginate_queryset(payouts, request, view=self)
         serializer = PotPayoutSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+class MpdaoUsers(APIView):
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("voter_id", str, OpenApiParameter.QUERY, required=False, description="NEAR account ID of the voter"),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=MpdaoVoterSerializer,
+                description="Returns voter details",
+            ),
+            404: OpenApiResponse(description="Voter not found"),
+            500: OpenApiResponse(description="File read error"),
+        },
+    )
+    @method_decorator(cache_page(60 * 5))
+    def get(self, request: Request, *args, **kwargs):
+        voter_id = request.query_params.get("voter_id")
+        try:
+            # Read JSON file
+            json_path = os.path.join(settings.BASE_DIR, 'pots', 'last-snapshot-AllVoters.json')
+            with open(json_path, 'r') as file:
+                all_voters = json.load(file)
+
+            # Find voter by ID
+            voter = next(
+                (voter for voter in all_voters if voter['voter_id'] == voter_id), 
+                None
+            )
+
+            if not voter:
+                return Response(
+                    {"message": f"Voter with ID {voter_id} not found"}, 
+                    status=404
+                )
+
+            serializer = MpdaoVoterSerializer(voter)
+            return Response(serializer.data)
+
+        except FileNotFoundError:
+            return Response(
+                {"message": "Voters snapshot file not found"}, 
+                status=500
+            )
+        except Exception as e:
+            return Response(
+                {"message": f"Error processing voter data: {str(e)}"}, 
+                status=500
+            )
+        

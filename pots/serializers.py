@@ -262,3 +262,35 @@ class PaginatedPotPayoutsResponseSerializer(serializers.Serializer):
     next = serializers.CharField(allow_null=True)
     previous = serializers.CharField(allow_null=True)
     results = PotPayoutSerializer(many=True)
+
+
+class LockingPositionSerializer(serializers.Serializer):
+    index = serializers.IntegerField()
+    amount = serializers.CharField()
+    locking_period = serializers.IntegerField()
+    voting_power = serializers.CharField()
+    unlocking_started_at = serializers.CharField(allow_null=True)
+    is_unlocked = serializers.BooleanField()
+    is_unlocking = serializers.BooleanField()
+    is_locked = serializers.BooleanField()
+
+
+class VotePositionSerializer(serializers.Serializer):
+    votable_address = serializers.CharField()
+    votable_object_id = serializers.CharField()
+    voting_power = serializers.CharField()
+
+
+class MpdaoVoterSerializer(serializers.Serializer):
+    voter_id = serializers.CharField()
+    balance_in_contract = serializers.CharField()
+    voting_power = serializers.CharField()
+    locking_positions = LockingPositionSerializer(many=True)
+    vote_positions = VotePositionSerializer(many=True)
+
+
+class PaginatedMpdaoVotersResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = MpdaoVoterSerializer(many=True)
