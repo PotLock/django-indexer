@@ -64,8 +64,8 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
 NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
-STELLAR_CONTRACT_ID = "CBMCMOS3KX2R3AFOG3SZFPOFSX2ASMIC3TWF5FTIQTQSLZ6G3RUBQUM5" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
-STELLAR_PROJECTS_REGISTRY_CONTRACT = "CDOR6NBGSIE6ARJZHRAJAEDN2NG4QS67LSQRMJETVX6GHEJELLVPXWJQ" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_CONTRACT_ID = "CBEW52FEWIFWK4LCSMX5FAAG2MYB36C2RLKS5YEIF5AOJEDMCGYU3ZGB" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = "CBG2JAGBYUAM3YLQFNFR3ZSWVR7XR5BEQHQ6XGUA3HCWVCHWO3RS3YUD" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
