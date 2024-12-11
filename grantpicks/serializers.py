@@ -178,6 +178,8 @@ SIMPLE_PROJECT_EXAMPLE = {
 SIMPLE_ROUND_EXAMPLE = {
     "id": 1,
     "name": "InteractGrant TO Apply V1",
+    "on_chain_id": 13,
+    "chain": "stellar",
     "owner": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
     "contacts": [
         {
