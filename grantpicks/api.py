@@ -335,16 +335,11 @@ class AccountProjectListAPI(APIView, CustomSizePageNumberPagination):
 
 
 class ProjectStatsAPI(APIView):
-    def dispatch(self, request, *args, **kwargs):
-        return super(ProjectStatsAPI, self).dispatch(request, *args, **kwargs)
-
-    
     @method_decorator(
         cache_page(60 * 5)
     )
     @extend_schema(
         parameters=[
-            OpenApiParameter("project_id", str, OpenApiParameter.PATH),
             OpenApiParameter("account_id", str, OpenApiParameter.PATH),
             *pagination_parameters,
         ],
@@ -369,24 +364,25 @@ class ProjectStatsAPI(APIView):
         }
     )
     def get(self, request: Request, *args, **kwargs):
-        project_id = kwargs.get("project_id")
         owner_address = kwargs.get("account_id")
-        project = Project.objects.get(id=project_id)
 
-        total_donations_usd = (
-            Donation.objects.all().aggregate(Sum("total_amount_usd"))[
-                "total_amount_usd__sum"
-            ]
-            or 0
-        )
+        # project = Project.objects.get(id=project_id)
+        account = Account.objects.get(id=owner_address)
+
+        # total_donations_usd = (
+        #     Donation.objects.all().aggregate(Sum("total_amount_usd"))[
+        #         "total_amount_usd__sum"
+        #     ]
+        #     or 0
+        # )
         total_fund_received = (
             PotPayout.objects.filter(paid_at__isnull=False, recipient_id=owner_address).aggregate(
                 Sum("amount_paid_usd")
             )["amount_paid_usd__sum"]
             or 0
         )
-        rounds = project.rounds_approved_in.count()
-        total_votes = Vote.objects.filter(pairs__project=project).aggregate(total_votes=Count('id'))['total_votes']
+        rounds = account.rounds_approved_in.count()
+        total_votes = Vote.objects.filter(pairs_voted_project=account).aggregate(total_votes=Count('id'))['total_votes']
 
         return Response(
             {
