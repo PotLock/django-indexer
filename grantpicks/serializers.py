@@ -63,6 +63,7 @@ class RoundSerializer(ModelSerializer):
         fields = [
             "id",  # Include the primary key
             "on_chain_id",
+            "chain",
             "factory_contract",
             "deployed_at",
             "owner",
@@ -105,6 +106,10 @@ class RoundSerializer(ModelSerializer):
     admins = AccountSerializer(many=True)
     remaining_dist_by = AccountSerializer()
     contacts = ProjectContactSerializer(many=True, required=False)
+    chain = serializers.SerializerMethodField()
+
+    def get_chain(self, obj):
+        return obj.chain.name
 
 
 class ApplicationReviewSerializer(ModelSerializer):
