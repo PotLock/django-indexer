@@ -382,7 +382,7 @@ class ProjectStatsAPI(APIView):
             or 0
         )
         rounds = account.rounds_approved_in.count()
-        total_votes = Vote.objects.filter(pairs_voted_project=account).aggregate(total_votes=Count('id'))['total_votes']
+        total_votes = Vote.objects.filter(pairs__voted_project=account).aggregate(total_votes=Count('id'))['total_votes']
 
         return Response(
             {
