@@ -51,6 +51,7 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
 
     @extend_schema(
         parameters=[
+            OpenApiParameter("account_id", str, OpenApiParameter.PATH, description="get rounds by this account"),
             OpenApiParameter(
                 name="sort",
                 type=str,
@@ -84,7 +85,17 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
     )
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
-        rounds = Round.objects.all()
+        account_id = kwargs.get("account_id")
+        if account_id:
+            try:
+                account = Account.objects.get(id=account_id)
+                rounds = Round.objects.filter(owner=account)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Account with ID {account_id} not found."}, status=404
+                )
+        else:
+            rounds = Round.objects.all()
         chain_param = request.query_params.get("chain")
         if chain_param:
             # chain = Chain.objects.get(name=chain_param)

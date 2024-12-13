@@ -90,6 +90,11 @@ urlpatterns = [
         AccountUpvotedListsAPI.as_view(),
         name="accounts_api_upvoted_lists",
     ),
+    path(
+        "v1/accounts/<str:account_id>/rounds",
+        RoundsListAPI.as_view(),
+        name="accounts_api_rounds",
+    ),
     # donate contract config
     path(
         "v1/donate_contract_config",
