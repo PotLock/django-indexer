@@ -52,6 +52,12 @@ app.conf.beat_schedule = {
     },
 }
 
+
+app.conf.update(
+    worker_max_memory_per_child=1500000,  # Limit worker memory to ~1.5GB
+    worker_max_tasks_per_child=100,      # Restart worker after 100 tasks
+)
+
 app.conf.task_routes = {
     "indexer_app.tasks.update_account_statistics": {"queue": "beat_tasks"},
     "indexer_app.tasks.fetch_usd_prices": {"queue": "beat_tasks"},
