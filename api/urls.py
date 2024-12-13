@@ -90,6 +90,11 @@ urlpatterns = [
         AccountUpvotedListsAPI.as_view(),
         name="accounts_api_upvoted_lists",
     ),
+    path(
+        "v1/accounts/<str:account_id>/rounds",
+        RoundsListAPI.as_view(),
+        name="accounts_api_rounds",
+    ),
     # donate contract config
     path(
         "v1/donate_contract_config",
@@ -149,7 +154,7 @@ urlpatterns = [
         name="rounds_applications_api",
     ),
     path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
-    path("v1/<str:account_id>/<int:project_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_api"),
+    path("v1/<str:account_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_stat__api"),
 
     path(
         "v1/mpdao/voter-info",

@@ -1424,7 +1424,7 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
         contract_id = settings.STELLAR_CONTRACT_ID
         function_name = "get_pair_by_index"
         parameters = [stellar_sdk.scval.to_uint128(round_id), stellar_sdk.scval.to_uint32(pair_id)]
-        public_key = "GDRZ47PQ43TA7GCBW22HHRM6FHN644KF23HFNZ76I46HPNBD5Q7YEYLJ"
+        public_key = "GAMFYFI7TIAPMLSAWIECFZCN52TR3NUIO74YM7ECBCPM6J743KENH367"  # TODO: move to settings
         acct = server.load_account(public_key)
 
         pair_result = server.simulate_transaction(
@@ -1463,7 +1463,7 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                 round_id, vote_data = event_data[0], event_data[1]
             else:
                 # vote_event_data = event_data['vote']
-                round_id, vote_data = event_data.get("round_id", 2), event_data['vote']
+                round_id, vote_data = event_data.get("round_id"), event_data['vote']
 
             chain = Chain.objects.get(name=chain_id)
             round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
