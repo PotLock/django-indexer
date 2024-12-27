@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from rest_framework.serializers import ModelSerializer, SerializerMethodField
+from rest_framework.serializers import ModelSerializer
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from base.serializers import TwoDecimalPlacesField
@@ -81,7 +81,7 @@ class PotFactorySerializer(ModelSerializer):
 
 
 class ApplicationReviewSerializer(serializers.ModelSerializer):
-    reviewer = AccountSerializer()
+    reviewer = serializers.SerializerMethodField()
 
     class Meta:
         model = PotApplicationReview
@@ -92,6 +92,9 @@ class ApplicationReviewSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "tx_hash"
         ]
+
+    def get_reviewer(self, obj):
+        return obj.reviewer.id
 
 
 class PotApplicationSerializer(ModelSerializer):
