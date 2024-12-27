@@ -406,7 +406,7 @@ async def handle_list_update(
 
         logger.info(f"updating list..... {data}")
 
-        listObject = await List.objects.filter(on_chain_id=data["id"]).aupdate(
+        listObject = await List.objects.filter(on_chain_id=data["list_id"]).aupdate(
             owner_id=data["owner"],
             default_registration_status=data["default_registration_status"],
             name=data["name"],

@@ -1,11 +1,11 @@
 from rest_framework import serializers
-from rest_framework.serializers import ModelSerializer, SerializerMethodField
+from rest_framework.serializers import ModelSerializer
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from base.serializers import TwoDecimalPlacesField
 from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
-from .models import Pot, PotApplication, PotFactory, PotPayout
+from .models import Pot, PotApplication, PotFactory, PotPayout, PotApplicationReview
 
 
 class PotSerializer(ModelSerializer):
@@ -80,7 +80,25 @@ class PotFactorySerializer(ModelSerializer):
     whitelisted_deployers = AccountSerializer(many=True)
 
 
+class ApplicationReviewSerializer(serializers.ModelSerializer):
+    reviewer = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PotApplicationReview
+        fields = [
+            "reviewer",
+            "notes",
+            "status",
+            "reviewed_at",
+            "tx_hash"
+        ]
+
+    def get_reviewer(self, obj):
+        return obj.reviewer.id
+
+
 class PotApplicationSerializer(ModelSerializer):
+    reviews = ApplicationReviewSerializer(many=True)
 
     class Meta:
         model = PotApplication
@@ -93,6 +111,7 @@ class PotApplicationSerializer(ModelSerializer):
             "submitted_at",
             "updated_at",
             "tx_hash",
+            "reviews",
         ]
 
     pot = PotSerializer()
@@ -211,6 +230,14 @@ PAGINATED_POT_FACTORY_EXAMPLE = {
     "results": [SIMPLE_POT_FACTORY_EXAMPLE],
 }
 
+POT_APPLICATION_REVIEW_EXAMPLE = {
+    "reviewer": SIMPLE_ACCOUNT_EXAMPLE,
+    "notes": "Looks good!",
+    "status": "Approved",
+    "reviewed_at": "2024-06-05T18:12:39.014Z",
+    "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
+}
+
 
 SIMPLE_POT_APPLICATION_EXAMPLE = {
     "id": 2,
@@ -221,6 +248,7 @@ SIMPLE_POT_APPLICATION_EXAMPLE = {
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
     "pot": SIMPLE_POT_EXAMPLE,
     "applicant": SIMPLE_ACCOUNT_EXAMPLE,
+    "reviews": [POT_APPLICATION_REVIEW_EXAMPLE],
 }
 
 PAGINATED_POT_APPLICATION_EXAMPLE = {
