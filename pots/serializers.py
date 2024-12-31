@@ -1,5 +1,8 @@
+import requests
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
+
+from django.conf import settings
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
 from base.serializers import TwoDecimalPlacesField
@@ -315,6 +318,24 @@ class MpdaoVoterSerializer(serializers.Serializer):
     voting_power = serializers.CharField()
     locking_positions = LockingPositionSerializer(many=True)
     vote_positions = VotePositionSerializer(many=True)
+
+    staking_token_balance = serializers.SerializerMethodField()
+
+    staking_token_id = serializers.SerializerMethodField()  # mpdao is only available on mainnet, 
+
+    def get_staking_token_balance(self, obj):
+        voter_id = obj.get('voter_id')
+        url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            balance = response.json()
+            return balance
+        return "0"
+    
+    def get_staking_token_id(self, obj):
+        return "meta-pool.near"
+        
+
 
 
 class PaginatedMpdaoVotersResponseSerializer(serializers.Serializer):
