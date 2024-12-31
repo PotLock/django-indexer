@@ -383,7 +383,7 @@ class MpdaoUsers(APIView):
                 account_data = None
 
             
-            if not (voter_data and account_data):
+            if not voter_data and not account_data:
                 return Response(
                     {"message": f"Voter with ID {voter_id} not found."}, 
                     status=404
