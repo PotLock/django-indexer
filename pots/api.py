@@ -369,20 +369,33 @@ class MpdaoUsers(APIView):
             with open(json_path, 'r') as file:
                 all_voters = json.load(file)
 
-            # Find voter by ID
-            voter = next(
+            # Find voter by ID in JSON
+            voter_data = next(
                 (voter for voter in all_voters if voter['voter_id'] == voter_id), 
                 None
             )
 
-            if not voter:
+            # Check in the database
+            try:
+                account = Account.objects.get(id=voter_id)
+                account_data = AccountSerializer(account).data
+            except Account.DoesNotExist:
+                account_data = None
+
+            
+            if not (voter_data and account_data):
                 return Response(
-                    {"message": f"Voter with ID {voter_id} not found"}, 
+                    {"message": f"Voter with ID {voter_id} not found."}, 
                     status=404
                 )
 
-            serializer = MpdaoVoterSerializer(voter)
-            return Response(serializer.data)
+            
+            response_data = {
+                    "account_data": account_data,
+                    "voter_data": MpdaoVoterSerializer(voter_data or {"voter_id": voter_id}).data
+                }
+
+            return Response(response_data)
 
         except FileNotFoundError:
             return Response(
