@@ -314,10 +314,10 @@ class VotePositionSerializer(serializers.Serializer):
 
 class MpdaoVoterSerializer(serializers.Serializer):
     voter_id = serializers.CharField()
-    balance_in_contract = serializers.CharField()
-    voting_power = serializers.CharField()
-    locking_positions = LockingPositionSerializer(many=True)
-    vote_positions = VotePositionSerializer(many=True)
+    balance_in_contract = serializers.CharField(allow_null=True)
+    voting_power = serializers.CharField(allow_null=True)
+    locking_positions = LockingPositionSerializer(many=True, allow_null=True)
+    vote_positions = VotePositionSerializer(many=True, allow_null=True)
 
     staking_token_balance = serializers.SerializerMethodField()
 
