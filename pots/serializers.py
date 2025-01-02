@@ -201,6 +201,35 @@ class PaginatedPotsResponseSerializer(serializers.Serializer):
     previous = serializers.CharField(allow_null=True)
     results = PotSerializer(many=True)
 
+SIMPLE_MPDAO_VOTER_INFO_EXAMPLE = {
+    "voter_id": "01f7f1d124232a78b2a2f8e8ac21219d1ecd131ab592c2d9cae505d3c3cd21b6",
+    "account_data": {
+        "id": "01f7f1d124232a78b2a2f8e8ac21219d1ecd131ab592c2d9cae505d3c3cd21b6",
+        "total_donations_in_usd": 0.0,
+        "total_donations_out_usd": 0.0,
+        "total_matching_pool_allocations_usd": 0.0,
+        "donors_count": 0,
+        "near_social_profile_data": {
+            "name": "Manny98"
+        }
+    },
+    "voter_data": {
+        "voter_id": "01f7f1d124232a78b2a2f8e8ac21219d1ecd131ab592c2d9cae505d3c3cd21b6",
+        "balance_in_contract": None,
+        "voting_power": None,
+        "locking_positions": None,
+        "vote_positions": None,
+        "staking_token_balance": "0",
+        "staking_token_id": "meta-pool.near"
+    }
+}
+
+PAGINATED_MPDAO_USER_EXAMPLE = {
+    "count": 30,
+    "next": "http://127.0.0.1:8000/api/v1/mpdao/voter-info?page=3&page_size=30",
+    "previous": None,
+    "results": [SIMPLE_MPDAO_VOTER_INFO_EXAMPLE],
+}
 
 SIMPLE_POT_FACTORY_EXAMPLE = {
     "account": "v1.potfactory.potlock.near",
@@ -335,11 +364,3 @@ class MpdaoVoterSerializer(serializers.Serializer):
     def get_staking_token_id(self, obj):
         return "meta-pool.near"
         
-
-
-
-class PaginatedMpdaoVotersResponseSerializer(serializers.Serializer):
-    count = serializers.IntegerField()
-    next = serializers.CharField(allow_null=True)
-    previous = serializers.CharField(allow_null=True)
-    results = MpdaoVoterSerializer(many=True)
