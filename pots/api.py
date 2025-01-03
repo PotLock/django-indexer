@@ -39,7 +39,9 @@ from .serializers import (
     PAGINATED_POT_APPLICATION_EXAMPLE,
     PAGINATED_POT_EXAMPLE,
     PAGINATED_POT_FACTORY_EXAMPLE,
+    SIMPLE_MPDAO_VOTER_INFO_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
+    MpdaoVoterItemSerializer,
     PaginatedMpdaoUsersSerializer,
     PaginatedPotApplicationsResponseSerializer,
     PaginatedPotFactoriesResponseSerializer,
@@ -350,46 +352,76 @@ class PotPayoutsAPI(APIView, CustomSizePageNumberPagination):
         return self.get_paginated_response(serializer.data)
 
 
-class MpdaoUsers(APIView):
+class MpdaoVoterMixin:
+    @cached_property
+    def all_voters(self):
+        """Cache the JSON file in memory"""
+        json_path = os.path.join(settings.BASE_DIR, 'pots', 'last-snapshot-AllVoters.json')
+        with open(json_path, 'r') as file:
+            return json.load(file)
+
+    def get_unique_voters(self):
+        """Get and cache the unique voters from RPC"""
+        cache_key = 'mpdao_unique_voters'
+        cached_voters = cache.get(cache_key)
+        
+        if cached_voters is not None:
+            return cached_voters
+
+        url = "https://rpc.web4.near.page/account/mpdao.vote.potlock.near/view/get_unique_voters?election_id.json=1"
+        response = requests.get(url)
+        
+        if response.status_code != 200:
+            raise Exception("Error fetching voters from contract")
+        
+        unique_voters = response.json()
+        cache.set(cache_key, unique_voters, 86400)
+        return unique_voters
+
+    def get_bulk_account_data(self, voter_ids):
+        """Get account data for multiple voters in one query"""
+        accounts = {
+            account.id: AccountSerializer(account).data 
+            for account in Account.objects.select_related().filter(id__in=voter_ids)
+        }
+        return accounts
+
+    def get_voter_data(self, voter_id):
+        """Get voter data from cached JSON"""
+        return next(
+            (voter for voter in self.all_voters if voter['voter_id'] == voter_id), 
+            None
+        )
+
+
+class MpdaoVotersListAPI(MpdaoVoterMixin, APIView):
     DEFAULT_PAGE_SIZE = 30
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("voter_id", str, OpenApiParameter.QUERY, required=False, description="NEAR account ID of the voter"),
             OpenApiParameter("page", int, OpenApiParameter.QUERY, required=False, description="Page number (starts from 1)"),
             OpenApiParameter("page_size", int, OpenApiParameter.QUERY, required=False, description="Number of items per page (default: 30)"),
         ],
         responses={
             200: OpenApiResponse(
                 response=PaginatedMpdaoUsersSerializer,
-                description="Returns voter details or paginated list of all voters for mpdao round",
+                description="Returns paginated list of all voters for mpdao round",
                 examples=[
                     OpenApiExample(
-                        "mpdao-example",
-                        summary="Simple example",
-                        description="Example response for mpdao voters info",
+                        "mpdao-list-example",
+                        summary="Paginated voters list",
+                        description="Example response for mpdao voters list",
                         value=PAGINATED_MPDAO_USER_EXAMPLE,
                     ),
                 ],
             ),
-            404: OpenApiResponse(description="Voter not found"),
-            500: OpenApiResponse(description="File read error"),
+            500: OpenApiResponse(description="Error fetching voters"),
         },
     )
     @method_decorator(cache_page(14400))
     def get(self, request: Request, *args, **kwargs):
-        voter_id = request.query_params.get("voter_id")
-        
         try:
-            if voter_id:
-                return self.get_single_voter(voter_id)
-            else:
-                return self.get_all_voters(request.query_params)
-        except FileNotFoundError:
-            return Response(
-                {"message": "Voters snapshot file not found"}, 
-                status=500
-            )
+            return self.get_all_voters(request.query_params)
         except Exception as e:
             return Response(
                 {"message": f"Error processing voter data: {str(e)}"}, 
@@ -460,56 +492,47 @@ class MpdaoUsers(APIView):
                 status=500
             )
 
-    @cached_property
-    def all_voters(self):
-        """Cache the JSON file in memory"""
-        json_path = os.path.join(settings.BASE_DIR, 'pots', 'last-snapshot-AllVoters.json')
-        with open(json_path, 'r') as file:
-            return json.load(file)
 
-    def get_unique_voters(self):
-        """Get and cache the unique voters from RPC"""
-        cache_key = 'mpdao_unique_voters'
-        cached_voters = cache.get(cache_key)
-        
-        if cached_voters is not None:
-            return cached_voters
+class MpdaoVoterDetailAPI(MpdaoVoterMixin, APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("voter_id", str, OpenApiParameter.PATH, required=True, description="account ID of the voter"),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=MpdaoVoterItemSerializer,
+                description="Returns details for a specific voter",
+                examples=[
+                    OpenApiExample(
+                        "mpdao-voter-example",
+                        summary="Specific voter details",
+                        description="Example response for single voter info",
+                        value=SIMPLE_MPDAO_VOTER_INFO_EXAMPLE
+                    )
+                ]
+            ),
+            404: OpenApiResponse(description="Voter not found"),
+            500: OpenApiResponse(description="Error fetching voter data"),
+        },
+    )
+    @method_decorator(cache_page(14400))
+    def get(self, request: Request, voter_id: str, *args, **kwargs):
+        try:
+            voter_data = self.get_voter_data(voter_id)
+            
+            accounts = self.get_bulk_account_data([voter_id])
+            account_data = accounts.get(voter_id)
 
-        url = "https://rpc.web4.near.page/account/mpdao.vote.potlock.near/view/get_unique_voters?election_id.json=1"
-        response = requests.get(url)
-        
-        if response.status_code != 200:
-            raise Exception("Error fetching voters from contract")
-        
-        unique_voters = response.json()
-        cache.set(cache_key, unique_voters, 86400)  # Cache for 24 hours
-        return unique_voters
-
-    def get_bulk_account_data(self, voter_ids):
-        """Get account data for multiple voters in one query"""
-        accounts = {
-            account.id: AccountSerializer(account).data 
-            for account in Account.objects.select_related().filter(id__in=voter_ids)
-        }
-        return accounts
-
-    def get_voter_data(self, voter_id):
-        """Get voter data from cached JSON"""
-        return next(
-            (voter for voter in self.all_voters if voter['voter_id'] == voter_id), 
-            None
-        )
-
-    def get_single_voter(self, voter_id):
-        """Handle single voter request"""
-        voter_data = self.get_voter_data(voter_id)
-        accounts = self.get_bulk_account_data([voter_id])
-        account_data = accounts.get(voter_id)
-
-        response_data = {
-            "account_data": account_data,
-            "voter_data": MpdaoSnapshotSerializer(voter_data or {"voter_id": voter_id}).data
-        }
-        
-        return Response(response_data)
+            response_data = {
+                "voter_id": voter_id,
+                "account_data": account_data,
+                "voter_data": MpdaoSnapshotSerializer(voter_data or {"voter_id": voter_id}).data
+            }
+            
+            return Response(response_data)
+        except Exception as e:
+            return Response(
+                {"message": f"Error processing voter data: {str(e)}"}, 
+                status=500
+            )
         
