@@ -361,10 +361,15 @@ class MpdaoUsers(APIView):
         responses={
             200: OpenApiResponse(
                 response=MpdaoVoterSerializer,
-                description="Returns voter details or paginated list of all voters",
+                description="Returns voter details or paginated list of all voters for mpdao round",
                 examples=[
-                    PAGINATED_MPDAO_USER_EXAMPLE
-                ]
+                    OpenApiExample(
+                        "mpdao-example",
+                        summary="Simple example",
+                        description="Example response for mpdao voters info",
+                        value=PAGINATED_MPDAO_USER_EXAMPLE,
+                    ),
+                ],
             ),
             404: OpenApiResponse(description="Voter not found"),
             500: OpenApiResponse(description="File read error"),
