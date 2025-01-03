@@ -40,6 +40,7 @@ from .serializers import (
     PAGINATED_POT_EXAMPLE,
     PAGINATED_POT_FACTORY_EXAMPLE,
     SIMPLE_POT_EXAMPLE,
+    PaginatedMpdaoUsersSerializer,
     PaginatedPotApplicationsResponseSerializer,
     PaginatedPotFactoriesResponseSerializer,
     PaginatedPotPayoutsResponseSerializer,
@@ -48,7 +49,7 @@ from .serializers import (
     PotFactorySerializer,
     PotPayoutSerializer,
     PotSerializer,
-    MpdaoVoterSerializer,
+    MpdaoSnapshotSerializer,
 )
 
 
@@ -360,7 +361,7 @@ class MpdaoUsers(APIView):
         ],
         responses={
             200: OpenApiResponse(
-                response=MpdaoVoterSerializer,
+                response=PaginatedMpdaoUsersSerializer,
                 description="Returns voter details or paginated list of all voters for mpdao round",
                 examples=[
                     OpenApiExample(
@@ -425,7 +426,7 @@ class MpdaoUsers(APIView):
                 voters_data.append({
                     "voter_id": voter_id,
                     "account_data": account_data,
-                    "voter_data": MpdaoVoterSerializer(voter_data or {"voter_id": voter_id}).data
+                    "voter_data": MpdaoSnapshotSerializer(voter_data or {"voter_id": voter_id}).data
                 })
 
             base_url = self.request.build_absolute_uri().split('?')[0]
@@ -507,7 +508,7 @@ class MpdaoUsers(APIView):
 
         response_data = {
             "account_data": account_data,
-            "voter_data": MpdaoVoterSerializer(voter_data or {"voter_id": voter_id}).data
+            "voter_data": MpdaoSnapshotSerializer(voter_data or {"voter_id": voter_id}).data
         }
         
         return Response(response_data)
