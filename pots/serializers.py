@@ -4,7 +4,7 @@ from rest_framework.serializers import ModelSerializer
 
 from django.conf import settings
 
-from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer
+from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer, NearSocialProfileDataSerializer
 from base.serializers import TwoDecimalPlacesField
 from tokens.serializers import SIMPLE_TOKEN_EXAMPLE, TokenSerializer
 
@@ -341,7 +341,7 @@ class VotePositionSerializer(serializers.Serializer):
     voting_power = serializers.CharField()
 
 
-class MpdaoVoterSerializer(serializers.Serializer):
+class MpdaoSnapshotSerializer(serializers.Serializer):
     voter_id = serializers.CharField()
     balance_in_contract = serializers.CharField(allow_null=True)
     voting_power = serializers.CharField(allow_null=True)
@@ -363,4 +363,16 @@ class MpdaoVoterSerializer(serializers.Serializer):
     
     def get_staking_token_id(self, obj):
         return "meta-pool.near"
+        
+
+class MpdaoVoterItemSerializer(serializers.Serializer):
+    voter_id = serializers.CharField()
+    account_data = AccountSerializer(allow_null=True)
+    voter_data = MpdaoSnapshotSerializer()
+
+class PaginatedMpdaoUsersSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = MpdaoVoterItemSerializer(many=True)
         
