@@ -435,7 +435,7 @@ class MpdaoVotersListAPI(MpdaoVoterMixin, APIView):
             
             try:
                 page = max(int(query_params.get('page', 1)), 1)
-                page_size = min(int(query_params.get('page_size', self.DEFAULT_PAGE_SIZE)), 100)
+                page_size = min(int(query_params.get('page_size', self.DEFAULT_PAGE_SIZE)), 170)
             except ValueError:
                 page = 1
                 page_size = self.DEFAULT_PAGE_SIZE
