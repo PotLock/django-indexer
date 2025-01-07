@@ -41,6 +41,12 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
                 OpenApiParameter.QUERY,
                 description="Filter lists by account",
             ),
+            OpenApiParameter(
+                "admin",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter lists by admin",
+            ),
             *pagination_parameters,
         ],
         responses={
@@ -72,6 +78,15 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
             except Account.DoesNotExist:
                 return Response(
                     {"message": f"Account with ID {account_id} not found."}, status=404
+                )
+        admin_id = request.query_params.get("admin")
+        if admin_id:
+            try:
+                admin = Account.objects.get(id=admin_id)
+                lists = lists.filter(admins=admin)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Admin with ID {admin_id} not found."}, status=404
                 )
         results = self.paginate_queryset(lists, request, view=self)
         serializer = ListSerializer(results, many=True)
