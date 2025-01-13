@@ -353,7 +353,7 @@ class MpdaoSnapshotSerializer(serializers.Serializer):
 
     staking_token_id = serializers.SerializerMethodField()  # mpdao is only available on mainnet, 
 
-    def get_is_human(self, obj):
+    def get_is_human(self, obj) -> bool:
         voter_id = obj.get('voter_id')
         url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}"
         response = requests.get(url)
