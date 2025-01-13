@@ -347,11 +347,21 @@ class MpdaoSnapshotSerializer(serializers.Serializer):
     voting_power = serializers.CharField(allow_null=True)
     locking_positions = LockingPositionSerializer(many=True, allow_null=True)
     vote_positions = VotePositionSerializer(many=True, allow_null=True)
+    is_human = serializers.SerializerMethodField()
 
     staking_token_balance = serializers.SerializerMethodField()
 
     staking_token_id = serializers.SerializerMethodField()  # mpdao is only available on mainnet, 
 
+    def get_is_human(self, obj):
+        voter_id = obj.get('voter_id')
+        url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            is_human = response.json()
+            return is_human
+        return False
+    
     def get_staking_token_balance(self, obj):
         voter_id = obj.get('voter_id')
         url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}"
