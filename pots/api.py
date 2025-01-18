@@ -79,7 +79,7 @@ class PotsListAPI(APIView, CustomSizePageNumberPagination):
     )
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
-        pots = Pot.objects.all()
+        pots = Pot.objects.select_related('account', 'pot_factory', 'deployer', 'owner', 'chef').prefetch_related('admins').all()
         results = self.paginate_queryset(pots, request, view=self)
         serializer = PotSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)
@@ -250,7 +250,7 @@ class PotDonationsAPI(APIView, CustomSizePageNumberPagination):
         except Pot.DoesNotExist:
             return Response({"message": f"Pot with ID {pot_id} not found."}, status=404)
 
-        donations = pot.donations.all()
+        donations = pot.donations.select_related("donor", "token", 'pot', 'pot__deployer', 'pot__owner', 'pot__chef', 'recipient', 'referrer', 'chef').prefetch_related('pot__admins').all()
         results = self.paginate_queryset(donations, request, view=self)
         serializer = DonationSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

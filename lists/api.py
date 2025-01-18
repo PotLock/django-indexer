@@ -18,7 +18,7 @@ from accounts.models import Account
 from api.pagination import pagination_parameters
 from api.pagination import CustomSizePageNumberPagination
 
-from .models import List, ListRegistrationStatus
+from .models import List, ListRegistration, ListRegistrationStatus
 from .serializers import (
     PAGINATED_LIST_EXAMPLE,
     PAGINATED_LIST_REGISTRATION_EXAMPLE,
@@ -69,7 +69,7 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
     )
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
-        lists = List.objects.all()
+        lists = List.objects.all().select_related("owner").prefetch_related("admins")
         account_id = request.query_params.get("account")
         if account_id:
             try:
@@ -121,7 +121,7 @@ class ListDetailAPI(APIView):
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         try:
-            list_obj = List.objects.get(on_chain_id=list_id)
+            list_obj = List.objects.select_related("owner").prefetch_related("admins").get(on_chain_id=list_id)
         except List.DoesNotExist:
             return Response(
                 {"message": f"List with onchain ID {list_id} not found."}, status=404
@@ -176,14 +176,10 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
-        try:
-            list_obj = List.objects.prefetch_related('registrations').get(on_chain_id=list_id)
-        except List.DoesNotExist:
-            return Response(
-                {"message": f"List with on chain ID {list_id} not found."}, status=404
-            )
+        #list_obj = List.objects.prefetch_related('registrations').get(on_chain_id=list_id)
+        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list__owner", "registrant", "registered_by").prefetch_related("list__admins")
 
-        registrations = list_obj.registrations.select_related().all()
+        # registrations = list_obj.registrations.select_related().all()
         status_param = request.query_params.get("status")
         category_param = request.query_params.get("category")
         search_param = request.query_params.get("search")
@@ -239,14 +235,10 @@ class ListRandomRegistrationAPI(APIView):
     )
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
-        try:
-            list_obj = List.objects.get(on_chain_id=list_id)
-        except List.DoesNotExist:
-            return Response(
-                {"message": f"List on chain ID {list_id} not found."}, status=404
-            )
+        # list_obj = List.objects.get(on_chain_id=list_id)
+        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list__owner", "registrant", "registered_by").prefetch_related("list__admins")
 
-        registrations = list_obj.registrations.all()
+        # registrations = list_obj.registrations.all()
         status_param = request.query_params.get("status")
         if status_param:
             if status_param not in ListRegistrationStatus.values:
