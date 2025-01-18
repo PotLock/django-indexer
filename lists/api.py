@@ -10,6 +10,7 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
 )
+from django.db.models import Count
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -69,7 +70,7 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
     )
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
-        lists = List.objects.all().select_related("owner").prefetch_related("admins")
+        lists = List.objects.all().select_related("owner").prefetch_related("admins", "upvotes").annotate(registrations_count=Count('registrations'))
         account_id = request.query_params.get("account")
         if account_id:
             try:
@@ -176,10 +177,10 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
-        #list_obj = List.objects.prefetch_related('registrations').get(on_chain_id=list_id)
-        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list__owner", "registrant", "registered_by").prefetch_related("list__admins")
+        # list_obj = List.objects.get(on_chain_id=list_id)
+        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins", "list__upvotes")
 
-        # registrations = list_obj.registrations.select_related().all()
+        # registrations = list_obj.registrations.select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins").annotate(registrations_count=Count('list_registrations')).all()
         status_param = request.query_params.get("status")
         category_param = request.query_params.get("category")
         search_param = request.query_params.get("search")
