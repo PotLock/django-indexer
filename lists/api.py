@@ -174,7 +174,7 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    # @method_decorator(cache_page(60 * 1))
+    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         # list_obj = List.objects.get(on_chain_id=list_id)
