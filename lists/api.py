@@ -178,7 +178,7 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         # list_obj = List.objects.get(on_chain_id=list_id)
-        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).annotate(registrations_count=Count('list__registrations')).select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins", "list__upvotes")
+        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins", "list__upvotes")
 
         # registrations = list_obj.registrations.select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins").annotate(registrations_count=Count('list_registrations')).all()
         status_param = request.query_params.get("status")
