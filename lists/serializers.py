@@ -13,6 +13,7 @@ class ListUpvoteSerializer(ModelSerializer):
 
 
 class ListSerializer(ModelSerializer):
+    registrations_count = serializers.IntegerField(required=False)
     class Meta:
         model = List
         fields = [
@@ -34,10 +35,6 @@ class ListSerializer(ModelSerializer):
     owner = AccountSerializer()
     admins = AccountSerializer(many=True)
     upvotes = ListUpvoteSerializer(many=True)
-    registrations_count = SerializerMethodField()
-    
-    def get_registrations_count(self, obj):
-        return obj.registrations.count()
 
     # def get_owner(self, obj):
     #     return AccountSerializer(obj.owner).data
@@ -51,7 +48,6 @@ class ListRegistrationSerializer(ModelSerializer):
         model = ListRegistration
         fields = [
             "id",
-            "list",
             "registrant",
             "registered_by",
             "status",
@@ -62,7 +58,6 @@ class ListRegistrationSerializer(ModelSerializer):
             "tx_hash",
         ]
 
-    list = ListSerializer()
     registrant = AccountSerializer()
     registered_by = AccountSerializer()
 
@@ -104,7 +99,6 @@ SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "registrant_notes": "I'm excited to apply for this list",
     "admin_notes": "This is a great project that I want on my list.",
     "tx_hash": "EVMQsXorrrxPLHfK9UnbzFUy1SVYWvc8hwSGQZs4RbTk",
-    "list": SIMPLE_LIST_EXAMPLE,
     "registrant": SIMPLE_ACCOUNT_EXAMPLE,
     "registered_by": SIMPLE_ACCOUNT_EXAMPLE,
 }
