@@ -94,6 +94,7 @@ class PaginatedListsResponseSerializer(serializers.Serializer):
 
 SIMPLE_LIST_REGISTRATION_EXAMPLE = {
     "id": 10,
+    "list_id": 1,
     "status": "Approved",
     "submitted_at": "2024-06-05T18:01:02.319Z",
     "updated_at": "2024-06-05T18:01:02.319Z",
