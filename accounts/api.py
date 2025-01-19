@@ -431,7 +431,7 @@ class AccountListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
                 {"message": f"Account with ID {account_id} not found."}, status=404
             )
 
-        registrations = ListRegistration.objects.filter(registrant=account)
+        registrations = ListRegistration.objects.filter(registrant=account).select_related('registered_by', 'registrant')
         status_param = request.query_params.get("status")
         if status_param:
             if status_param not in ListRegistrationStatus.values:

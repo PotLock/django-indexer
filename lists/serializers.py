@@ -48,6 +48,7 @@ class ListRegistrationSerializer(ModelSerializer):
         model = ListRegistration
         fields = [
             "id",
+            "list_id",
             "registrant",
             "registered_by",
             "status",
