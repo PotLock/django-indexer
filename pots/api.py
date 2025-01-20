@@ -520,8 +520,7 @@ class MpdaoVoterDetailAPI(MpdaoVoterMixin, APIView):
         try:
             voter_data = self.get_voter_data(voter_id)
             
-            # accounts = self.get_bulk_account_data([voter_id])
-            account_data = accounts = AccountSerializer(voter_id).data 
+            account_data = self.get_bulk_account_data([voter_id])
 
             response_data = {
                 "voter_id": voter_id,
