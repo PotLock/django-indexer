@@ -382,7 +382,7 @@ class MpdaoVoterMixin:
         """Get account data for multiple voters in one query"""
         accounts = {
             account.id: AccountSerializer(account).data 
-            for account in Account.objects.select_related().filter(id__in=voter_ids)
+            for account in Account.objects.filter(id__in=voter_ids)
         }
         return accounts
 
@@ -418,7 +418,7 @@ class MpdaoVotersListAPI(MpdaoVoterMixin, APIView):
             500: OpenApiResponse(description="Error fetching voters"),
         },
     )
-    @method_decorator(cache_page(14400))
+    @method_decorator(cache_page(86400))
     def get(self, request: Request, *args, **kwargs):
         try:
             return self.get_all_voters(request.query_params)
@@ -515,13 +515,13 @@ class MpdaoVoterDetailAPI(MpdaoVoterMixin, APIView):
             500: OpenApiResponse(description="Error fetching voter data"),
         },
     )
-    @method_decorator(cache_page(14400))
+    @method_decorator(cache_page(86400))
     def get(self, request: Request, voter_id: str, *args, **kwargs):
         try:
             voter_data = self.get_voter_data(voter_id)
             
-            accounts = self.get_bulk_account_data([voter_id])
-            account_data = accounts.get(voter_id)
+            # accounts = self.get_bulk_account_data([voter_id])
+            account_data = accounts = AccountSerializer(voter_id).data 
 
             response_data = {
                 "voter_id": voter_id,

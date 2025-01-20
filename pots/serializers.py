@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
 from django.conf import settings
+from django.core.cache import cache
 
 from accounts.serializers import SIMPLE_ACCOUNT_EXAMPLE, AccountSerializer, NearSocialProfileDataSerializer
 from base.serializers import TwoDecimalPlacesField
@@ -355,19 +356,31 @@ class MpdaoSnapshotSerializer(serializers.Serializer):
 
     def get_is_human(self, obj) -> bool:
         voter_id = obj.get('voter_id')
-        url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}"
+        cache_key = f'{voter_id}_is_human'
+        cached_res = cache.get(cache_key)
+        
+        if cached_res is not None:
+            return cached_res
+        url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}&near_block_height=137346724"
         response = requests.get(url)
         if response.status_code == 200:
             is_human = response.json()
+            cache.set(cache_key, is_human, 8640000)
             return is_human
         return False
     
     def get_staking_token_balance(self, obj):
         voter_id = obj.get('voter_id')
-        url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}"
+        cache_key = f'{voter_id}_token_balance'
+        cached_res = cache.get(cache_key)
+
+        if cached_res is not None:
+            return cached_res
+        url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}&near_block_height=137346724"
         response = requests.get(url)
         if response.status_code == 200:
             balance = response.json()
+            cache.set(cache_key, balance, 8640000)
             return balance
         return "0"
     
