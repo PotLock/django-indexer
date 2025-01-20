@@ -361,7 +361,7 @@ class MpdaoSnapshotSerializer(serializers.Serializer):
         
         if cached_res is not None:
             return cached_res
-        url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}&near_block_height=137346724"
+        url = f"https://rpc.web4.near.page/account/v1.nadabot.near/view/is_human?account_id={voter_id}&near_block_height=137273829"
         response = requests.get(url)
         if response.status_code == 200:
             is_human = response.json()
@@ -376,7 +376,7 @@ class MpdaoSnapshotSerializer(serializers.Serializer):
 
         if cached_res is not None:
             return cached_res
-        url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}&near_block_height=137346724"
+        url = f"https://rpc.web4.near.page/account/meta-pool.near/view/ft_balance_of?account_id={voter_id}&near_block_height=137273829"
         response = requests.get(url)
         if response.status_code == 200:
             balance = response.json()
