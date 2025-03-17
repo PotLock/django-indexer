@@ -12,7 +12,7 @@ from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
-from near_lake_framework import LakeConfig, streamer
+from near_lake_framework import LakeConfig, streamer, Network
 import stellar_sdk
 from stellar_sdk.soroban_server import EventFilter, EventFilterType
 from stellar_sdk import Address, stellar_xdr, scval
@@ -38,9 +38,9 @@ async def indexer(from_block: int, to_block: int):
     logger.info(f"from block: {from_block}")
 
     lake_config = LakeConfig(
-        "testnet"
+        Network.TESTNET
         if settings.ENVIRONMENT == "testnet"
-        else "mainnet",
+        else Network.MAINNET,
         settings.AWS_ACCESS_KEY_ID,
         settings.AWS_SECRET_ACCESS_KEY,
         from_block
