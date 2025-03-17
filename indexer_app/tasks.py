@@ -12,7 +12,7 @@ from celery.signals import task_revoked, worker_shutdown
 from django.conf import settings
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Cast, NullIf
-from near_lake_framework import LakeConfig, streamer
+from near_lake_framework import LakeConfig, streamer, Network
 import stellar_sdk
 from stellar_sdk.soroban_server import EventFilter, EventFilterType
 from stellar_sdk import Address, stellar_xdr, scval
@@ -36,22 +36,16 @@ async def indexer(from_block: int, to_block: int):
     """
     # Initialize lake indexer
     logger.info(f"from block: {from_block}")
-    lake_config = (
-        LakeConfig.testnet()
+
+    lake_config = LakeConfig(
+        Network.TESTNET
         if settings.ENVIRONMENT == "testnet"
-        else LakeConfig.mainnet()
-    )
-    lake_config.start_block_height = (
+        else Network.MAINNET,
+        settings.AWS_ACCESS_KEY_ID,
+        settings.AWS_SECRET_ACCESS_KEY,
         from_block
-        if from_block
-        else logger.info(
-            "Starting to index from latest block"
-        )  # TODO: wtf is this shitty code
     )
-    lake_config.aws_access_key_id = settings.AWS_ACCESS_KEY_ID
-    lake_config.aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
     _, streamer_messages_queue = streamer(lake_config)
-    block_count = 0
 
     while True:
         try:
@@ -63,8 +57,6 @@ async def indexer(from_block: int, to_block: int):
             logger.info(
                 f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
             )
-            block_count += 1
-
             # Log time before caching block height
             save_start_time = time.time()
             # Update current block height
