@@ -1,18 +1,19 @@
-from django.db.models import Count, Exists, OuterRef, Sum
-from django.utils import timezone
+from django.db.models import Sum
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import (
     OpenApiExample,
-    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
 )
+from django.conf import settings
+from asgiref.sync import async_to_sync
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from reclaim_python_sdk import ReclaimProofRequest
 from accounts.models import Account
 from donations.models import Donation
 from pots.models import PotPayout
@@ -25,6 +26,8 @@ class StatsResponseSerializer(serializers.Serializer):
     total_donors_count = serializers.IntegerField()
     total_recipients_count = serializers.IntegerField()
 
+class ReclaimProofRequestConfigSerializer(serializers.Serializer):
+    reclaimProofRequestConfig = serializers.CharField()
 
 class StatsAPI(APIView):
     def dispatch(self, request, *args, **kwargs):
@@ -87,3 +90,45 @@ class StatsAPI(APIView):
                 "total_recipients_count": total_recipients_count,
             }
         )
+
+
+class ReclaimProofRequestView(APIView):
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(
+                response=ReclaimProofRequestConfigSerializer,
+                description="Returns Reclaim proof request configuration",
+                examples=[
+                    OpenApiExample(
+                        "example-1",
+                        summary="Simple example",
+                        description="Example response for Reclaim proof request config",
+                        value={
+                            "reclaimProofRequestConfig": "{}"
+                        },
+                        response_only=True,
+                    ),
+                ],
+            ),
+            500: OpenApiResponse(description="Internal server error"),
+        }
+    )
+    def post(self, request: Request, *args, **kwargs):
+        APP_ID = settings.RECLAIM_APP_ID
+        APP_SECRET = settings.RECLAIM_APP_SECRET
+        PROVIDER_ID = settings.RECLAIM_TWITTER_PROVIDER_ID
+
+        platform = request.query_params.get("platform")
+        handle = request.query_params.get("handle")
+
+        try:
+            reclaim_proof_func = async_to_sync(ReclaimProofRequest.init)
+            reclaim_proof_request = reclaim_proof_func(APP_ID, APP_SECRET, PROVIDER_ID, {"context": {"handle": handle}})
+            # reclaim_proof_request.set_app_callback_url("https://your-backend.com/receive-proofs")
+            reclaim_proof_request_config = reclaim_proof_request.to_json_string()
+
+            return JsonResponse({"reclaimProofRequestConfig": reclaim_proof_request_config})
+        except Exception as error:
+            print(f"Error generating request config: {error}")
+            return JsonResponse({"error": "Failed to generate request config"}, status=500)

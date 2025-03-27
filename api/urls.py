@@ -17,7 +17,7 @@ from accounts.api import (
     AccountsListAPI,
     DonorsAPI,
 )
-from base.api import StatsAPI
+from base.api import StatsAPI, ReclaimProofRequestView
 from donations.api import DonationContractConfigAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
 from lists.api import (
@@ -143,6 +143,7 @@ urlpatterns = [
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),
+    path("v1/reclaim/generate-request", ReclaimProofRequestView.as_view(), name="stats_api"),
 
     # grantpicks
     path("v1/rounds", RoundsListAPI.as_view(), name="rounds_api"),

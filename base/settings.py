@@ -59,6 +59,9 @@ POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
 REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
+RECLAIM_APP_ID = os.environ.get("PL_RECLAIM_APP_ID")
+RECLAIM_APP_SECRET = os.environ.get("PL_RECLAIM_APP_SECRET")
+RECLAIM_TWITTER_PROVIDER_ID = os.environ.get("PL_RECLAIM_TWITTER_PROVIDER_ID")
 
 # POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
