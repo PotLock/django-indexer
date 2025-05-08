@@ -1651,7 +1651,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 'use_whitelist_application': event_data.get('use_whitelist_application', False),
                 'application_wl_list_id': event_data.get('application_wl_list_id'),
                 'voting_wl_list_id': event_data.get('voting_wl_list_id'),
-                'use_vault': use_vault,
+                'use_vault': use_vault or False,
                 'num_picks_per_voter': event_data.get('num_picks_per_voter'),
                 'max_participants': event_data.get('max_participants'),
                 'allow_applications': event_data.get('allow_applications'),
