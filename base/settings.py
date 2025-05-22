@@ -232,7 +232,11 @@ else:
         "https://bos.potlock.io",
         "https://app.potlock.io",
         "https://bos.potlock.app",
-        "https://app.potlock.app"
+        "https://app.potlock.app",
+        "https://staging.alpha.potlock.org",
+        "https://staging.alpha.potlock.io",
+        "https://staging.app.potlock.io",
+        "https://staging.app.potlock.org",
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
