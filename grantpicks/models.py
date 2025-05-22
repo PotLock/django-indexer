@@ -184,10 +184,25 @@ class Round(models.Model):
         null=False,
         help_text=_("Round voting end date."),
     )
-    use_whitelist = models.BooleanField(
+    use_whitelist_voting = models.BooleanField(
         _("use whitelist"),
         null=False,
-        help_text=_("Use whitelist."),
+        help_text=_("Use whitelist for voting."),
+    )
+    use_whitelist_application = models.BooleanField(
+        _("use whitelist"),
+        null=False,
+        help_text=_("Use whitelist for application."),
+    )
+    application_wl_list_id = models.IntegerField(
+        _("list for applicants"),
+        null=True,
+        help_text=_("list for applicants"),
+    )
+    voting_wl_list_id = models.IntegerField(
+        _("list for voter whitelist"),
+        null=True,
+        help_text=_("list for voter whitelist"),
     )
     use_vault = models.BooleanField(
         _("use vault"),

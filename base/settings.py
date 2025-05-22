@@ -59,13 +59,16 @@ POSTGRES_USER = os.environ.get("PL_POSTGRES_USER", None)
 REDIS_HOST = os.environ.get("PL_REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("PL_REDIS_PORT", 6379)
 SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
+RECLAIM_APP_ID = os.environ.get("PL_RECLAIM_APP_ID")
+RECLAIM_APP_SECRET = os.environ.get("PL_RECLAIM_APP_SECRET")
+RECLAIM_TWITTER_PROVIDER_ID = os.environ.get("PL_RECLAIM_TWITTER_PROVIDER_ID")
 
 # POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
 NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
-STELLAR_CONTRACT_ID = "CBEW52FEWIFWK4LCSMX5FAAG2MYB36C2RLKS5YEIF5AOJEDMCGYU3ZGB" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
-STELLAR_PROJECTS_REGISTRY_CONTRACT = "CBG2JAGBYUAM3YLQFNFR3ZSWVR7XR5BEQHQ6XGUA3HCWVCHWO3RS3YUD" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_CONTRACT_ID = "CA7A2776JYIOYXPAJFONDC7BVPDWWLZU524UTGIJIQH6HWWOR6LKYQQT" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = "CA56XSY7YEZ7CJ5FYG7YODQIWE3JNRGZ5S7E7VJAQ675KDS4BLZJ5NJH" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
@@ -234,7 +237,9 @@ else:
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$",
-    "^https?:\/\/.*\.?grantpicks\.com$"
+    "^https?:\/\/.*\.?grantpicks\.com$",
+    "^https:\/\/staging\.app\.potlock\.(org|io|xyz|app)\/?$",
+    "^https:\/\/staging\.alpha\.potlock\.(org|io|xyz|app)\/?$"
 ]
 
 # REDIS / CACHE CONFIGS
