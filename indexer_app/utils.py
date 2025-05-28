@@ -1406,9 +1406,9 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
             # If the application is approved, add the project to the round's approved projects
                 if not round_obj.approved_projects.filter(id=project.owner.id).exists():
                     logger.info(f"Adding project {project.owner.id} to approved projects for Round {round_id}")
-                    round_obj.approved_projects.add(project)
+                    round_obj.approved_projects.add(project.owner)
             else:
-                round_obj.approved_projects.remove(project)
+                round_obj.approved_projects.remove(project.owner)
 
             # Update the PotApplication object
             PotApplication.objects.filter(applicant=applicant, round=round_obj).update(
