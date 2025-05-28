@@ -59,7 +59,6 @@ class Project(models.Model):
     name = models.CharField(max_length=255)
     overview = models.TextField()
     owner = models.ForeignKey(Account, related_name='owned_projects', on_delete=models.CASCADE)
-    payout_address = models.ForeignKey(Account, related_name='payout_projects', on_delete=models.CASCADE)
     contacts = models.ManyToManyField(
         ProjectContact,
         related_name="contact_lists",

@@ -30,7 +30,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     contracts = ProjectContractSerializer(many=True, required=False)
     repositories = ProjectRepositorySerializer(many=True, required=False)
     owner = AccountSerializer()
-    payout_address = AccountSerializer()
 
     class Meta:
         model = Project
@@ -42,7 +41,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             'name',
             'overview',
             'owner',
-            'payout_address',
             'contacts',
             'contracts',
             'team_members',
@@ -161,7 +159,6 @@ SIMPLE_PROJECT_EXAMPLE = {
     "name": "My Project",
     "overview": "This project aims to do something impactful.",
     "owner": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
-    "payout_address": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
     "contacts": [
         {
             "id": 2,

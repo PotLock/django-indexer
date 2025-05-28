@@ -1401,21 +1401,10 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
                 defaults=defaults,
             )
 
-            
-            project = Project.objects.get(on_chain_id=application_data.get("project_id"))
-            if status == PotApplicationStatus.APPROVED:
-            # If the application is approved, add the project to the round's approved projects
-                if not round_obj.approved_projects.filter(id=project.owner.id).exists():
-                    logger.info(f"Adding project {project.owner.id} to approved projects for Round {round_id}")
-                    round_obj.approved_projects.add(project)
-            else:
-                round_obj.approved_projects.remove(project)
-
             # Update the PotApplication object
             PotApplication.objects.filter(applicant=applicant, round=round_obj).update(
                 **{"status": status, "updated_at": updated_at}
             )
-            
 
             return True
 
@@ -1544,7 +1533,6 @@ def process_project_event(event_data, chain_id="stellar"):
         owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['owner'])
 
         # Create or get the payout Account
-        payout_address, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['payout_address'])
 
         # Create the Project
         project, created = Project.objects.update_or_create(
@@ -1555,7 +1543,6 @@ def process_project_event(event_data, chain_id="stellar"):
                 'name': project_data['name'],
                 'overview': project_data['overview'],
                 'owner': owner,
-                'payout_address': payout_address,
                 'status': ProjectStatus("NEW").name,
                 'submited_ms': project_data['submited_ms'],
                 'updated_ms': project_data['updated_ms'],
