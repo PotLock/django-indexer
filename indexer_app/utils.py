@@ -1676,6 +1676,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 'remaining_dist_memo': event_data.get('remaining_dist_memo', event_data.get('remaining_funds_redistribution_memo')),
                 'round_complete': round_time_stamp,
                 'vault_total_deposits': event_data.get('vault_total_deposits'),
+                'minimum_deposit': event_data.get('minimum_deposit'),
                 'current_vault_balance': event_data.get('current_vault_balance'),
                 'deployed_at': timestamp
             }

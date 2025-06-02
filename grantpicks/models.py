@@ -332,6 +332,11 @@ class Round(models.Model):
         blank=True,
         help_text=_("Vault total deposits in USD."),
     )
+
+    minimum_deposit = models.CharField(
+        _("minimum deposit"),
+        help_text=_("Minimum deposit."),
+    )
     round_complete = models.DateTimeField(
         _("round complete"),
         null=True,
