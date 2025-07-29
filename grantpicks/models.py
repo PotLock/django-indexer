@@ -59,7 +59,6 @@ class Project(models.Model):
     name = models.CharField(max_length=255)
     overview = models.TextField()
     owner = models.ForeignKey(Account, related_name='owned_projects', on_delete=models.CASCADE)
-    payout_address = models.ForeignKey(Account, related_name='payout_projects', on_delete=models.CASCADE)
     contacts = models.ManyToManyField(
         ProjectContact,
         related_name="contact_lists",
@@ -332,6 +331,11 @@ class Round(models.Model):
         null=True,
         blank=True,
         help_text=_("Vault total deposits in USD."),
+    )
+
+    minimum_deposit = models.CharField(
+        _("minimum deposit"),
+        help_text=_("Minimum deposit."),
     )
     round_complete = models.DateTimeField(
         _("round complete"),

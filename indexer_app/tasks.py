@@ -341,7 +341,7 @@ def stellar_event_indexer():
     start_sequence = get_ledger_sequence()
     # start_sequence = 12169
     if not start_sequence:
-        start_sequence = 774951
+        start_sequence = 2771
     jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
     try:
         # Fetch events for the current sequence
@@ -371,7 +371,7 @@ def stellar_event_indexer():
                 transaction_hash=event.transaction_hash,
                 data=event_value
             ))
-    
+
         if len(stellar_events) > 0:
             StellarEvent.objects.bulk_create(
                 objs=stellar_events,
@@ -398,39 +398,39 @@ def process_stellar_events():
 
             if event_name == 'c_project':
                 event.processed = process_project_event(event_data)
-            
+
             elif event_name == 'c_round' or event_name == 'u_round':
-                
+
                 # Mark event as processed
                 event.processed = create_or_update_round(event_data, event.contract_id, event.ingested_at)
 
             elif event_name == 'apply_to_round':
-                
+
                 # Mark event as processed
-                event.processed = process_application_to_round(event_data, event.transaction_hash)            
+                event.processed = process_application_to_round(event_data, event.transaction_hash)
 
             elif event_name == 'c_app':
-                
+
                 event.processed = create_round_application(event_data, event.transaction_hash)
 
 
-            elif event_name == 'u_app': # application review and aproval                
+            elif event_name == 'u_app': # application review and aproval
                 event.processed = update_application(event_data, event.transaction_hash)
-            
-            elif event_name == 'u_ap':                
+
+            elif event_name == 'u_ap':
                 event.processed = update_approved_projects(event_data)
-            
+
             elif event_name == 'c_depo':
-                
+
                 event.processed = process_rounds_deposit_event(event_data, event.transaction_hash)
 
             elif event_name == 'c_vote':
-                
+
                 event.processed = process_vote_event(event_data, event.transaction_hash)
             elif event_name == "c_pay":
                 event.processed = create_round_payout(event_data, event.transaction_hash)
             elif event_name == "u_pay":
-                
+
                 event.processed = update_round_payout(event_data, event.transaction_hash)
             event.save()
 

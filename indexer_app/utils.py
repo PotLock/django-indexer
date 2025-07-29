@@ -15,6 +15,7 @@ import stellar_sdk
 
 from accounts.models import Account
 from activities.models import Activity
+from campaigns.models import Campaign, CampaignDonation
 from chains.models import Chain
 from donations.models import Donation
 from grantpicks.models import Project, ProjectContact, ProjectContract, ProjectFundingHistory, ProjectRepository, ProjectStatus, Round, RoundDeposit, Vote, VotePair
@@ -517,11 +518,11 @@ async def handle_list_registration_removal(
     receiver_id: str,
 ):
     logger.info(f"list reg removal: {data}, {receiver_id}")
-    
+
     try:
         list_obj = await List.objects.aget(on_chain_id=data["list_id"])
         await list_obj.registrations.filter(id=data["registration_id"]).adelete()
-        
+
     except Exception as e:
         logger.error(f"Encountered error trying to remove reg: {e}")
 
@@ -1326,7 +1327,7 @@ def get_block_height() -> int:
     if record:
         return record.block_height
     return 178243042
-    
+
 
 
 def update_ledger_sequence(sequence, timestamp: datetime):
@@ -1389,7 +1390,7 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
                 "status": status,
                 "tx_hash": txhash,
             }
-            
+
             appl = PotApplication.objects.filter(
                 applicant=applicant
             ).first()
@@ -1400,6 +1401,15 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
                 reviewed_at=updated_at,
                 defaults=defaults,
             )
+
+            project = Project.objects.get(on_chain_id=application_data.get("project_id"))
+            if status == PotApplicationStatus.APPROVED:
+            # If the application is approved, add the project to the round's approved projects
+                if not round_obj.approved_projects.filter(id=project.owner.id).exists():
+                    logger.info(f"Adding project {project.owner.id} to approved projects for Round {round_id}")
+                    round_obj.approved_projects.add(project.owner)
+            else:
+                round_obj.approved_projects.remove(project.owner)
 
             # Update the PotApplication object
             PotApplication.objects.filter(applicant=applicant, round=round_obj).update(
@@ -1437,9 +1447,9 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
             )
             .set_timeout(30)
             .build()
-        )        
+        )
 
-        
+
         if pair_result.results:
             xdr = pair_result.results[0].xdr
             data = stellar_sdk.scval.to_native(xdr)
@@ -1487,12 +1497,12 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                 if chain_id == "NEAR":
                     pair_id = pick['pair_id']
                     project_id = pick['voted_project']
-                    
-                    
+
+
                 else:
                     pair_id = pick['pair_id']
                     project_id = Project.objects.get(on_chain_id=pick['project_id']).owner.id
-                
+
                 pair_data = get_pair_projects(pair_id, round_id, chain_id)
                 logger.info(f"pair data from contract...:,{pair_data}")
                 if pair_data:
@@ -1502,9 +1512,9 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                         project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
                     else:
                         project_1 = project_id_1
-                        project_2 = project_id_2                
+                        project_2 = project_id_2
 
-                
+
                 vp, created = VotePair.objects.update_or_create(
                     vote=vote,
                     pair_id=pair_id,
@@ -1533,7 +1543,6 @@ def process_project_event(event_data, chain_id="stellar"):
         owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['owner'])
 
         # Create or get the payout Account
-        payout_address, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['payout_address'])
 
         # Create the Project
         project, created = Project.objects.update_or_create(
@@ -1544,7 +1553,6 @@ def process_project_event(event_data, chain_id="stellar"):
                 'name': project_data['name'],
                 'overview': project_data['overview'],
                 'owner': owner,
-                'payout_address': payout_address,
                 'status': ProjectStatus("NEW").name,
                 'submited_ms': project_data['submited_ms'],
                 'updated_ms': project_data['updated_ms'],
@@ -1596,7 +1604,7 @@ def process_project_event(event_data, chain_id="stellar"):
             logger.info(f"Created new Project: {project.id}")
         else:
             logger.info(f"Updated existing Project: {project.id}")
-        
+
         return True
 
     except Exception as e:
@@ -1624,7 +1632,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
         if remaining_dist_by:
             remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
 
-        if event_data.get('round_complete_ms', event_data.get('round_complete')):   
+        if event_data.get('round_complete_ms', event_data.get('round_complete')):
             round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
         else:
             round_time_stamp = None
@@ -1669,6 +1677,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 'remaining_dist_memo': event_data.get('remaining_dist_memo', event_data.get('remaining_funds_redistribution_memo')),
                 'round_complete': round_time_stamp,
                 'vault_total_deposits': event_data.get('vault_total_deposits'),
+                'minimum_deposit': event_data.get('minimum_deposit'),
                 'current_vault_balance': event_data.get('current_vault_balance'),
                 'deployed_at': timestamp
             }
@@ -1681,7 +1690,7 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 value=contact['value']
             )
             round_obj.contacts.add(contact_obj)
-        
+
         logger.info(f"Created/Updated Round: {round_id}")
         return True
     except Exception as e:
@@ -1739,7 +1748,7 @@ def create_round_application(event_data, tx_hash, chain_id="stellar"):
         else:
             status = PotApplicationStatus[application_data['status'][0].upper()]
         logger.info(f"Creating application for round: {round_id}")
-        
+
         appl_defaults = {
             "message": application_data["applicant_note"],
             "submitted_at": datetime.fromtimestamp(application_data["submited_ms"] / 1000),
@@ -1747,7 +1756,7 @@ def create_round_application(event_data, tx_hash, chain_id="stellar"):
             "tx_hash": tx_hash,
         }
 
-        
+
         PotApplication.objects.update_or_create(
             applicant=applicant,
             round=round_obj,
@@ -1774,7 +1783,7 @@ def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
         round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         amount = deposit_data["total_amount"]
         depositor, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=deposit_data["depositor_id"])
-        
+
         # Create or update a RoundDeposit object
         deposit, created = RoundDeposit.objects.update_or_create(
             round=round_obj,
@@ -1789,7 +1798,7 @@ def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
                 'deposit_at': datetime.fromtimestamp(deposit_data["deposited_at"] / 1000),
             }
         )
-        
+
         round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + int(amount))
         round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + int(deposit_data["net_amount"]))
         round_obj.save()
@@ -1858,3 +1867,318 @@ def update_round_payout(event_data, tx_hash, chain_id="stellar"):
     except Exception as e:
         logger.error(f"Error updating Payout. {str(e)}")
         return False
+
+# Campaign Event Indexing Methods
+
+async def handle_new_campaign(data: dict, created_at):
+    """
+    Index a new campaign creation event.
+    Expected data format:
+    {
+        "id": campaign_id,
+        "owner": "account.near",
+        "name": "Campaign Name",
+        "description": "Campaign description",
+        "cover_image_url": "https://...",
+        "recipient": "recipient.near",
+        "start_ms": 1234567890000,
+        "end_ms": 1234567890000 or null,
+        "created_ms": 1234567890000,
+        "ft_id": "token.near" or null,
+        "target_amount": "1000000000000000000000000",
+        "min_amount": "100000000000000000000000" or null,
+        "max_amount": "10000000000000000000000000" or null,
+        "total_raised_amount": "0",
+        "net_raised_amount": "0",
+        "escrow_balance": "0",
+        "referral_fee_basis_points": 500,
+        "creator_fee_basis_points": 250,
+        "allow_fee_avoidance": false
+    }
+    """
+
+    try:
+        logger.info(f"Indexing new campaign: {data}")
+
+        data = data["campaign"]
+
+        # Get or create accounts
+        owner, _ = await Account.objects.aget_or_create(id=data["owner"])
+        recipient, _ = await Account.objects.aget_or_create(id=data["recipient"])
+
+        # Get token if specified
+        token_id = data.get("ft_id") or "near"
+        token, _ = await Token.objects.aget_or_create(account_id=token_id)
+
+        # Convert timestamps to datetime objects
+        start_at = datetime.fromtimestamp(data["start_ms"] / 1000)
+        end_at = None
+        if data.get("end_ms"):
+            end_at = datetime.fromtimestamp(data["end_ms"] / 1000)
+        created_at_dt = datetime.fromtimestamp(data["created_ms"] / 1000)
+
+        campaign_defaults = {
+            "owner": owner,
+            "name": data["name"],
+            "description": data.get("description"),
+            "cover_image_url": data.get("cover_image_url"),
+            "recipient": recipient,
+            "token": token,
+            "start_at": start_at,
+            "end_at": end_at,
+            "created_at": created_at_dt,
+            "target_amount": data["target_amount"],
+            "min_amount": data.get("min_amount"),
+            "max_amount": data.get("max_amount"),
+            "total_raised_amount": data.get("total_raised_amount", "0"),
+            "net_raised_amount": data.get("net_raised_amount", "0"),
+            "escrow_balance": data.get("escrow_balance", "0"),
+            "referral_fee_basis_points": data["referral_fee_basis_points"],
+            "creator_fee_basis_points": data["creator_fee_basis_points"],
+            "allow_fee_avoidance": data.get("allow_fee_avoidance", False),
+        }
+
+        campaign, created = await Campaign.objects.aupdate_or_create(
+            on_chain_id=data["id"], defaults=campaign_defaults
+        )
+
+        if created:
+            logger.info(f"Created new campaign: {campaign.on_chain_id}")
+        else:
+            logger.info(f"Updated existing campaign: {campaign.on_chain_id}")
+
+        # Fetch USD prices asynchronously
+        await campaign.fetch_usd_prices_async()
+
+    except Exception as e:
+        logger.error(f"Failed to index new campaign: {e}")
+
+
+
+async def handle_update_campaign(data: dict):
+    """
+    Index a campaign update event.
+    Expected data format:
+    {
+        "id": campaign_id,
+        "name": "Updated Name" (optional),
+        "description": "Updated description" (optional),
+        "cover_image_url": "https://..." (optional),
+        "start_ms": 1234567890000 (optional),
+        "end_ms": 1234567890000 (optional),
+        "ft_id": "token.near" (optional),
+        "target_amount": "2000000000000000000000000" (optional),
+        "min_amount": "200000000000000000000000" (optional),
+        "max_amount": "20000000000000000000000000" (optional),
+        "allow_fee_avoidance": true (optional)
+    }
+    """
+
+    try:
+        logger.info(f"Updating campaign: {data}")
+
+        data = data["campaign"]
+
+        token_id = data.get("ft_id") or "near"
+        token, _ = await Token.objects.aget_or_create(account_id=token_id)
+
+        campaign, created = await Campaign.objects.aupdate_or_create(
+            on_chain_id=data["id"],
+            defaults={
+                "name": data["name"],
+                "description": data["description"],
+                "cover_image_url": data["cover_image_url"],
+                "start_at": datetime.fromtimestamp(data["start_ms"] / 1000),
+                "end_at": datetime.fromtimestamp(data["end_ms"] / 1000) if data["end_ms"] else None,
+                "token": token,
+                "target_amount": data["target_amount"],
+                "min_amount": data["min_amount"],
+                "max_amount": data["max_amount"],
+                "allow_fee_avoidance": data["allow_fee_avoidance"],
+            }
+        )
+
+        # Fetch updated USD prices
+        # await campaign.fetch_usd_prices_async()
+
+        logger.info(f"Successfully updated campaign: {campaign.on_chain_id}, or created? {created}")
+
+    except Campaign.DoesNotExist:
+        logger.error(f"Campaign {data['id']} not found for update")
+    except Exception as e:
+        logger.error(f"Failed to update campaign: {e}")
+
+
+async def handle_delete_campaign(campaign_id: int):
+    """
+    Index a campaign deletion event.
+    campaign_id: on_chain_id of the campaign to delete
+    """
+
+    try:
+        logger.info(f"Deleting campaign: {campaign_id}")
+
+        deleted_count, _ = await Campaign.objects.filter(on_chain_id=campaign_id).adelete()
+
+        if deleted_count > 0:
+            logger.info(f"Successfully deleted campaign: {campaign_id}")
+        else:
+            logger.warning(f"Campaign {campaign_id} not found for deletion")
+
+    except Exception as e:
+        logger.error(f"Failed to delete campaign {campaign_id}: {e}")
+
+
+
+async def handle_campaign_donation(data: dict, receipt_id):
+    """
+    Index a campaign donation event.
+    Expected data format:
+    {
+        "id": donation_id,
+        "campaign_id": campaign_id,
+        "donor_id": "donor.near",
+        "total_amount": "1000000000000000000000000",
+        "net_amount": "950000000000000000000000",
+        "message": "Good luck!" (optional),
+        "donated_at_ms": 1234567890000,
+        "protocol_fee": "25000000000000000000000",
+        "referrer_id": "referrer.near" (optional),
+        "referrer_fee": "25000000000000000000000" (optional),
+        "creator_fee": "25000000000000000000000",
+    }
+    """
+
+    try:
+        logger.info(f"Indexing campaign donation: {data}")
+
+        data = data["donation"]
+
+        # Get or create accounts
+        donor, _ = await Account.objects.aget_or_create(id=data["donor_id"])
+
+        logger.info(f"got donor: {donor}")
+        referrer = None
+        if data.get("referrer_id"):
+            referrer, _ = await Account.objects.aget_or_create(id=data["referrer_id"])
+
+        # Get campaign
+        campaign = await Campaign.objects.aget(on_chain_id=data["campaign_id"])
+
+        logger.info(f"got campaign: {campaign}")
+
+        # Convert timestamp to datetime
+        donated_at_dt = datetime.fromtimestamp(data["donated_at_ms"] / 1000)
+
+        logger.info(f"campaign donation timestamp: {donated_at_dt}")
+
+        token_id = data.get("ft_id") or "near"
+
+        donation_defaults = {
+            "token_id": token_id,  # Use campaign's token
+            "total_amount": data["total_amount"],
+            "net_amount": data["net_amount"],
+            "message": data.get("message"),
+            "donated_at": donated_at_dt,
+            "protocol_fee": data["protocol_fee"],
+            "referrer": referrer,
+            "referrer_fee": data.get("referrer_fee"),
+            "creator_fee": data["creator_fee"],
+            "escrowed": data["is_in_escrow"],
+            "tx_hash": receipt_id,
+        }
+
+        logger.info(f"creating campaign donation: {token_id}")
+        donation, created = await CampaignDonation.objects.aupdate_or_create(
+            on_chain_id=data["id"],
+            campaign=campaign,
+            donor=donor,
+            defaults=donation_defaults
+        )
+
+        logger.info(f"before respective: {donation, created}")
+
+        if created:
+            logger.info(f"Created new campaign donation: {donation.on_chain_id}")
+        else:
+            logger.info(f"Updated existing campaign donation: {donation.on_chain_id}")
+
+        # Fetch USD prices asynchronously
+        await donation.fetch_usd_prices_async()
+
+    except Campaign.DoesNotExist:
+        logger.error(f"Campaign {data['campaign_id']} not found for donation")
+    except Exception as e:
+        logger.error(f"Failed to index campaign donation: {e}")
+
+
+
+async def handle_campaign_donation_refund(data: dict, refunded_at):
+    """
+    Index a campaign donation refund event.
+    Expected data format:
+    {
+          "amount": "994710000000000000000000",
+          "campaign_id": 8,
+          "donations": [13],
+          "escrow_balance": "891380000000000000000000"
+        }
+    """
+
+    try:
+        logger.info(f"Indexing campaign donation refund: {data}")
+
+        campaign_id = data["campaign_id"]
+        donation_ids = data.get("donations")
+        escrow_balance = data.get("escrow_balance")
+
+        updated_count = await CampaignDonation.objects.filter(
+            on_chain_id__in=donation_ids,
+            campaign__on_chain_id=campaign_id
+        ).aupdate(returned_at=refunded_at)
+
+        if updated_count > 0:
+            logger.info(f"Successfully marked {updated_count} donations as refunded: {donation_ids}")
+        else:
+            logger.warning(f"No donations found for refund: {donation_ids}")
+
+        # Update campaign escrow balance
+        try:
+            campaign = await Campaign.objects.aget(on_chain_id=campaign_id)
+            campaign.escrow_balance = int(campaign.escrow_balance) - int(escrow_balance)
+            await campaign.asave()
+            logger.info(f"Updated campaign {campaign_id} escrow balance to {escrow_balance}")
+        except Campaign.DoesNotExist:
+            logger.error(f"Campaign {campaign_id} not found for escrow balance update")
+
+    except Exception as e:
+        logger.error(f"Failed to index campaign donation refund: {e}")
+
+
+async def handle_campaign_donation_unescrowed(data: dict):
+    """
+    Index a campaign donation refund event.
+    Expected data format:
+    {
+          "donation_ids": [
+            14
+          ]
+        }
+    """
+
+    try:
+        logger.info(f"Indexing campaign donation unescrow(release to recipient): {data}")
+        donation_ids = data.get("donation_ids")
+
+        updated_count = await CampaignDonation.objects.filter(
+            on_chain_id__in=donation_ids
+        ).aupdate(escrowed=False)
+
+        if updated_count > 0:
+            logger.info(f"Successfully marked donation {data['donation_ids']} as unescrowed")
+
+        else:
+            logger.warning(f"Donation {data['donation_ids']} not found to be unescrowed")
+
+    except Exception as e:
+        logger.error(f"Failed to index campaign donation unescrow: {e}")

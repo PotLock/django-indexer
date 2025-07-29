@@ -30,7 +30,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     contracts = ProjectContractSerializer(many=True, required=False)
     repositories = ProjectRepositorySerializer(many=True, required=False)
     owner = AccountSerializer()
-    payout_address = AccountSerializer()
 
     class Meta:
         model = Project
@@ -42,7 +41,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             'name',
             'overview',
             'owner',
-            'payout_address',
             'contacts',
             'contracts',
             'team_members',
@@ -102,6 +100,7 @@ class RoundSerializer(ModelSerializer):
             "referrer_fee_basis_points",
             "vault_total_deposits",
             "vault_total_deposits_usd",
+            "minimum_deposit",
             "round_complete",
         ]
     owner = AccountSerializer()
@@ -161,7 +160,6 @@ SIMPLE_PROJECT_EXAMPLE = {
     "name": "My Project",
     "overview": "This project aims to do something impactful.",
     "owner": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
-    "payout_address": "GD4I4FXMIKKKVSGVCGNILRFFHDQHITMDW545SCLGEOKGBN6W44AV6367",
     "contacts": [
         {
             "id": 2,
@@ -218,6 +216,7 @@ SIMPLE_ROUND_EXAMPLE = {
     "vault_total_deposits": 0,
     "current_vault_balance": 0,
     "referrer_fee_basis_points": 0,
+    "minimum_deposit": 10000000,
 }
 
 PAGINATED_ROUND_EXAMPLE = {
