@@ -18,6 +18,13 @@ from accounts.api import (
     DonorsAPI,
 )
 from base.api import StatsAPI, ReclaimProofRequestView
+from campaigns.api import (
+    AllCampaignDonationsAPI,
+    CampaignContractConfigAPI,
+    CampaignDetailAPI,
+    CampaignDonationsAPI,
+    CampaignsAPI,
+)
 from donations.api import DonationContractConfigAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
 from lists.api import (
@@ -101,6 +108,28 @@ urlpatterns = [
         "v1/donate_contract_config",
         DonationContractConfigAPI.as_view(),
         name="donate_contract_config_api",
+    ),
+    # campaigns
+    path("v1/campaigns", CampaignsAPI.as_view(), name="campaigns_api"),
+    path(
+        "v1/campaigns/<int:campaign_id>",
+        CampaignDetailAPI.as_view(),
+        name="campaigns_api_by_id",
+    ),
+    path(
+        "v1/campaigns/<int:campaign_id>/donations",
+        CampaignDonationsAPI.as_view(),
+        name="campaigns_donations_api",
+    ),
+    path(
+        "v1/campaign_donations",
+        AllCampaignDonationsAPI.as_view(),
+        name="all_campaign_donations_api",
+    ),
+    path(
+        "v1/campaign_contract_config",
+        CampaignContractConfigAPI.as_view(),
+        name="campaign_contract_config_api",
     ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
