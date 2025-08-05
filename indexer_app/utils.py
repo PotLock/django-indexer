@@ -2106,6 +2106,19 @@ async def handle_campaign_donation(data: dict, receipt_id):
         # Fetch USD prices asynchronously
         await donation.fetch_usd_prices_async()
 
+        # Update campaign totals
+        try:
+            total_amount = int(data["total_amount"])
+            net_amount = int(data["net_amount"])
+
+            campaign.total_raised_amount = str(int(campaign.total_raised_amount) + total_amount)
+            campaign.net_raised_amount = str(int(campaign.net_raised_amount) + net_amount)
+            await campaign.asave()
+
+            logger.info(f"Updated campaign {campaign.on_chain_id} totals: +{total_amount} total, +{net_amount} net")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Failed to update campaign totals: {e}")
+
     except Campaign.DoesNotExist:
         logger.error(f"Campaign {data['campaign_id']} not found for donation")
     except Exception as e:
@@ -2142,14 +2155,28 @@ async def handle_campaign_donation_refund(data: dict, refunded_at):
         else:
             logger.warning(f"No donations found for refund: {donation_ids}")
 
-        # Update campaign escrow balance
+        # Update campaign escrow balance and totals
         try:
             campaign = await Campaign.objects.aget(on_chain_id=campaign_id)
-            campaign.escrow_balance = int(campaign.escrow_balance) - int(escrow_balance)
+            campaign.escrow_balance = str(int(campaign.escrow_balance) - int(escrow_balance))
+
+            refunded_donations = CampaignDonation.objects.filter(
+                on_chain_id__in=donation_ids,
+                campaign__on_chain_id=campaign_id
+            ).values_list('total_amount', 'net_amount')
+
+            total_refunded = sum(int(donation[0]) for donation in refunded_donations)
+            net_refunded = sum(int(donation[1]) for donation in refunded_donations)
+
+            campaign.total_raised_amount = str(int(campaign.total_raised_amount) - total_refunded)
+            campaign.net_raised_amount = str(int(campaign.net_raised_amount) - net_refunded)
+
             await campaign.asave()
-            logger.info(f"Updated campaign {campaign_id} escrow balance to {escrow_balance}")
+            logger.info(f"Updated campaign {campaign_id}: -{total_refunded} total, -{net_refunded} net, escrow={campaign.escrow_balance}")
         except Campaign.DoesNotExist:
             logger.error(f"Campaign {campaign_id} not found for escrow balance update")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Failed to update campaign totals after refund: {e}")
 
     except Exception as e:
         logger.error(f"Failed to index campaign donation refund: {e}")
