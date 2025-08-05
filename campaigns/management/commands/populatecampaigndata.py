@@ -11,7 +11,7 @@ from tokens.models import Token
 
 
 
-CAMPAIGN_CONTRACT_ID =f"v1.campaign.{settings.POTLOCK_TLA}" if settings.ENVIRONMENT=="testnet" else f"v1.campaigns.staging.{settings.POTLOCK_TLA}"
+CAMPAIGN_CONTRACT_ID =f"v1.campaign.{settings.POTLOCK_TLA}" if settings.ENVIRONMENT=="testnet" else f"v1.campaigns.{settings.POTLOCK_TLA}"
 
 class Command(BaseCommand):
     help = "Pull campaigns data from contract & populate campaigns table."
