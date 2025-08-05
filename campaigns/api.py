@@ -1,4 +1,7 @@
 import requests
+from django.utils import timezone
+from django.db.models import Q, F, FloatField
+from django.db.models.functions import Cast
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -56,10 +59,11 @@ class CampaignsAPI(APIView, CustomSizePageNumberPagination):
                 type=str,
             ),
             OpenApiParameter(
-                name="active",
+                name="status",
                 description="Filter by active campaigns (true/false)",
                 required=False,
-                type=bool,
+                type=str,
+                enum=["active", "upcoming", "ended", "unfufilled"],
             ),
         ],
         responses={
@@ -94,25 +98,37 @@ class CampaignsAPI(APIView, CustomSizePageNumberPagination):
 
         token = request.query_params.get('token')
         if token:
-            if token.lower() == 'near':
-                queryset = queryset.filter(token__isnull=True)
-            else:
-                queryset = queryset.filter(token__account__id=token)
+            queryset = queryset.filter(token__account__id=token.lower())
 
-        active = request.query_params.get('active')
-        if active is not None:
-            from django.utils import timezone
-            from django.db import models
+        status = request.query_params.get('status')
+        if status:
             now = timezone.now()
-            if active.lower() == 'true':
+            status = status.lower()
+            queryset = queryset.annotate(
+            cast_net_raised=Cast('net_raised_amount', FloatField()),
+            cast_max_amount=Cast('max_amount', FloatField()),
+            cast_target=Cast('target_amount', FloatField())
+        )
+            if status == 'upcoming':
+                queryset = queryset.filter(start_at__gt=now)
+            elif status == 'active':
                 queryset = queryset.filter(
-                    start_at__lte=now,
-                    end_at__gte=now
-                )
-            else:
+                start_at__lte=now
+                    ).filter(
+                        Q(end_at__isnull=True) | Q(end_at__gt=now)
+                    ).filter(
+                        Q(max_amount__isnull=True) | Q(cast_net_raised__lt=F('cast_max_amount'))
+                    )
+            elif status == 'ended':
                 queryset = queryset.filter(
-                    models.Q(start_at__gt=now) | models.Q(end_at__lt=now)
-                )
+                Q(end_at__isnull=False, end_at__lte=now) |
+                Q(max_amount__isnull=False, cast_net_raised__gte=F('cast_max_amount'))
+            )
+            elif status == 'unfufilled':
+                queryset = queryset.filter(
+                Q(end_at__isnull=False, end_at__lte=now),
+                cast_net_raised__lt=F('cast_target')
+            )
 
         # Paginate results
         page = self.paginate_queryset(queryset, request)
