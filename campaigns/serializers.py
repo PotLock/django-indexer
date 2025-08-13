@@ -41,41 +41,39 @@ class CampaignSerializer(ModelSerializer):
             "owner",
             "recipient",
             "token",
-            "is_active",
+            "status",
         ]
 
     owner = AccountSerializer()
     recipient = AccountSerializer()
     token = TokenSerializer()
-    is_active = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
-    def get_is_active(self, obj):
+    def get_status(self, obj):
         """
-        Check if campaign is active based on:
-        1. Campaign has started (start_at <= current_time)
-        2. Campaign hasn't ended yet (end_at > current_time or end_at is None)
-        3. Campaign hasn't reached max amount (net_raised_amount < max_amount or max_amount is None)
+        Get campaign status: active, ended, or upcoming
         """
+        from django.utils import timezone
 
         now = timezone.now()
 
         if obj.start_at > now:
-            return False
+            return "upcoming"
 
         if obj.end_at is not None and obj.end_at <= now:
-            return False
+            return "ended"
 
         if obj.max_amount is not None:
             try:
                 net_raised = int(obj.net_raised_amount)
                 max_amount = int(obj.max_amount)
                 if net_raised >= max_amount:
-                    return False
+                    return "ended"
             except (ValueError, TypeError):
                 # If we can't parse the amounts, assume not maxed out
                 pass
 
-        return True
+        return "active"
 
 
 
@@ -135,7 +133,7 @@ SIMPLE_CAMPAIGN_EXAMPLE = {
     "referral_fee_basis_points": 500,
     "creator_fee_basis_points": 250,
     "allow_fee_avoidance": False,
-    "is_active": True,
+    "status": "active",
     "owner": SIMPLE_ACCOUNT_EXAMPLE,
     "recipient": SIMPLE_ACCOUNT_EXAMPLE,
     "token": SIMPLE_TOKEN_EXAMPLE,
