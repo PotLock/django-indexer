@@ -67,8 +67,8 @@ RECLAIM_TWITTER_PROVIDER_ID = os.environ.get("PL_RECLAIM_TWITTER_PROVIDER_ID")
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
 NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
-STELLAR_CONTRACT_ID = "CCT5MBDD4QGHNHG3VWSJ5AC6FL7DIZHVFQRPXW2OATBWZZRHTQMHSW4O" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
-STELLAR_PROJECTS_REGISTRY_CONTRACT = "CAUX3WSEWUR2Z7N3XKJBQXS5LBVRW62D2C7EYDOAUJXXI3T3YWCBTVMW" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+STELLAR_CONTRACT_ID = os.environ.get("PL_STELLAR_CONTRACT_ID", "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = os.environ.get("PL_STELLAR_PROJECTS_REGISTRY_CONTRACT", "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )

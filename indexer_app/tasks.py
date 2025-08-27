@@ -341,7 +341,7 @@ def stellar_event_indexer():
     start_sequence = get_ledger_sequence()
     # start_sequence = 12169
     if not start_sequence:
-        start_sequence = 63727
+        start_sequence = 58655649
     jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
     try:
         # Fetch events for the current sequence
@@ -362,7 +362,6 @@ def stellar_event_indexer():
             if event.value is not None:
                 event_value = stellar_sdk.scval.to_native(event.value)
                 event_value = json.loads(json.dumps(event_value, default=address_to_string))
-                print("event value:. ", event_value)
             stellar_events.append(StellarEvent(
                 ledger_sequence=event.ledger,
                 event_type=event_name,
