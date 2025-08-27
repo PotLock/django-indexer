@@ -331,9 +331,7 @@ def address_to_string(obj):
 @shared_task
 def stellar_event_indexer():
     server = stellar_sdk.SorobanServer(
-        "https://soroban-testnet.stellar.org"
-        if settings.ENVIRONMENT == "testnet" or settings.ENVIRONMENT == "local"
-        else "https://horizon.stellar.org"
+        settings.STELLAR_RPC_URL
     )
     contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT]
     if contract_ids == ['', '']:

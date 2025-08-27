@@ -90,6 +90,12 @@ FASTNEAR_RPC_URL = (
     else "https://rpc.web4.near.page"
 )
 
+STELLAR_RPC_URL = (
+    "https://soroban-testnet.stellar.org"
+    if ENVIRONMENT == "testnet"
+    else "https://stellar-soroban-public.nodies.app"
+)
+
 BLOCK_SAVE_HEIGHT = os.environ.get("BLOCK_SAVE_HEIGHT")
 
 COINGECKO_URL = (
