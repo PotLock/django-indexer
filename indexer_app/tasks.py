@@ -52,7 +52,7 @@ async def indexer(from_block: int, to_block: int):
             # Log time before fetching a new block
             fetch_start_time = time.time()
             # streamer_message is the current block
-            streamer_message = await streamer_messages_queue.get()
+            streamer_message = await asyncio.wait_for(streamer_messages_queue.get(), 30)
             fetch_end_time = time.time()
             logger.info(
                 f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
@@ -85,6 +85,11 @@ async def indexer(from_block: int, to_block: int):
             logger.info(
                 f"Total time for one iteration: {iteration_end_time - fetch_start_time:.4f} seconds"
             )
+        
+
+        except asyncio.TimeoutError:
+            logger.warning("Stream stalled: no new blocks within timeout, restarting...") # raise Exception so sytemd can restart the worker
+            raise Exception("Stream stalled: restarting...")
 
         except Exception as e:
             logger.error(f"Error in streamer_messages_queue: {e}")
