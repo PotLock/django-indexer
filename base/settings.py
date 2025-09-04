@@ -62,6 +62,7 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 RECLAIM_APP_ID = os.environ.get("PL_RECLAIM_APP_ID")
 RECLAIM_APP_SECRET = os.environ.get("PL_RECLAIM_APP_SECRET")
 RECLAIM_TWITTER_PROVIDER_ID = os.environ.get("PL_RECLAIM_TWITTER_PROVIDER_ID")
+INDEXER_STREAMER_WAIT_TIME = os.environ.get("PL_INDEXER_STREAMER_WAIT_TIME", 300)  # in seconds
 
 # POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
 POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
