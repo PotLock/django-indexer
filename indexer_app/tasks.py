@@ -52,7 +52,7 @@ async def indexer(from_block: int, to_block: int):
             # Log time before fetching a new block
             fetch_start_time = time.time()
             # streamer_message is the current block
-            streamer_message = await asyncio.wait_for(streamer_messages_queue.get(), 30)
+            streamer_message = await asyncio.wait_for(streamer_messages_queue.get(), settings.INDEXER_STREAMER_WAIT_TIME)
             fetch_end_time = time.time()
             logger.info(
                 f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
