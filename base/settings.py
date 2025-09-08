@@ -214,6 +214,8 @@ elif ENVIRONMENT == "dev":
         "https://staging.alpha.potlock.app",
         "http://dev.local",
         "https://dev.local",
+        "https://app.potlock.app",
+        "https://app.potlock.org",
     ]
 else:
     CORS_ALLOWED_ORIGINS = [
