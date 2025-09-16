@@ -415,12 +415,11 @@ def process_stellar_events():
 
                 event.processed = create_round_application(event_data, event.transaction_hash)
 
-
             elif event_name == 'u_app': # application review and aproval
                 event.processed = update_application(event_data, event.transaction_hash)
 
             elif event_name == 'u_ap':
-                event.processed = update_approved_projects(event_data)
+                event.processed = update_approved_projects(event_data, time_stamp=event.ingested_at, tx_hash=event.transaction_hash)
 
             elif event_name == 'c_depo':
 

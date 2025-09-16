@@ -1346,7 +1346,7 @@ def get_ledger_sequence() -> int:
         return record.block_height
 
 
-def update_approved_projects(event_data, chain_id="stellar"):
+def update_approved_projects(event_data, chain_id="stellar", time_stamp=None, tx_hash=None):
     round_id, project_ids = event_data[0], event_data[1]
 
     with transaction.atomic():
@@ -1356,6 +1356,22 @@ def update_approved_projects(event_data, chain_id="stellar"):
             for ids in project_ids:
                 project = Project.objects.get(on_chain_id=ids)
                 round_obj.approved_projects.add(project.owner)
+                logger.info(f"Creating application for round: {round_id} for approved projects")
+                status = PotApplicationStatus['Approved'.upper()]
+
+                appl_defaults = {
+                    "message": "added by owner",
+                    "submitted_at": time_stamp or datetime.now(),
+                    "status": status,
+                    "tx_hash": tx_hash,
+                }
+
+                PotApplication.objects.update_or_create(
+                    applicant=project.owner,
+                    round=round_obj,
+                    project=project.owner,
+                    defaults=appl_defaults,
+                )
             return True
 
         except Exception as e:
@@ -1682,6 +1698,10 @@ def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar
                 'deployed_at': timestamp
             }
         )
+
+        for admin_address in event_data.get('admins', []):
+            admin, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=admin_address)
+            round_obj.admins.add(admin)
 
         # Create contacts for the round
         for contact in event_data.get('contacts', []):
