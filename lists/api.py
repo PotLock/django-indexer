@@ -43,6 +43,12 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
                 description="Filter lists by account",
             ),
             OpenApiParameter(
+                "chain",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter lists by chain id",
+            ),
+            OpenApiParameter(
                 "admin",
                 str,
                 OpenApiParameter.QUERY,
@@ -72,6 +78,17 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all().select_related("owner").prefetch_related("admins", "upvotes").annotate(registrations_count=Count('registrations'))
         account_id = request.query_params.get("account")
+        chain = request.query_params.get("chain")
+        if chain:
+            lists = lists.filter(chain__id=chain)
+        if account_id:
+            try:
+                account = Chain.objects.get(name=account_id)
+                lists = lists.filter(owner=account)
+            except Account.DoesNotExist:
+                return Response(
+                    {"message": f"Account with ID {account_id} not found."}, status=404
+                )
         if account_id:
             try:
                 account = Account.objects.get(id=account_id)

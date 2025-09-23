@@ -906,7 +906,7 @@ async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
         }
 
         activity, activity_created = await Activity.objects.aupdate_or_create(
-            type="List_Admin_Ops", defaults=activity
+            type="Add_List_Admin", defaults=activity
         )
     except Exception as e:
         logger.error(f"Failed to remove list admin, Error: {e}")
@@ -1612,7 +1612,7 @@ def process_project_event(event_data, chain_id="stellar"):
             project.admins.add(admin)
 
         # Associate team members
-        for team_member_data in project_data['team_members']:
+        for team_member_data in project_data.get('team_members', []):
             team_member, _ = Account.objects.get_or_create(id=team_member_data['value'])
             project.team_members.add(team_member)
 
@@ -1886,6 +1886,146 @@ def update_round_payout(event_data, tx_hash, chain_id="stellar"):
         return True
     except Exception as e:
         logger.error(f"Error updating Payout. {str(e)}")
+        return False
+
+
+
+
+def handle_stellar_list(data, contract_id, timestamp, chain_id="stellar"):
+    # receipt = block.receipts().filter(receiptId=receiptId)[0]
+    try:
+        logger.info("upserting involveed accts...")
+
+        owner_address = data.get('owner')
+        chain = Chain.objects.get(name=chain_id)
+        Account.objects.get_or_create(defaults={"chain":chain},id=owner_address)
+
+
+        logger.info(f"creating list..... {data}")
+
+        listObject = List.objects.create(
+            on_chain_id=data["id"],
+            chain=chain,
+            owner_id=data["owner"],
+            default_registration_status=data["default_registration_status"][0],
+            name=data["name"],
+            description=data["description"],
+            cover_image_url=data["cover_img_url"],
+            admin_only_registrations=data["admin_only_registrations"],
+            created_at=datetime.fromtimestamp(data["created_ms"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_ms"] / 1000),
+        )
+
+        if data.get("admins"):
+            for admin_id in data["admins"]:
+                admin_object, _ = Account.objects.get_or_create(defaults={"chain":chain},
+                    id=admin_id,
+                )
+                listObject.admins.add(admin_object)
+        logger.info(f"created list for chain {chain.name}.....")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to handle new list, Error: {e}")
+        return False
+
+
+def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar"):
+    try:
+        logger.info(f"updating list from result..... {data}")
+
+        listObject = List.objects.filter(on_chain_id=data["id"]).update(
+            owner_id=data["owner"],
+            default_registration_status=data["default_registration_status"][0],
+            name=data["name"],
+            description=data["description"],
+            cover_image_url=data["cover_image_url"],
+            admin_only_registrations=data["admin_only_registrations"],
+            created_at=datetime.fromtimestamp(data["created_at"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to handle list update, Error: {e}")
+        return False
+
+
+def handle_new_stellar_list_registration(data, contract_id, tx_hash, chain_id="stellar"):
+    logger.info(f"new Project data: {data}")
+    # Prepare data for insertion
+    chain = Chain.objects.get(name=chain_id)
+    parent_list = List.objects.get(on_chain_id=data["list_id"])
+    try:
+        project = Account.objects.get_or_create({"chain":chain, "id": data["registrant_id"]})
+    except Exception as e:
+        logger.error(f"Encountered error trying to get create acct: {e}")
+
+    logger.info(f"creating new List registration")
+
+    try:
+        _ = ListRegistration.objects.create(
+            **{
+                "id": data["id"],
+                "registrant_id": data["registrant_id"],
+                "list_id": parent_list.id,
+                "status": data["status"],
+                "submitted_at": datetime.fromtimestamp(data["submitted_ms"] / 1000),
+                "updated_at": datetime.fromtimestamp(data["updated_ms"] / 1000),
+                "registered_by_id": data["registered_by"],
+                "admin_notes": data.get("admin_notes"),
+                "registrant_notes": data.get("registrant_notes"),
+                "tx_hash": tx_hash,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Encountered error trying to create list: {e}")
+
+    # Insert activity
+    try:
+        defaults = {
+            "signer_id": data["registered_by"],
+            "receiver_id": contract_id,
+            "timestamp": data["submitted_ms"],
+            "tx_hash": tx_hash,
+        }
+
+        activity, activity_created = Activity.objects.update_or_create(
+            action_result=data, type="Register", defaults=defaults
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Encountered error trying to insert activity: {e}")
+    return False
+
+
+def handle_stellar_list_admin_ops(data, contract_id, timestamp, tx_hash):
+    try:
+        round_id, admins = data[0], data[1]
+        logger.info(f"updating admins: {admins} for round {round_id}")
+        round_obj = Round.objects.get(on_chain_id=round_id) # select related?
+        chain = Chain.objects.get(name="stellar")
+
+        for acct in admins:
+            admin, _ = Account.objects.get_or_create(defaults={"chain":chain},id=acct)
+            contains = round_obj.admins.acontains(admin)
+            if not contains:
+                round_obj.admins.add(admin)
+        for admin in round_obj.admins.all():
+            if not admin.id in admins:
+                round_obj.admins.remove(admin)
+
+        activity = {
+            "signer_id": round_obj.owner.id,
+            "receiver_id": contract_id,
+            "timestamp": timestamp,
+            "tx_hash": tx_hash,
+        }
+
+        activity, activity_created = Activity.objects.update_or_create(
+            type="Add_List_Admin", defaults=activity
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to remove list admin, Error: {e}")
         return False
 
 # Campaign Event Indexing Methods

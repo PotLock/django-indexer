@@ -70,6 +70,7 @@ POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlo
 NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
 STELLAR_CONTRACT_ID = os.environ.get("PL_STELLAR_CONTRACT_ID", "")
 STELLAR_PROJECTS_REGISTRY_CONTRACT = os.environ.get("PL_STELLAR_PROJECTS_REGISTRY_CONTRACT", "")
+STELLAR_LIST_CONTRACT = os.environ.get("PL_STELLAR_LIST_CONTRACT", "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
@@ -93,7 +94,7 @@ FASTNEAR_RPC_URL = (
 
 STELLAR_RPC_URL = (
     "https://soroban-testnet.stellar.org"
-    if ENVIRONMENT == "testnet"
+    if ENVIRONMENT == "local"
     else "https://stellar-soroban-public.nodies.app"
 )
 

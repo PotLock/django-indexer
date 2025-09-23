@@ -25,7 +25,13 @@ from indexer_app.handler import handle_streamer_message
 from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 
 from .logging import logger
-from .utils import create_or_update_round, create_round_application, create_round_payout, get_block_height, get_ledger_sequence, process_application_to_round, process_project_event, process_rounds_deposit_event, process_vote_event, save_block_height, update_application, update_approved_projects, update_ledger_sequence, update_round_payout
+from .utils import (
+    create_or_update_round, create_round_application, create_round_payout,
+    get_block_height, get_ledger_sequence, handle_stellar_list_admin_ops, handle_stellar_list_update, process_application_to_round,
+    process_project_event, process_rounds_deposit_event, process_vote_event,
+    save_block_height, update_application, update_approved_projects,
+    update_ledger_sequence, update_round_payout, handle_stellar_list
+)
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
@@ -85,7 +91,7 @@ async def indexer(from_block: int, to_block: int):
             logger.info(
                 f"Total time for one iteration: {iteration_end_time - fetch_start_time:.4f} seconds"
             )
-        
+
 
         except asyncio.TimeoutError:
             logger.warning("Stream stalled: no new blocks within timeout, restarting...") # raise Exception so sytemd can restart the worker
@@ -333,16 +339,22 @@ def address_to_string(obj):
         return obj.address
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
+
+
+# Todo: Change model so thatthe event indexer saves the event and queues a task to immediately process the event,
+# so we don;t have a separate beat that's looping through
+
+
 @shared_task
 def stellar_event_indexer():
     server = stellar_sdk.SorobanServer(
         settings.STELLAR_RPC_URL
     )
-    contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT]
-    if contract_ids == ['', '']:
+    contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT, settings.STELLAR_LIST_CONTRACT]
+    if contract_ids == ['', '', '']:
         return
     start_sequence = get_ledger_sequence()
-    # start_sequence = 12169
+    # start_sequence = 668843
     if not start_sequence:
         start_sequence = 58655649
     jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
@@ -433,6 +445,14 @@ def process_stellar_events():
             elif event_name == "u_pay":
 
                 event.processed = update_round_payout(event_data, event.transaction_hash)
+            elif event_name == "c_list":
+                event.processed = handle_stellar_list(event_data, event.contract_id, event.ingested_at)
+            elif event_name == "u_list":
+                event.processed = handle_stellar_list_update(event_data, event.contract_id, event.ingested_at)
+            elif event_name == "c_reg":
+                event.processed = handle_stellar_list(event_data, event.contract_id, event.transaction_hash)
+            elif event_name == "u_adm":
+                event.processed = handle_stellar_list_admin_ops(event_data, event.contract_id, event.ingested_at, event.transaction_hash)
             event.save()
 
         except Exception as e:

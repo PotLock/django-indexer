@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
+from chains.models import Chain
 
 
 class ListRegistrationStatus(models.TextChoices):
@@ -10,6 +11,8 @@ class ListRegistrationStatus(models.TextChoices):
     REJECTED = "Rejected", "Rejected"
     GRAYLISTED = "Graylisted", "Graylisted"
     BLACKLISTED = "Blacklisted", "Blacklisted"
+
+
 
 
 class List(models.Model):
@@ -21,8 +24,15 @@ class List(models.Model):
     on_chain_id = models.IntegerField(
         _("contract list ID"),
         null=False,
-        unique=True,
         help_text=_("List ID in contract"),
+    )
+    chain = models.ForeignKey(
+        Chain,
+        default=1,
+        on_delete=models.CASCADE,
+        related_name="lists",
+        related_query_name="list",
+        help_text=_("Blockchain this list was created on."),
     )
     owner = models.ForeignKey(
         Account,
@@ -79,7 +89,12 @@ class List(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["created_at", "updated_at"], name="idx_list_stamps")
+            models.Index(fields=["created_at", "updated_at"], name="idx_list_stamps"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "chain"], name="unique_on_chain_id_per_chain"
+            )
         ]
 
 

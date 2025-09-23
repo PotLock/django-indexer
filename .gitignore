@@ -65,6 +65,7 @@ media/
 # Celery beat schedule file
 celerybeat-schedule
 dump.rdb
+celerybeat-schedule.db
 
 # Flask stuff:
 instance/
