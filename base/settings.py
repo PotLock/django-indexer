@@ -94,7 +94,7 @@ FASTNEAR_RPC_URL = (
 
 STELLAR_RPC_URL = (
     "https://soroban-testnet.stellar.org"
-    if ENVIRONMENT == "local"
+    if ENVIRONMENT == "testnet"
     else "https://stellar-soroban-public.nodies.app"
 )
 
