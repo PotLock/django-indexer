@@ -116,7 +116,12 @@ class ListDetailAPI(APIView):
     @extend_schema(
         parameters=[
             OpenApiParameter("list_id", int, OpenApiParameter.PATH),
-            OpenApiParameter("chain", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "chain",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter lists by chain id",
+            ),
         ],
         responses={
             200: OpenApiResponse(
@@ -139,12 +144,12 @@ class ListDetailAPI(APIView):
     @method_decorator(cache_page(60 * 5))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
-        chain = kwargs.get("chain")
+        chain = request.query_params.get("chain")
         try:
-            list_obj = List.objects.select_related("owner").prefetch_related("admins").get(on_chain_id=list_id, chain=chain)
+            list_obj = List.objects.select_related("owner").prefetch_related("admins").get(on_chain_id=list_id, chain=1 if not chain else chain)
         except List.DoesNotExist:
             return Response(
-                {"message": f"List with onchain ID {list_id} not found on chain {chain}."}, status=404
+                {"message": f"List with onchain ID {list_id} not found."}, status=404
             )
         serializer = ListSerializer(list_obj)
         return Response(serializer.data)
