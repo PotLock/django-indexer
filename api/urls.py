@@ -135,7 +135,7 @@ urlpatterns = [
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
     # lists
     path("v1/lists", ListsListAPI.as_view(), name="lists_api"),
-    path("v1/lists/<int:list_id>", ListDetailAPI.as_view(), name="lists_api_by_id"),
+    path("v1/lists/<int:chain>/<int:list_id>", ListDetailAPI.as_view(), name="lists_api_by_id"),
     path(
         "v1/lists/<int:list_id>/registrations",
         ListRegistrationsAPI.as_view(),
