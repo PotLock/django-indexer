@@ -78,9 +78,8 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all().select_related("owner").prefetch_related("admins", "upvotes").annotate(registrations_count=Count('registrations'))
         account_id = request.query_params.get("account")
-        chain = request.query_params.get("chain")
-        if chain:
-            lists = lists.filter(chain__id=chain)
+        chain = request.query_params.get("chain", "NEAR")
+        lists = lists.filter(chain__name=chain)
         if account_id:
             try:
                 account = Chain.objects.get(name=account_id)
@@ -146,7 +145,7 @@ class ListDetailAPI(APIView):
         list_id = kwargs.get("list_id")
         chain = request.query_params.get("chain")
         try:
-            list_obj = List.objects.select_related("owner").prefetch_related("admins").get(on_chain_id=list_id, chain=1 if not chain else chain)
+            list_obj = List.objects.select_related("owner").prefetch_related("admins").get(on_chain_id=list_id, chain__name="NEAR" if not chain else chain)
         except List.DoesNotExist:
             return Response(
                 {"message": f"List with onchain ID {list_id} not found."}, status=404
@@ -160,6 +159,12 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     @extend_schema(
         parameters=[
             OpenApiParameter("list_id", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "chain",
+                str,
+                OpenApiParameter.QUERY,
+                description="Filter registrations by list chain: ('NEAR', 'stellar')",
+            ),
             OpenApiParameter(
                 "status",
                 str,
@@ -201,8 +206,9 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
     @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
+        chain = request.query_params.get("chain")
         # list_obj = List.objects.get(on_chain_id=list_id)
-        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id).select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins", "list__upvotes")
+        registrations = ListRegistration.objects.filter(list__on_chain_id=list_id, list__chain__name="NEAR" if not chain else chain).select_related("list__chain", "list__owner", "registrant", "registered_by").prefetch_related("list__admins", "list__upvotes")
 
         # registrations = list_obj.registrations.select_related("list", "list__owner", "registrant", "registered_by").prefetch_related("list__admins").annotate(registrations_count=Count('list_registrations')).all()
         status_param = request.query_params.get("status")
