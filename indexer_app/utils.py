@@ -18,7 +18,18 @@ from activities.models import Activity
 from campaigns.models import Campaign, CampaignDonation
 from chains.models import Chain
 from donations.models import Donation
-from grantpicks.models import Project, ProjectContact, ProjectContract, ProjectFundingHistory, ProjectRepository, ProjectStatus, Round, RoundDeposit, Vote, VotePair
+from grantpicks.models import (
+    Project,
+    ProjectContact,
+    ProjectContract,
+    ProjectFundingHistory,
+    ProjectRepository,
+    ProjectStatus,
+    Round,
+    RoundDeposit,
+    Vote,
+    VotePair,
+)
 from indexer_app.models import BlockHeight
 from lists.models import List, ListRegistration, ListUpvote
 from nadabot.models import BlackList, Group, NadabotRegistry, Provider, Stamp
@@ -64,8 +75,12 @@ async def handle_new_nadabot_registry(
     logger.info(f"nadabot registry init... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiverId)
-        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["owner"])
+        registry, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=receiverId
+        )
+        owner, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=data["owner"]
+        )
         nadabot_registry, created = await NadabotRegistry.objects.aupdate_or_create(
             account=registry,
             owner=owner,
@@ -76,7 +91,9 @@ async def handle_new_nadabot_registry(
 
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=admin_id)
+                admin, _ = await Account.objects.aget_or_create(
+                    defaults={"chain_id": 1}, id=admin_id
+                )
                 await nadabot_registry.admins.aadd(admin)
     except Exception as e:
         logger.error(f"Error in registry initiialization: {e}")
@@ -88,10 +105,14 @@ async def handle_registry_blacklist_action(
     logger.info(f"Registry blacklist action....... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiverId)
+        registry, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=receiverId
+        )
         bulk_obj = []
         for acct in data["accounts"]:
-            account, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            account, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=acct
+            )
             bulk_obj.append(
                 {
                     "registry": registry,
@@ -113,7 +134,9 @@ async def handle_registry_unblacklist_action(
     logger.info(f"Registry remove blacklisted accts....... {data}")
 
     try:
-        registry, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiverId)
+        registry, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=receiverId
+        )
         entries = BlackList.objects.filter(account__in=data["accounts"])
         await entries.adelete()
     except Exception as e:
@@ -129,16 +152,21 @@ async def handle_new_pot(
     created_at: datetime,
 ):
     try:
-
         logger.info("new pot deployment process... upsert accounts,")
 
         # Upsert accounts
         owner_id = (
             data.get("owner") or signer_id
         )  # owner is optional; if not provided, owner will be transaction signer (this logic is implemented by Pot contract's "new" method)
-        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=owner_id)
-        signer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=signer_id)
-        receiver, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiver_id)
+        owner, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=owner_id
+        )
+        signer, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=signer_id
+        )
+        receiver, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=receiver_id
+        )
 
         # check if pot exists
         pot = await Pot.objects.filter(account=receiver).afirst()
@@ -150,7 +178,9 @@ async def handle_new_pot(
 
         logger.info("upsert chef")
         if data.get("chef"):
-            chef, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["chef"])
+            chef, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=data["chef"]
+            )
 
         # Create Pot object
         logger.info(f"creating pot with owner {owner_id}....")
@@ -178,7 +208,10 @@ async def handle_new_pot(
                 data["public_round_end_ms"] / 1000
             ),
             "registry_provider": data["registry_provider"],
-            "min_matching_pool_donation_amount": data.get("min_matching_pool_donation_amount") or "0",
+            "min_matching_pool_donation_amount": data.get(
+                "min_matching_pool_donation_amount"
+            )
+            or "0",
             "sybil_wrapper_provider": data.get("sybil_wrapper_provider"),
             "custom_sybil_checks": data.get("custom_sybil_checks"),
             "custom_min_threshold_score": data.get("custom_min_threshold_score"),
@@ -203,7 +236,9 @@ async def handle_new_pot(
         # Add admins to the Pot
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=admin_id)
+                admin, _ = await Account.objects.aget_or_create(
+                    defaults={"chain_id": 1}, id=admin_id
+                )
                 await pot.admins.aadd(admin)
 
         defaults = {
@@ -288,18 +323,20 @@ async def handle_pot_config_update(
 
 async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datetime):
     try:
-
         logger.info("upserting accounts...")
 
         # Upsert accounts
-        owner, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        owner, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=data["owner"],
         )
-        protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        protocol_fee_recipient_account, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=data["protocol_fee_recipient_account"],
         )
 
-        receiver, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        receiver, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=receiver_id,
         )
 
@@ -320,7 +357,8 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         # Add admins to the PotFactory
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+                admin, _ = await Account.objects.aget_or_create(
+                    defaults={"chain_id": 1},
                     id=admin_id,
                 )
                 await factory.admins.aadd(admin)
@@ -328,30 +366,38 @@ async def handle_new_pot_factory(data: dict, receiver_id: str, created_at: datet
         # Add whitelisted deployers to the PotFactory
         if data.get("whitelisted_deployers"):
             for deployer_id in data["whitelisted_deployers"]:
-                deployer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=deployer_id)
+                deployer, _ = await Account.objects.aget_or_create(
+                    defaults={"chain_id": 1}, id=deployer_id
+                )
                 await factory.whitelisted_deployers.aadd(deployer)
     except Exception as e:
         logger.error(f"Failed to handle new pot Factory, Error: {e}")
 
 
-async def handle_new_list_and_reg(signer_id: str, receiver_id: str, status_obj: ExecutionOutcome, receipt: Receipt):
+async def handle_new_list_and_reg(
+    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome, receipt: Receipt
+):
     create_data, reg_data = json.loads(
-                base64.b64decode(status_obj.status.get("SuccessValue")).decode(
-                    "utf-8"
-                )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
-            )
+        base64.b64decode(status_obj.status.get("SuccessValue")).decode(
+            "utf-8"
+        )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
+    )
     await handle_new_list(signer_id, receiver_id, None, create_data)
     if reg_data:
-        await handle_new_list_registration(reg_data, receiver_id, signer_id, receipt, None)
+        await handle_new_list_registration(
+            reg_data, receiver_id, signer_id, receipt, None
+        )
     pass
 
 
 async def handle_new_list(
-    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
+    signer_id: str,
+    receiver_id: str,
+    status_obj: ExecutionOutcome | None,
+    data: dict | None,
 ):
     # receipt = block.receipts().filter(receiptId=receiptId)[0]
     try:
-
         if not data:
             data = json.loads(
                 base64.b64decode(status_obj.status.get("SuccessValue")).decode(
@@ -361,11 +407,11 @@ async def handle_new_list(
 
         logger.info("upserting involveed accts...")
 
-        await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["owner"])
+        await Account.objects.aget_or_create(defaults={"chain_id": 1}, id=data["owner"])
 
-        await Account.objects.aget_or_create(defaults={"chain_id":1},id=signer_id)
+        await Account.objects.aget_or_create(defaults={"chain_id": 1}, id=signer_id)
 
-        await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiver_id)
+        await Account.objects.aget_or_create(defaults={"chain_id": 1}, id=receiver_id)
 
         logger.info(f"creating list..... {data}")
 
@@ -383,7 +429,8 @@ async def handle_new_list(
 
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin_object, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+                admin_object, _ = await Account.objects.aget_or_create(
+                    defaults={"chain_id": 1},
                     id=admin_id,
                 )
                 await listObject.admins.aadd(admin_object)
@@ -391,19 +438,19 @@ async def handle_new_list(
         logger.error(f"Failed to handle new list, Error: {e}")
 
 
-
 async def handle_list_update(
-    signer_id: str, receiver_id: str, status_obj: ExecutionOutcome | None, data: dict | None
+    signer_id: str,
+    receiver_id: str,
+    status_obj: ExecutionOutcome | None,
+    data: dict | None,
 ):
     try:
-
         if not data:
             data = json.loads(
                 base64.b64decode(status_obj.status.get("SuccessValue")).decode(
                     "utf-8"
                 )  # TODO: RECEIVE AS A FUNCTION ARGUMENT
             )
-
 
         logger.info(f"updating list from result..... {data}")
 
@@ -428,14 +475,13 @@ async def handle_list_update(
         logger.error(f"Failed to handle list update, Error: {e}")
 
 
-async def handle_delete_list(
-    data: dict
-):
+async def handle_delete_list(data: dict):
     try:
         logger.info(f"deleting list..... {data}")
         lst = await List.objects.filter(on_chain_id=data["list_id"]).adelete()
     except Exception as e:
         logger.error(f"Failed to delete, Error: {e}")
+
 
 async def handle_new_list_registration(
     data: dict,
@@ -464,7 +510,7 @@ async def handle_new_list_registration(
     parent_list = await List.objects.aget(on_chain_id=reg_data[0]["list_id"])
     for dt in reg_data:
         logger.info(f"dt: {dt}")
-        project_list.append({"chain_id":1, "id": dt["registrant_id"]})
+        project_list.append({"chain_id": 1, "id": dt["registrant_id"]})
         insert_data.append(
             {
                 "id": dt["id"],
@@ -485,7 +531,7 @@ async def handle_new_list_registration(
         await Account.objects.abulk_create(
             objs=[Account(**data) for data in project_list], ignore_conflicts=True
         )
-        await Account.objects.aget_or_create(defaults={"chain_id":1},id=signer_id)
+        await Account.objects.aget_or_create(defaults={"chain_id": 1}, id=signer_id)
         logger.info("Upserted accounts/registrants(signer)")
     except Exception as e:
         logger.error(f"Encountered error trying to get create acct: {e}")
@@ -526,6 +572,7 @@ async def handle_list_registration_removal(
     except Exception as e:
         logger.error(f"Encountered error trying to remove reg: {e}")
 
+
 async def handle_list_registration_update(
     data: dict, receiver_id: str, status_obj: ExecutionOutcome
 ):
@@ -560,7 +607,6 @@ async def handle_pot_application(
     created_at: datetime,
 ):
     try:
-
         # receipt = block.receipts().filter(lambda receipt: receipt.receiptId == receiptId)[0]
         result = status_obj.status.get("SuccessValue")
         if not result:
@@ -572,12 +618,14 @@ async def handle_pot_application(
         logger.info(f"new pot application data: {data}, {appl_data}")
 
         # Update or create the account
-        project, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        project, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=appl_data["project_id"],
         )
 
         # TODO: wouldn't this be the same as the project_id? should inspect
-        signer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        signer, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=signer_id,
         )
 
@@ -590,12 +638,13 @@ async def handle_pot_application(
             "status": appl_data["status"],
             "tx_hash": receipt.receipt_id,
         }
-        application, application_created = (
-            await PotApplication.objects.aupdate_or_create(
-                applicant=project,
-                pot_id=receiver_id,
-                defaults=appl_defaults,
-            )
+        (
+            application,
+            application_created,
+        ) = await PotApplication.objects.aupdate_or_create(
+            applicant=project,
+            pot_id=receiver_id,
+            defaults=appl_defaults,
         )
 
         # Create the activity object
@@ -627,7 +676,6 @@ async def handle_pot_application_status_change(
     status_obj: ExecutionOutcome,
 ):
     try:
-
         logger.info(f"pot application update data: {data}, {receiver_id}")
 
         # receipt = next(receipt for receipt in block.receipts() if receipt.receiptId == receiptId)
@@ -638,7 +686,13 @@ async def handle_pot_application_status_change(
         )
 
         # Retrieve the PotApplication object
-        appl = await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).afirst()
+        appl = (
+            await PotApplication.objects.select_related(
+                "round", "pot", "project", "applicant"
+            )
+            .filter(applicant_id=data["project_id"], pot_id=receiver_id)
+            .afirst()
+        )
 
         if not appl:
             logger.error(
@@ -664,8 +718,12 @@ async def handle_pot_application_status_change(
         )
 
         # Update the PotApplication object
-        await PotApplication.objects.select_related('round', 'pot', 'project', 'applicant').filter(applicant_id=data["project_id"], pot_id=receiver_id).aupdate(
-            **{"status": update_data["status"], "updated_at": updated_at}
+        await (
+            PotApplication.objects.select_related(
+                "round", "pot", "project", "applicant"
+            )
+            .filter(applicant_id=data["project_id"], pot_id=receiver_id)
+            .aupdate(**{"status": update_data["status"], "updated_at": updated_at})
         )
 
         logger.info("PotApplicationReview and PotApplication updated successfully.")
@@ -677,7 +735,6 @@ async def handle_default_list_status_change(
     data: dict, receiver_id: str, status_obj: ExecutionOutcome
 ):
     try:
-
         logger.info(f"update project data: {data}, {receiver_id}")
 
         result_data = json.loads(
@@ -710,24 +767,19 @@ async def handle_list_upvote(
     data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
-
         logger.info(f"upvote list: {data}, {receiver_id}")
 
-        acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
+        acct, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1},
             id=signer_id,
         )
 
-
-        up_default = {
-            "created_at": created_at
-        }
+        up_default = {"created_at": created_at}
 
         list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
 
         await ListUpvote.objects.aupdate_or_create(
-            list=list_obj,
-            account_id=signer_id,
-            defaults=up_default
+            list=list_obj, account_id=signer_id, defaults=up_default
         )
 
         defaults = {
@@ -748,30 +800,25 @@ async def handle_list_upvote(
         logger.error(f"Failed to upvote list, Error: {e}")
 
 
-
-async def handle_remove_upvote(
-    data: dict, receiver_id: str, signer_id: str
-):
+async def handle_remove_upvote(data: dict, receiver_id: str, signer_id: str):
     try:
-
         logger.info(f"remove upvote from list: {data}, {receiver_id}")
         list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
         await ListUpvote.objects.filter(list=list_obj, account_id=signer_id).adelete()
 
-        logger.info(
-            f"Upvote removed successfully"
-        )
+        logger.info(f"Upvote removed successfully")
     except Exception as e:
         logger.error(f"Failed to remove upvote from list, Error: {e}")
 
 
 async def handle_set_payouts(data: dict, receiver_id: str, receipt: Receipt):
     try:
-
         logger.info(f"set payout data: {data}, {receiver_id}")
         payouts = data.get("payouts", [])
         pot = await Pot.objects.aget(account=receiver_id)
-        near_acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id="near")
+        near_acct, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id="near"
+        )
         near_token, _ = await Token.objects.aget_or_create(
             account=near_acct
         )  # Pots only support native NEAR
@@ -807,7 +854,6 @@ async def handle_transfer_payout(
     data: dict, receiver_id: str, receiptId: str, created_at: datetime
 ):
     try:
-
         data = data["payout"]
         logger.info(f"fulfill payout data: {data}, {receiver_id}, {created_at}")
         payout = {
@@ -837,7 +883,9 @@ async def handle_payout_challenge(
     data: dict, receiver_id: str, signer_id: str, receiptId: str, created_at: datetime
 ):
     try:
-        acct, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=signer_id)
+        acct, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=signer_id
+        )
         logger.info(f"challenging payout..: {data}, {receiver_id}")
         payoutChallenge = {
             "created_at": created_at,
@@ -885,12 +933,13 @@ async def handle_payout_challenge_response(
 
 async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
     try:
-
         logger.info(f"updating admin...: {data}, {receiver_id}")
         list_obj = await List.objects.aget(on_chain_id=data["list_id"])
 
         for acct in data["admins"]:
-            admin, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            admin, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=acct
+            )
             contains = await list_obj.admins.acontains(admin)
             if not contains:
                 await list_obj.admins.aadd(admin)
@@ -915,12 +964,13 @@ async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
 async def handle_list_owner_change(data):
     try:
         logger.info(f"changing owner... ...: {data}")
-        await List.objects.filter(id=data["list_id"]).aupdate(**{
-            "owner": data["new_owner_id"]
-        })
+        await List.objects.filter(id=data["list_id"]).aupdate(
+            **{"owner": data["new_owner_id"]}
+        )
 
     except Exception as e:
         logger.error(f"Failed to change list owner, Error: {e}")
+
 
 async def handle_add_nadabot_admin(data, receiverId):
     logger.info(f"adding admin...: {data}, {receiverId}")
@@ -928,7 +978,9 @@ async def handle_add_nadabot_admin(data, receiverId):
         obj = await NadabotRegistry.objects.aget(account=receiverId)
 
         for acct in data["account_ids"]:
-            user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            user, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=acct
+            )
             await obj.admins.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add nadabot admin, Error: {e}")
@@ -939,7 +991,9 @@ async def handle_add_factory_deployers(data, receiverId):
     try:
         factory = await PotFactory.objects.aget(account=receiverId)
         for acct in data["whitelisted_deployers"]:
-            user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=acct)
+            user, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=acct
+            )
             await factory.whitelisted_deployers.aadd(user)
     except Exception as e:
         logger.error(f"Failed to add factory whitelisted deployers, Error: {e}")
@@ -953,8 +1007,6 @@ async def handle_set_factory_configs(data, receiverId):
         await config_update()
     except Exception as e:
         logger.error(f"Failed to update factory configs, Error: {e}")
-
-
 
 
 # # TODO: Need to abstract some actions.
@@ -1008,33 +1060,41 @@ async def handle_new_donation(
 
     try:
         # insert donate contract which is the receiver id(because of activity relationship mainly)
-        donate_contract, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=receiver_id)
+        donate_contract, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=receiver_id
+        )
         # Upsert donor account
-        donor, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=donation_data["donor_id"])
+        donor, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=donation_data["donor_id"]
+        )
         recipient = None
         referrer = None
         chef = None
 
         if donation_data.get("recipient_id"):  # direct donations have recipient_id
-            recipient, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
-                id=donation_data["recipient_id"]
+            recipient, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=donation_data["recipient_id"]
             )
         if donation_data.get("project_id"):  # pot donations have project_id
-            recipient, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
-                id=donation_data["project_id"]
+            recipient, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=donation_data["project_id"]
             )
 
         if donation_data.get("referrer_id"):
-            referrer, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},
-                id=donation_data["referrer_id"]
+            referrer, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=donation_data["referrer_id"]
             )
 
         if donation_data.get("chef_id"):
-            chef, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=donation_data["chef_id"])
+            chef, _ = await Account.objects.aget_or_create(
+                defaults={"chain_id": 1}, id=donation_data["chef_id"]
+            )
 
         # Upsert token account
         ft_id = donation_data.get("ft_id") or "near"
-        token_acct, token_acct_created = await Account.objects.aget_or_create(defaults={"chain_id":1},id=ft_id)
+        token_acct, token_acct_created = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=ft_id
+        )
         token_defaults = {
             "decimals": 24,
         }
@@ -1065,7 +1125,6 @@ async def handle_new_donation(
         logger.error(f"Failed to create/get an account involved in donation: {e}")
 
     try:
-
         total_amount = donation_data["total_amount"]
 
         logger.info(f"inserting {donation_type} donation")
@@ -1199,7 +1258,6 @@ async def handle_update_default_human_threshold(data: dict, receiverId: str):
     logger.info(f"update threshold data... {data}")
 
     try:
-
         reg = await NadabotRegistry.objects.filter(account=receiverId).aupdate(
             **{"default_human_threshold": data["default_human_threshold"]}
         )
@@ -1217,8 +1275,12 @@ async def handle_new_provider(data: dict, receiverId: str, signerId: str):
     )
 
     try:
-        submitter, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["submitted_by"])
-        contract, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["contract_id"])
+        submitter, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=data["submitted_by"]
+        )
+        contract, _ = await Account.objects.aget_or_create(
+            defaults={"chain_id": 1}, id=data["contract_id"]
+        )
 
         provider_id = data["id"]
 
@@ -1263,7 +1325,9 @@ async def handle_add_stamp(data: dict, receiverId: str, signerId: str):
 
     logger.info(f"upserting accounts involved, {data['user_id']}")
 
-    user, _ = await Account.objects.aget_or_create(defaults={"chain_id":1},id=data["user_id"])
+    user, _ = await Account.objects.aget_or_create(
+        defaults={"chain_id": 1}, id=data["user_id"]
+    )
     provider, _ = await Provider.objects.aget_or_create(on_chain_id=data["provider_id"])
 
     try:
@@ -1329,7 +1393,6 @@ def get_block_height() -> int:
     return 178243042
 
 
-
 def update_ledger_sequence(sequence, timestamp: datetime):
     BlockHeight.objects.update_or_create(
         id=2,
@@ -1340,13 +1403,16 @@ def update_ledger_sequence(sequence, timestamp: datetime):
         },
     )
 
+
 def get_ledger_sequence() -> int:
     record = BlockHeight.objects.filter(id=2).first()
     if record:
         return record.block_height
 
 
-def update_approved_projects(event_data, chain_id="stellar", time_stamp=None, tx_hash=None):
+def update_approved_projects(
+    event_data, chain_id="stellar", time_stamp=None, tx_hash=None
+):
     round_id, project_ids = event_data[0], event_data[1]
 
     with transaction.atomic():
@@ -1356,8 +1422,10 @@ def update_approved_projects(event_data, chain_id="stellar", time_stamp=None, tx
             for ids in project_ids:
                 project = Project.objects.get(on_chain_id=ids)
                 round_obj.approved_projects.add(project.owner)
-                logger.info(f"Creating application for round: {round_id} for approved projects")
-                status = PotApplicationStatus['Approved'.upper()]
+                logger.info(
+                    f"Creating application for round: {round_id} for approved projects"
+                )
+                status = PotApplicationStatus["Approved".upper()]
 
                 appl_defaults = {
                     "message": "added by owner",
@@ -1378,28 +1446,41 @@ def update_approved_projects(event_data, chain_id="stellar", time_stamp=None, tx
             logger.error(f"Error updating application for Round {round_id}: {e}")
             return False
 
+
 def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar"):
     if type(event_data) == list:
-        round_id, application_data, reviewer_id = event_data[0], event_data[1], event_data[2]
+        round_id, application_data, reviewer_id = (
+            event_data[0],
+            event_data[1],
+            event_data[2],
+        )
     else:
-        event_data = event_data['application']
-        round_id, application_data, reviewer_id = event_data["round_id"], event_data, reviewer_id
+        event_data = event_data["application"]
+        round_id, application_data, reviewer_id = (
+            event_data["round_id"],
+            event_data,
+            reviewer_id,
+        )
 
     with transaction.atomic():
         try:
             chain = Chain.objects.get(name=chain_id)
             round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
-            applicant = Account.objects.get(id=application_data['applicant_id'], chain=chain)
+            applicant = Account.objects.get(
+                id=application_data["applicant_id"], chain=chain
+            )
 
             reviewer = Account.objects.get(id=reviewer_id, chain=chain)
 
             if chain_id == "NEAR":
-                status = PotApplicationStatus[application_data['status'].upper()]
+                status = PotApplicationStatus[application_data["status"].upper()]
             else:
-                status = PotApplicationStatus[application_data['status'][0].upper()]
+                status = PotApplicationStatus[application_data["status"][0].upper()]
 
-            submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
-            updated_at = datetime.fromtimestamp(application_data['updated_ms'] / 1000)
+            submitted_at = datetime.fromtimestamp(
+                application_data["submited_ms"] / 1000
+            )
+            updated_at = datetime.fromtimestamp(application_data["updated_ms"] / 1000)
 
             defaults = {
                 "notes": application_data.get("review_note"),
@@ -1407,9 +1488,7 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
                 "tx_hash": txhash,
             }
 
-            appl = PotApplication.objects.filter(
-                applicant=applicant
-            ).first()
+            appl = PotApplication.objects.filter(applicant=applicant).first()
 
             PotApplicationReview.objects.update_or_create(
                 application_id=appl.id,
@@ -1418,11 +1497,15 @@ def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar")
                 defaults=defaults,
             )
 
-            project = Project.objects.get(on_chain_id=application_data.get("project_id"))
+            project = Project.objects.get(
+                on_chain_id=application_data.get("project_id")
+            )
             if status == PotApplicationStatus.APPROVED:
-            # If the application is approved, add the project to the round's approved projects
+                # If the application is approved, add the project to the round's approved projects
                 if not round_obj.approved_projects.filter(id=project.owner.id).exists():
-                    logger.info(f"Adding project {project.owner.id} to approved projects for Round {round_id}")
+                    logger.info(
+                        f"Adding project {project.owner.id} to approved projects for Round {round_id}"
+                    )
                     round_obj.approved_projects.add(project.owner)
             else:
                 round_obj.approved_projects.remove(project.owner)
@@ -1449,22 +1532,21 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
 
         contract_id = settings.STELLAR_CONTRACT_ID
         function_name = "get_pair_by_index"
-        parameters = [stellar_sdk.scval.to_uint128(round_id), stellar_sdk.scval.to_uint32(pair_id)]
+        parameters = [
+            stellar_sdk.scval.to_uint128(round_id),
+            stellar_sdk.scval.to_uint32(pair_id),
+        ]
         public_key = "GAMFYFI7TIAPMLSAWIECFZCN52TR3NUIO74YM7ECBCPM6J743KENH367"  # TODO: move to settings
         acct = server.load_account(public_key)
 
         pair_result = server.simulate_transaction(
             transaction_envelope=stellar_sdk.TransactionBuilder(
                 source_account=acct,
-            ).append_invoke_contract_function_op(
-                contract_id,
-                function_name,
-                parameters
             )
+            .append_invoke_contract_function_op(contract_id, function_name, parameters)
             .set_timeout(30)
             .build()
         )
-
 
         if pair_result.results:
             xdr = pair_result.results[0].xdr
@@ -1489,57 +1571,58 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
                 round_id, vote_data = event_data[0], event_data[1]
             else:
                 # vote_event_data = event_data['vote']
-                round_id, vote_data = event_data.get("round_id"), event_data['vote']
+                round_id, vote_data = event_data.get("round_id"), event_data["vote"]
 
             chain = Chain.objects.get(name=chain_id)
             round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
-            voter, _ = Account.objects.get_or_create(id=vote_data['voter'], chain=chain)
-            voted_at = datetime.fromtimestamp(vote_data['voted_ms'] / 1000)
+            voter, _ = Account.objects.get_or_create(id=vote_data["voter"], chain=chain)
+            voted_at = datetime.fromtimestamp(vote_data["voted_ms"] / 1000)
 
             # Create or update the Vote
             vote, created = Vote.objects.update_or_create(
                 round=round_obj,
                 voter=voter,
-                defaults={
-                    'tx_hash': tx_hash,
-                    'voted_at': voted_at
-                }
+                defaults={"tx_hash": tx_hash, "voted_at": voted_at},
             )
 
-
-
             # Process vote pairs
-            for pick in vote_data['picks']:
+            for pick in vote_data["picks"]:
                 if chain_id == "NEAR":
-                    pair_id = pick['pair_id']
-                    project_id = pick['voted_project']
-
+                    pair_id = pick["pair_id"]
+                    project_id = pick["voted_project"]
 
                 else:
-                    pair_id = pick['pair_id']
-                    project_id = Project.objects.get(on_chain_id=pick['project_id']).owner.id
+                    pair_id = pick["pair_id"]
+                    project_id = Project.objects.get(
+                        on_chain_id=pick["project_id"]
+                    ).owner.id
 
                 pair_data = get_pair_projects(pair_id, round_id, chain_id)
                 logger.info(f"pair data from contract...:,{pair_data}")
                 if pair_data:
-                    project_id_1, project_id_2 = pair_data.get('projects')
+                    project_id_1, project_id_2 = pair_data.get("projects")
                     if chain_id == "stellar":
-                        project_1 = Project.objects.get(on_chain_id=project_id_1).owner.id
-                        project_2 = Project.objects.get(on_chain_id=project_id_2).owner.id
+                        project_1 = Project.objects.get(
+                            on_chain_id=project_id_1
+                        ).owner.id
+                        project_2 = Project.objects.get(
+                            on_chain_id=project_id_2
+                        ).owner.id
                     else:
                         project_1 = project_id_1
                         project_2 = project_id_2
 
-
                 vp, created = VotePair.objects.update_or_create(
                     vote=vote,
                     pair_id=pair_id,
-                    defaults={'voted_project_id': project_id}
+                    defaults={"voted_project_id": project_id},
                 )
                 vp.projects.add(project_1)
                 vp.projects.add(project_2)
 
-            logger.info(f"Processed vote for Round: {round_id}, Voter: {voter.id}, Project: {project_id}")
+            logger.info(
+                f"Processed vote for Round: {round_id}, Voter: {voter.id}, Project: {project_id}"
+            )
             return True
     except Exception as e:
         logger.error(f"Error processing vote for Round: {str(e)}")
@@ -1556,64 +1639,68 @@ def process_project_event(event_data, chain_id="stellar"):
         chain = Chain.objects.get(name=chain_id)
 
         # Create or get the owner Account
-        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=project_data['owner'])
+        owner, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=project_data["owner"]
+        )
 
         # Create or get the payout Account
 
         # Create the Project
         project, created = Project.objects.update_or_create(
-            on_chain_id=project_data['id'],
+            on_chain_id=project_data["id"],
             defaults={
-                'image_url': project_data['image_url'],
-                'video_url': project_data['video_url'],
-                'name': project_data['name'],
-                'overview': project_data['overview'],
-                'owner': owner,
-                'status': ProjectStatus("NEW").name,
-                'submited_ms': project_data['submited_ms'],
-                'updated_ms': project_data['updated_ms'],
-            }
+                "image_url": project_data["image_url"],
+                "video_url": project_data["video_url"],
+                "name": project_data["name"],
+                "overview": project_data["overview"],
+                "owner": owner,
+                "status": ProjectStatus("NEW").name,
+                "submited_ms": project_data["submited_ms"],
+                "updated_ms": project_data["updated_ms"],
+            },
         )
 
-        for contact_data in project_data['contacts']:
+        for contact_data in project_data["contacts"]:
             contact, _ = ProjectContact.objects.get_or_create(
-                name=contact_data['name'],
-                value=contact_data['value']
+                name=contact_data["name"], value=contact_data["value"]
             )
             project.contacts.add(contact)
 
-        for contract_data in project_data['contracts']:
+        for contract_data in project_data["contracts"]:
             contract, _ = ProjectContract.objects.get_or_create(
-                name=contract_data['name'],
-                contract_address=contract_data['contract_address']
+                name=contract_data["name"],
+                contract_address=contract_data["contract_address"],
             )
             project.contracts.add(contract)
 
         # Create and associate ProjectRepositories
-        for repo_data in project_data['repositories']:
+        for repo_data in project_data["repositories"]:
             repo, _ = ProjectRepository.objects.get_or_create(
-                label=repo_data['label'],
-                url=repo_data['url']
+                label=repo_data["label"], url=repo_data["url"]
             )
             project.repositories.add(repo)
 
-        for funding_data in project_data['funding_histories']:
+        for funding_data in project_data["funding_histories"]:
             ProjectFundingHistory.objects.create(
-                source=funding_data['source'],
-                amount=funding_data['amount'],
-                denomination=funding_data['denomination'],  # Note: There's a typo in the event data
-                description=funding_data['description'],
-                timestamp=timezone.datetime.fromtimestamp(funding_data['funded_ms'] / 1000)
+                source=funding_data["source"],
+                amount=funding_data["amount"],
+                denomination=funding_data[
+                    "denomination"
+                ],  # Note: There's a typo in the event data
+                description=funding_data["description"],
+                timestamp=timezone.datetime.fromtimestamp(
+                    funding_data["funded_ms"] / 1000
+                ),
             )
 
         # Associate admins
-        for admin_address in project_data['admins']:
+        for admin_address in project_data["admins"]:
             admin, _ = Account.objects.get_or_create(id=admin_address)
             project.admins.add(admin)
 
         # Associate team members
-        for team_member_data in project_data.get('team_members', []):
-            team_member, _ = Account.objects.get_or_create(id=team_member_data['value'])
+        for team_member_data in project_data.get("team_members", []):
+            team_member, _ = Account.objects.get_or_create(id=team_member_data["value"])
             project.team_members.add(team_member)
 
         if created:
@@ -1628,86 +1715,140 @@ def process_project_event(event_data, chain_id="stellar"):
         return False
 
 
-
 def create_or_update_round(event_data, contract_id, timestamp, chain_id="stellar"):
     try:
         logger.info(f"create_or_update_round: {event_data}, {contract_id}, {chain_id}")
         # Create Round
         if chain_id == "NEAR":
-            event_data = event_data.get('round_detail')
-        round_id = event_data.get('id')
-        owner_address = event_data.get('owner')
+            event_data = event_data.get("round_detail")
+        round_id = event_data.get("id")
+        owner_address = event_data.get("owner")
         chain = Chain.objects.get(name=chain_id)
-        owner, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=owner_address)
-        factory_contract, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=contract_id)
-        remaining_dist_address = event_data.get('remaining_dist_address', event_data.get('remaining_funds_redistribution_recipient'))
+        owner, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=owner_address
+        )
+        factory_contract, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=contract_id
+        )
+        remaining_dist_address = event_data.get(
+            "remaining_dist_address",
+            event_data.get("remaining_funds_redistribution_recipient"),
+        )
         if remaining_dist_address:
-            remaining_dist_address_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_address)
+            remaining_dist_address_obj, _ = Account.objects.get_or_create(
+                defaults={"chain": chain}, id=remaining_dist_address
+            )
 
-        remaining_dist_by = event_data.get('remaining_dist_by', event_data.get('remaining_funds_redistributed_by'))
+        remaining_dist_by = event_data.get(
+            "remaining_dist_by", event_data.get("remaining_funds_redistributed_by")
+        )
         if remaining_dist_by:
-            remaining_dist_by_obj, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=remaining_dist_by)
+            remaining_dist_by_obj, _ = Account.objects.get_or_create(
+                defaults={"chain": chain}, id=remaining_dist_by
+            )
 
-        if event_data.get('round_complete_ms', event_data.get('round_complete')):
-            round_time_stamp = datetime.fromtimestamp(event_data.get('round_complete_ms', event_data.get('round_complete')) / 1000)
+        if event_data.get("round_complete_ms", event_data.get("round_complete")):
+            round_time_stamp = datetime.fromtimestamp(
+                event_data.get("round_complete_ms", event_data.get("round_complete"))
+                / 1000
+            )
         else:
             round_time_stamp = None
         if chain_id == "NEAR":
             use_vault = True
         else:
-            use_vault = event_data.get('use_vault', False)
+            use_vault = event_data.get("use_vault", False)
 
         round_obj, created = Round.objects.update_or_create(
             on_chain_id=round_id,
             chain=chain,
             defaults={
-                'owner': owner,
-                'factory_contract': factory_contract,
-                'chain': chain,
-                'name': event_data.get('name'),
-                'description': event_data.get('description'),
-                'expected_amount': event_data.get('expected_amount'),
-                'application_start': datetime.fromtimestamp(event_data.get('application_start_ms') / 1000) if event_data.get('application_start_ms') else None,
-                'application_end': datetime.fromtimestamp(event_data.get('application_end_ms') / 1000) if event_data.get('application_end_ms') else None,
-                'voting_start': datetime.fromtimestamp(event_data.get('voting_start_ms') / 1000),
-                'voting_end': datetime.fromtimestamp(event_data.get('voting_end_ms') / 1000),
-                'use_whitelist_voting': event_data.get('use_whitelist_voting', False),
-                'use_whitelist_application': event_data.get('use_whitelist_application', False),
-                'application_wl_list_id': event_data.get('application_wl_list_id'),
-                'voting_wl_list_id': event_data.get('voting_wl_list_id'),
-                'use_vault': use_vault or False,
-                'num_picks_per_voter': event_data.get('num_picks_per_voter'),
-                'max_participants': event_data.get('max_participants'),
-                'allow_applications': event_data.get('allow_applications'),
-                'allow_remaining_dist': event_data.get('allow_remaining_dist', event_data.get('allow_remaining_funds_redistribution')),
-                'compliance_end': datetime.fromtimestamp(event_data.get('compliance_end_ms') / 1000) if event_data.get('compliance_end_ms') else None,
-                'compliance_period_ms': event_data.get('compliance_period_ms'),
-                'compliance_req_desc': event_data.get('compliance_req_desc', event_data.get('compliance_requirement_description')),
-                'cooldown_end': datetime.fromtimestamp(event_data.get('cooldown_end_ms') / 1000) if event_data.get('cooldown_end_ms') else None,
-                'cooldown_period_ms': event_data.get('cooldown_period_ms'),
-                'is_video_required': event_data.get('is_video_required') or event_data.get('application_requires_video', False) ,
-                'referrer_fee_basis_points': event_data.get('referrer_fee_basis_points'),
-                'remaining_dist_address_id': remaining_dist_address,
-                'remaining_dist_at_ms': datetime.fromtimestamp(event_data.get('remaining_dist_at_ms') / 1000) if event_data.get('remaining_dist_at_ms') else None,
-                'remaining_dist_by_id': remaining_dist_by,
-                'remaining_dist_memo': event_data.get('remaining_dist_memo', event_data.get('remaining_funds_redistribution_memo')),
-                'round_complete': round_time_stamp,
-                'vault_total_deposits': event_data.get('vault_total_deposits'),
-                'minimum_deposit': event_data.get('minimum_deposit'),
-                'current_vault_balance': event_data.get('current_vault_balance'),
-                'deployed_at': timestamp
-            }
+                "owner": owner,
+                "factory_contract": factory_contract,
+                "chain": chain,
+                "name": event_data.get("name"),
+                "description": event_data.get("description"),
+                "expected_amount": event_data.get("expected_amount"),
+                "application_start": datetime.fromtimestamp(
+                    event_data.get("application_start_ms") / 1000
+                )
+                if event_data.get("application_start_ms")
+                else None,
+                "application_end": datetime.fromtimestamp(
+                    event_data.get("application_end_ms") / 1000
+                )
+                if event_data.get("application_end_ms")
+                else None,
+                "voting_start": datetime.fromtimestamp(
+                    event_data.get("voting_start_ms") / 1000
+                ),
+                "voting_end": datetime.fromtimestamp(
+                    event_data.get("voting_end_ms") / 1000
+                ),
+                "use_whitelist_voting": event_data.get("use_whitelist_voting", False),
+                "use_whitelist_application": event_data.get(
+                    "use_whitelist_application", False
+                ),
+                "application_wl_list_id": event_data.get("application_wl_list_id"),
+                "voting_wl_list_id": event_data.get("voting_wl_list_id"),
+                "use_vault": use_vault or False,
+                "num_picks_per_voter": event_data.get("num_picks_per_voter"),
+                "max_participants": event_data.get("max_participants"),
+                "allow_applications": event_data.get("allow_applications"),
+                "allow_remaining_dist": event_data.get(
+                    "allow_remaining_dist",
+                    event_data.get("allow_remaining_funds_redistribution"),
+                ),
+                "compliance_end": datetime.fromtimestamp(
+                    event_data.get("compliance_end_ms") / 1000
+                )
+                if event_data.get("compliance_end_ms")
+                else None,
+                "compliance_period_ms": event_data.get("compliance_period_ms"),
+                "compliance_req_desc": event_data.get(
+                    "compliance_req_desc",
+                    event_data.get("compliance_requirement_description"),
+                ),
+                "cooldown_end": datetime.fromtimestamp(
+                    event_data.get("cooldown_end_ms") / 1000
+                )
+                if event_data.get("cooldown_end_ms")
+                else None,
+                "cooldown_period_ms": event_data.get("cooldown_period_ms"),
+                "is_video_required": event_data.get("is_video_required")
+                or event_data.get("application_requires_video", False),
+                "referrer_fee_basis_points": event_data.get(
+                    "referrer_fee_basis_points"
+                ),
+                "remaining_dist_address_id": remaining_dist_address,
+                "remaining_dist_at_ms": datetime.fromtimestamp(
+                    event_data.get("remaining_dist_at_ms") / 1000
+                )
+                if event_data.get("remaining_dist_at_ms")
+                else None,
+                "remaining_dist_by_id": remaining_dist_by,
+                "remaining_dist_memo": event_data.get(
+                    "remaining_dist_memo",
+                    event_data.get("remaining_funds_redistribution_memo"),
+                ),
+                "round_complete": round_time_stamp,
+                "vault_total_deposits": event_data.get("vault_total_deposits"),
+                "minimum_deposit": event_data.get("minimum_deposit"),
+                "current_vault_balance": event_data.get("current_vault_balance"),
+                "deployed_at": timestamp,
+            },
         )
 
-        for admin_address in event_data.get('admins', []):
-            admin, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=admin_address)
+        for admin_address in event_data.get("admins", []):
+            admin, _ = Account.objects.get_or_create(
+                defaults={"chain": chain}, id=admin_address
+            )
             round_obj.admins.add(admin)
 
         # Create contacts for the round
-        for contact in event_data.get('contacts', []):
+        for contact in event_data.get("contacts", []):
             contact_obj, created = ProjectContact.objects.update_or_create(
-                name=contact['name'],
-                value=contact['value']
+                name=contact["name"], value=contact["value"]
             )
             round_obj.contacts.add(contact_obj)
 
@@ -1722,12 +1863,13 @@ def process_application_to_round(event_data, tx_hash):
     try:
         # Process application to Round
         round_id, application_data = event_data[0], event_data[1]
-        applicant_id = application_data.get('applicant_id')
-        status = PotApplicationStatus[application_data['status'].upper()]
-        submitted_at = datetime.fromtimestamp(application_data['submited_ms'] / 1000)
+        applicant_id = application_data.get("applicant_id")
+        status = PotApplicationStatus[application_data["status"].upper()]
+        submitted_at = datetime.fromtimestamp(application_data["submited_ms"] / 1000)
         updated_at = (
-            datetime.fromtimestamp(application_data['updated_ms'] / 1000)
-            if application_data['updated_ms'] else None
+            datetime.fromtimestamp(application_data["updated_ms"] / 1000)
+            if application_data["updated_ms"]
+            else None
         )
 
         round_obj = Round.objects.get(on_chain_id=round_id)
@@ -1737,19 +1879,20 @@ def process_application_to_round(event_data, tx_hash):
             round=round_obj,
             applicant=applicant,
             defaults={
-                'message': application_data['applicant_note'],
-                'status': status,
-                'submitted_at': submitted_at,
-                'updated_at': updated_at,
-                'tx_hash': tx_hash
-            }
+                "message": application_data["applicant_note"],
+                "status": status,
+                "submitted_at": submitted_at,
+                "updated_at": updated_at,
+                "tx_hash": tx_hash,
+            },
         )
-        logger.info(f"Processed application for Round: {round_id}, Applicant: {applicant_id}")
+        logger.info(
+            f"Processed application for Round: {round_id}, Applicant: {applicant_id}"
+        )
         return True
     except Exception as e:
         logger.error(f"Error processing rounds applications event: {str(e)}")
         return False
-
 
 
 def create_round_application(event_data, tx_hash, chain_id="stellar"):
@@ -1758,24 +1901,27 @@ def create_round_application(event_data, tx_hash, chain_id="stellar"):
         if type(event_data) == list:
             round_id, application_data = event_data[0], event_data[1]
         else:
-            event_data = event_data['application']
+            event_data = event_data["application"]
             round_id, application_data = event_data["round_id"], event_data
         chain = Chain.objects.get(name=chain_id)
-        applicant, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=application_data["applicant_id"])
+        applicant, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=application_data["applicant_id"]
+        )
         round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         if chain_id == "NEAR":
-            status = PotApplicationStatus[application_data['status'].upper()]
+            status = PotApplicationStatus[application_data["status"].upper()]
         else:
-            status = PotApplicationStatus[application_data['status'][0].upper()]
+            status = PotApplicationStatus[application_data["status"][0].upper()]
         logger.info(f"Creating application for round: {round_id}")
 
         appl_defaults = {
             "message": application_data["applicant_note"],
-            "submitted_at": datetime.fromtimestamp(application_data["submited_ms"] / 1000),
+            "submitted_at": datetime.fromtimestamp(
+                application_data["submited_ms"] / 1000
+            ),
             "status": status,
             "tx_hash": tx_hash,
         }
-
 
         PotApplication.objects.update_or_create(
             applicant=applicant,
@@ -1792,17 +1938,21 @@ def create_round_application(event_data, tx_hash, chain_id="stellar"):
 
 def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
     try:
-        logger.info(f"process_rounds_deposit_event: {event_data}, {tx_hash}, {chain_id}")
+        logger.info(
+            f"process_rounds_deposit_event: {event_data}, {tx_hash}, {chain_id}"
+        )
         # Process deposit event
         if type(event_data) == list:
             round_id, deposit_data = event_data
         else:
-            event_data = event_data['deposit']
+            event_data = event_data["deposit"]
             round_id, deposit_data = event_data["round_id"], event_data
         chain = Chain.objects.get(name=chain_id)
         round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
         amount = deposit_data["total_amount"]
-        depositor, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=deposit_data["depositor_id"])
+        depositor, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=deposit_data["depositor_id"]
+        )
 
         # Create or update a RoundDeposit object
         deposit, created = RoundDeposit.objects.update_or_create(
@@ -1810,26 +1960,33 @@ def process_rounds_deposit_event(event_data, tx_hash, chain_id="stellar"):
             on_chain_id=deposit_data.get("deposit_id", deposit_data.get("id")),
             depositor=depositor,
             defaults={
-                'amount': amount,
-                'protocol_fee': deposit_data["protocol_fee"],
-                'referrer_fee': deposit_data["referrer_fee"],
-                'memo': deposit_data["memo"],
-                'tx_hash': tx_hash,
-                'deposit_at': datetime.fromtimestamp(deposit_data["deposited_at"] / 1000),
-            }
+                "amount": amount,
+                "protocol_fee": deposit_data["protocol_fee"],
+                "referrer_fee": deposit_data["referrer_fee"],
+                "memo": deposit_data["memo"],
+                "tx_hash": tx_hash,
+                "deposit_at": datetime.fromtimestamp(
+                    deposit_data["deposited_at"] / 1000
+                ),
+            },
         )
 
-        round_obj.vault_total_deposits = str(int(round_obj.vault_total_deposits or 0) + int(amount))
-        round_obj.current_vault_balance = str(int(round_obj.current_vault_balance or 0) + int(deposit_data["net_amount"]))
+        round_obj.vault_total_deposits = str(
+            int(round_obj.vault_total_deposits or 0) + int(amount)
+        )
+        round_obj.current_vault_balance = str(
+            int(round_obj.current_vault_balance or 0) + int(deposit_data["net_amount"])
+        )
         round_obj.save()
         round_obj.update_vault_usd_equivalent()
 
-        logger.info(f"Processed deposit for Round: {round_id}, Depositor: {depositor.id}, Amount: {amount}")
+        logger.info(
+            f"Processed deposit for Round: {round_id}, Depositor: {depositor.id}, Amount: {amount}"
+        )
         return True
     except Exception as e:
         logger.error(f"Error processing deposits to rounds: {str(e)}")
         return False
-
 
 
 def create_round_payout(event_data, tx_hash, chain_id="stellar"):
@@ -1841,10 +1998,10 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
         memo = payout_data.get("memo")
 
         chain = Chain.objects.get(name=chain_id)
-        token_acct, _ = Account.objects.get_or_create(defaults={"chain":chain},id=chain_id.lower())
-        token, _ = Token.objects.get_or_create(
-            account=token_acct
+        token_acct, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=chain_id.lower()
         )
+        token, _ = Token.objects.get_or_create(account=token_acct)
         round_obj = Round.objects.get(on_chain_id=round_id, chain=chain)
 
         payout = PotPayout(
@@ -1858,7 +2015,9 @@ def create_round_payout(event_data, tx_hash, chain_id="stellar"):
             tx_hash=tx_hash,
         )
         payout.save()
-        logger.info(f"Created payout for round {round_id} to {recipient_id} for amount {amount}, on chain {chain_id}")
+        logger.info(
+            f"Created payout for round {round_id} to {recipient_id} for amount {amount}, on chain {chain_id}"
+        )
         return True
     except Exception as e:
         logger.error(f"Error creating round payout: {str(e)}")
@@ -1873,7 +2032,9 @@ def update_round_payout(event_data, tx_hash, chain_id="stellar"):
         amount = payout_data["amount"]
         paid_at_ms = payout_data.get("paid_at_ms")
         chain = Chain.objects.get(name=chain_id)
-        recipient_id, _ = Account.objects.get_or_create(defaults={"chain":chain}, id=payout_data["recipient_id"])
+        recipient_id, _ = Account.objects.get_or_create(
+            defaults={"chain": chain}, id=payout_data["recipient_id"]
+        )
         memo = payout_data.get("memo")
         payout = PotPayout.objects.get(on_chain_id=payout_on_chain_id)
         payout.amount = amount
@@ -1882,13 +2043,13 @@ def update_round_payout(event_data, tx_hash, chain_id="stellar"):
         payout.tx_hash = tx_hash
         payout.memo = memo
         payout.save()
-        logger.info(f"Updated payout {payout_on_chain_id} for recipient {recipient_id} with amount {amount}.")
+        logger.info(
+            f"Updated payout {payout_on_chain_id} for recipient {recipient_id} with amount {amount}."
+        )
         return True
     except Exception as e:
         logger.error(f"Error updating Payout. {str(e)}")
         return False
-
-
 
 
 def handle_stellar_list(data, contract_id, timestamp, chain_id="stellar"):
@@ -1896,10 +2057,9 @@ def handle_stellar_list(data, contract_id, timestamp, chain_id="stellar"):
     try:
         logger.info("upserting involveed accts...")
 
-        owner_address = data.get('owner')
+        owner_address = data.get("owner")
         chain = Chain.objects.get(name=chain_id)
-        Account.objects.get_or_create(defaults={"chain":chain},id=owner_address)
-
+        Account.objects.get_or_create(defaults={"chain": chain}, id=owner_address)
 
         logger.info(f"creating list..... {data}")
 
@@ -1918,7 +2078,8 @@ def handle_stellar_list(data, contract_id, timestamp, chain_id="stellar"):
 
         if data.get("admins"):
             for admin_id in data["admins"]:
-                admin_object, _ = Account.objects.get_or_create(defaults={"chain":chain},
+                admin_object, _ = Account.objects.get_or_create(
+                    defaults={"chain": chain},
                     id=admin_id,
                 )
                 listObject.admins.add(admin_object)
@@ -1938,7 +2099,7 @@ def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar")
             default_registration_status=data["default_registration_status"][0],
             name=data["name"],
             description=data["description"],
-            cover_image_url=data["cover_image_url"],
+            cover_image_url=data["cover_img_url"],
             admin_only_registrations=data["admin_only_registrations"],
             created_at=datetime.fromtimestamp(data["created_at"] / 1000),
             updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
@@ -1949,13 +2110,17 @@ def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar")
         return False
 
 
-def handle_new_stellar_list_registration(data, contract_id, tx_hash, chain_id="stellar"):
+def handle_new_stellar_list_registration(
+    data, contract_id, tx_hash, chain_id="stellar"
+):
     logger.info(f"new Project data: {data}")
     # Prepare data for insertion
     chain = Chain.objects.get(name=chain_id)
     parent_list = List.objects.get(on_chain_id=data["list_id"])
     try:
-        project = Account.objects.get_or_create({"chain":chain, "id": data["registrant_id"]})
+        project = Account.objects.get_or_create(
+            {"chain": chain, "id": data["registrant_id"]}
+        )
     except Exception as e:
         logger.error(f"Encountered error trying to get create acct: {e}")
 
@@ -2001,11 +2166,11 @@ def handle_stellar_list_admin_ops(data, contract_id, timestamp, tx_hash):
     try:
         round_id, admins = data[0], data[1]
         logger.info(f"updating admins: {admins} for round {round_id}")
-        round_obj = Round.objects.get(on_chain_id=round_id) # select related?
+        round_obj = Round.objects.get(on_chain_id=round_id)  # select related?
         chain = Chain.objects.get(name="stellar")
 
         for acct in admins:
-            admin, _ = Account.objects.get_or_create(defaults={"chain":chain},id=acct)
+            admin, _ = Account.objects.get_or_create(defaults={"chain": chain}, id=acct)
             contains = round_obj.admins.acontains(admin)
             if not contains:
                 round_obj.admins.add(admin)
@@ -2028,7 +2193,9 @@ def handle_stellar_list_admin_ops(data, contract_id, timestamp, tx_hash):
         logger.error(f"Failed to remove list admin, Error: {e}")
         return False
 
+
 # Campaign Event Indexing Methods
+
 
 async def handle_new_campaign(data: dict, created_at):
     """
@@ -2114,7 +2281,6 @@ async def handle_new_campaign(data: dict, created_at):
         logger.error(f"Failed to index new campaign: {e}")
 
 
-
 async def handle_update_campaign(data: dict):
     """
     Index a campaign update event.
@@ -2149,19 +2315,23 @@ async def handle_update_campaign(data: dict):
                 "description": data["description"],
                 "cover_image_url": data["cover_image_url"],
                 "start_at": datetime.fromtimestamp(data["start_ms"] / 1000),
-                "end_at": datetime.fromtimestamp(data["end_ms"] / 1000) if data["end_ms"] else None,
+                "end_at": datetime.fromtimestamp(data["end_ms"] / 1000)
+                if data["end_ms"]
+                else None,
                 "token": token,
                 "target_amount": data["target_amount"],
                 "min_amount": data["min_amount"],
                 "max_amount": data["max_amount"],
                 "allow_fee_avoidance": data["allow_fee_avoidance"],
-            }
+            },
         )
 
         # Fetch updated USD prices
         # await campaign.fetch_usd_prices_async()
 
-        logger.info(f"Successfully updated campaign: {campaign.on_chain_id}, or created? {created}")
+        logger.info(
+            f"Successfully updated campaign: {campaign.on_chain_id}, or created? {created}"
+        )
 
     except Campaign.DoesNotExist:
         logger.error(f"Campaign {data['id']} not found for update")
@@ -2178,7 +2348,9 @@ async def handle_delete_campaign(campaign_id: int):
     try:
         logger.info(f"Deleting campaign: {campaign_id}")
 
-        deleted_count, _ = await Campaign.objects.filter(on_chain_id=campaign_id).adelete()
+        deleted_count, _ = await Campaign.objects.filter(
+            on_chain_id=campaign_id
+        ).adelete()
 
         if deleted_count > 0:
             logger.info(f"Successfully deleted campaign: {campaign_id}")
@@ -2187,7 +2359,6 @@ async def handle_delete_campaign(campaign_id: int):
 
     except Exception as e:
         logger.error(f"Failed to delete campaign {campaign_id}: {e}")
-
 
 
 async def handle_campaign_donation(data: dict, receipt_id):
@@ -2253,7 +2424,7 @@ async def handle_campaign_donation(data: dict, receipt_id):
             on_chain_id=data["id"],
             campaign=campaign,
             donor=donor,
-            defaults=donation_defaults
+            defaults=donation_defaults,
         )
 
         logger.info(f"before respective: {donation, created}")
@@ -2271,11 +2442,17 @@ async def handle_campaign_donation(data: dict, receipt_id):
             total_amount = int(data["total_amount"])
             net_amount = int(data["net_amount"])
 
-            campaign.total_raised_amount = str(int(campaign.total_raised_amount) + total_amount)
-            campaign.net_raised_amount = str(int(campaign.net_raised_amount) + net_amount)
+            campaign.total_raised_amount = str(
+                int(campaign.total_raised_amount) + total_amount
+            )
+            campaign.net_raised_amount = str(
+                int(campaign.net_raised_amount) + net_amount
+            )
             await campaign.asave()
 
-            logger.info(f"Updated campaign {campaign.on_chain_id} totals: +{total_amount} total, +{net_amount} net")
+            logger.info(
+                f"Updated campaign {campaign.on_chain_id} totals: +{total_amount} total, +{net_amount} net"
+            )
         except (ValueError, TypeError) as e:
             logger.error(f"Failed to update campaign totals: {e}")
 
@@ -2283,7 +2460,6 @@ async def handle_campaign_donation(data: dict, receipt_id):
         logger.error(f"Campaign {data['campaign_id']} not found for donation")
     except Exception as e:
         logger.error(f"Failed to index campaign donation: {e}")
-
 
 
 async def handle_campaign_donation_refund(data: dict, refunded_at):
@@ -2306,33 +2482,41 @@ async def handle_campaign_donation_refund(data: dict, refunded_at):
         escrow_balance = data.get("escrow_balance")
 
         updated_count = await CampaignDonation.objects.filter(
-            on_chain_id__in=donation_ids,
-            campaign__on_chain_id=campaign_id
+            on_chain_id__in=donation_ids, campaign__on_chain_id=campaign_id
         ).aupdate(returned_at=refunded_at)
 
         if updated_count > 0:
-            logger.info(f"Successfully marked {updated_count} donations as refunded: {donation_ids}")
+            logger.info(
+                f"Successfully marked {updated_count} donations as refunded: {donation_ids}"
+            )
         else:
             logger.warning(f"No donations found for refund: {donation_ids}")
 
         # Update campaign escrow balance and totals
         try:
             campaign = await Campaign.objects.aget(on_chain_id=campaign_id)
-            campaign.escrow_balance = str(int(campaign.escrow_balance) - int(escrow_balance))
+            campaign.escrow_balance = str(
+                int(campaign.escrow_balance) - int(escrow_balance)
+            )
 
             refunded_donations = CampaignDonation.objects.filter(
-                on_chain_id__in=donation_ids,
-                campaign__on_chain_id=campaign_id
-            ).values_list('total_amount', 'net_amount')
+                on_chain_id__in=donation_ids, campaign__on_chain_id=campaign_id
+            ).values_list("total_amount", "net_amount")
 
             total_refunded = sum(int(donation[0]) for donation in refunded_donations)
             net_refunded = sum(int(donation[1]) for donation in refunded_donations)
 
-            campaign.total_raised_amount = str(int(campaign.total_raised_amount) - total_refunded)
-            campaign.net_raised_amount = str(int(campaign.net_raised_amount) - net_refunded)
+            campaign.total_raised_amount = str(
+                int(campaign.total_raised_amount) - total_refunded
+            )
+            campaign.net_raised_amount = str(
+                int(campaign.net_raised_amount) - net_refunded
+            )
 
             await campaign.asave()
-            logger.info(f"Updated campaign {campaign_id}: -{total_refunded} total, -{net_refunded} net, escrow={campaign.escrow_balance}")
+            logger.info(
+                f"Updated campaign {campaign_id}: -{total_refunded} total, -{net_refunded} net, escrow={campaign.escrow_balance}"
+            )
         except Campaign.DoesNotExist:
             logger.error(f"Campaign {campaign_id} not found for escrow balance update")
         except (ValueError, TypeError) as e:
@@ -2354,7 +2538,9 @@ async def handle_campaign_donation_unescrowed(data: dict):
     """
 
     try:
-        logger.info(f"Indexing campaign donation unescrow(release to recipient): {data}")
+        logger.info(
+            f"Indexing campaign donation unescrow(release to recipient): {data}"
+        )
         donation_ids = data.get("donation_ids")
 
         updated_count = await CampaignDonation.objects.filter(
@@ -2362,10 +2548,14 @@ async def handle_campaign_donation_unescrowed(data: dict):
         ).aupdate(escrowed=False)
 
         if updated_count > 0:
-            logger.info(f"Successfully marked donation {data['donation_ids']} as unescrowed")
+            logger.info(
+                f"Successfully marked donation {data['donation_ids']} as unescrowed"
+            )
 
         else:
-            logger.warning(f"Donation {data['donation_ids']} not found to be unescrowed")
+            logger.warning(
+                f"Donation {data['donation_ids']} not found to be unescrowed"
+            )
 
     except Exception as e:
         logger.error(f"Failed to index campaign donation unescrow: {e}")
