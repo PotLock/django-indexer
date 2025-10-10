@@ -136,3 +136,5 @@ dmypy.json
 # static
 
 /static/
+
+.DS_Store
