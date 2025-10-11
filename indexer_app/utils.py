@@ -2113,8 +2113,9 @@ def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar")
 def handle_new_stellar_list_registration(
     data, contract_id, tx_hash, chain_id="stellar"
 ):
-    logger.info(f"new Project data: {data}")
+    logger.info(f"new list reg data: {data}")
     # Prepare data for insertion
+    data = data[2]
     chain = Chain.objects.get(name=chain_id)
     parent_list = List.objects.get(on_chain_id=data["list_id"])
     try:
