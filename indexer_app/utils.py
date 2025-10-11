@@ -454,7 +454,9 @@ async def handle_list_update(
 
         logger.info(f"updating list from result..... {data}")
 
-        listObject = await List.objects.filter(on_chain_id=data["id"]).aupdate(
+        listObject = await List.objects.filter(
+            on_chain_id=data["id"], chain__name="NEAR"
+        ).aupdate(
             owner_id=data["owner"],
             default_registration_status=data["default_registration_status"],
             name=data["name"],
@@ -478,7 +480,9 @@ async def handle_list_update(
 async def handle_delete_list(data: dict):
     try:
         logger.info(f"deleting list..... {data}")
-        lst = await List.objects.filter(on_chain_id=data["list_id"]).adelete()
+        lst = await List.objects.filter(
+            on_chain_id=data["list_id"], chain__name="NEAR"
+        ).adelete()
     except Exception as e:
         logger.error(f"Failed to delete, Error: {e}")
 
@@ -507,7 +511,9 @@ async def handle_new_list_registration(
     # Prepare data for insertion
     project_list = []
     insert_data = []
-    parent_list = await List.objects.aget(on_chain_id=reg_data[0]["list_id"])
+    parent_list = await List.objects.aget(
+        on_chain_id=reg_data[0]["list_id"], chain__name="NEAR"
+    )
     for dt in reg_data:
         logger.info(f"dt: {dt}")
         project_list.append({"chain_id": 1, "id": dt["registrant_id"]})
@@ -566,7 +572,9 @@ async def handle_list_registration_removal(
     logger.info(f"list reg removal: {data}, {receiver_id}")
 
     try:
-        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
+        list_obj = await List.objects.aget(
+            on_chain_id=data["list_id"], chain__name="NEAR"
+        )
         await list_obj.registrations.filter(id=data["registration_id"]).adelete()
 
     except Exception as e:
@@ -756,7 +764,7 @@ async def handle_default_list_status_change(
         if result_data.get("cover_image_url"):
             list_update["cover_image_url"] = result_data["cover_image_url"]
 
-        await List.objects.filter(id=list_id).aupdate(**list_update)
+        await List.objects.filter(id=list_id, chain__name="NEAR").aupdate(**list_update)
 
         logger.info("List updated successfully.")
     except Exception as e:
@@ -776,7 +784,9 @@ async def handle_list_upvote(
 
         up_default = {"created_at": created_at}
 
-        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
+        list_obj = await List.objects.aget(
+            on_chain_id=data.get("list_id"), chain__name="NEAR"
+        )
 
         await ListUpvote.objects.aupdate_or_create(
             list=list_obj, account_id=signer_id, defaults=up_default
@@ -803,7 +813,9 @@ async def handle_list_upvote(
 async def handle_remove_upvote(data: dict, receiver_id: str, signer_id: str):
     try:
         logger.info(f"remove upvote from list: {data}, {receiver_id}")
-        list_obj = await List.objects.aget(on_chain_id=data.get("list_id"))
+        list_obj = await List.objects.aget(
+            on_chain_id=data.get("list_id"), chain__name="NEAR"
+        )
         await ListUpvote.objects.filter(list=list_obj, account_id=signer_id).adelete()
 
         logger.info(f"Upvote removed successfully")
@@ -934,7 +946,9 @@ async def handle_payout_challenge_response(
 async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
     try:
         logger.info(f"updating admin...: {data}, {receiver_id}")
-        list_obj = await List.objects.aget(on_chain_id=data["list_id"])
+        list_obj = await List.objects.aget(
+            on_chain_id=data["list_id"], chain__name="NEAR"
+        )
 
         for acct in data["admins"]:
             admin, _ = await Account.objects.aget_or_create(
@@ -964,7 +978,7 @@ async def handle_list_admin_ops(data, receiver_id, signer_id, receiptId):
 async def handle_list_owner_change(data):
     try:
         logger.info(f"changing owner... ...: {data}")
-        await List.objects.filter(id=data["list_id"]).aupdate(
+        await List.objects.filter(id=data["list_id"], chain__name="NEAR").aupdate(
             **{"owner": data["new_owner_id"]}
         )
 
@@ -2094,7 +2108,9 @@ def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar")
     try:
         logger.info(f"updating list from result..... {data}")
 
-        listObject = List.objects.filter(on_chain_id=data["id"]).update(
+        listObject = List.objects.filter(
+            on_chain_id=data["id"], chain__name=chain_id
+        ).update(
             owner_id=data["owner"],
             default_registration_status=data["default_registration_status"][0],
             name=data["name"],
@@ -2117,7 +2133,7 @@ def handle_new_stellar_list_registration(
     # Prepare data for insertion
     data = data[2]
     chain = Chain.objects.get(name=chain_id)
-    parent_list = List.objects.get(on_chain_id=data["list_id"])
+    parent_list = List.objects.get(on_chain_id=data["list_id"], chain=chain)
     try:
         project = Account.objects.get_or_create(
             {"chain": chain, "id": data["registrant_id"]}
