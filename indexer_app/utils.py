@@ -2117,8 +2117,8 @@ def handle_stellar_list_update(data, contract_id, timestamp, chain_id="stellar")
             description=data["description"],
             cover_image_url=data["cover_img_url"],
             admin_only_registrations=data["admin_only_registrations"],
-            created_at=datetime.fromtimestamp(data["created_at"] / 1000),
-            updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+            created_at=datetime.fromtimestamp(data["created_ms"] / 1000),
+            updated_at=datetime.fromtimestamp(data["updated_ms"] / 1000),
         )
         return True
     except Exception as e:
