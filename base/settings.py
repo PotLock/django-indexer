@@ -237,6 +237,8 @@ elif ENVIRONMENT == "dev":
         "https://app.potlock.app",
         "https://app.potlock.org",
         "http://alpha.potlock.org",
+        "https://alpha.potlock.xyz",
+        "https://alpha.potlock.app",
     ]
 else:
     CORS_ALLOWED_ORIGINS = [
