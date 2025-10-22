@@ -519,7 +519,7 @@ async def handle_new_list_registration(
         project_list.append({"chain_id": 1, "id": dt["registrant_id"]})
         insert_data.append(
             {
-                "id": dt["id"],
+                "on_chain_id": data["id"],
                 "registrant_id": dt["registrant_id"],
                 "list_id": parent_list.id,
                 "status": dt["status"],
@@ -2146,7 +2146,7 @@ def handle_new_stellar_list_registration(
     try:
         _ = ListRegistration.objects.create(
             **{
-                "id": data["id"],
+                "on_chain_id": data["id"],
                 "registrant_id": data["registrant_id"],
                 "list_id": parent_list.id,
                 "status": data["status"],

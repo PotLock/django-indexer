@@ -13,8 +13,6 @@ class ListRegistrationStatus(models.TextChoices):
     BLACKLISTED = "Blacklisted", "Blacklisted"
 
 
-
-
 class List(models.Model):
     id = models.AutoField(
         _("list id"),
@@ -135,6 +133,11 @@ class ListRegistration(models.Model):
         _("registration id"),
         primary_key=True,
         help_text=_("Registration id."),
+    )
+    on_chain_id = models.IntegerField(
+        _("list registration id on chain"),
+        null=True,
+        help_text=_("list registration id in contract"),
     )
     list = models.ForeignKey(
         List,
