@@ -2136,7 +2136,7 @@ def handle_new_stellar_list_registration(
     parent_list = List.objects.get(on_chain_id=data["list_id"], chain=chain)
     try:
         project = Account.objects.get_or_create(
-            {"chain": chain, "id": data["registrant_id"]}
+            defaults={"chain": chain}, id=data["registrant_id"]
         )
     except Exception as e:
         logger.error(f"Encountered error trying to get create acct: {e}")
