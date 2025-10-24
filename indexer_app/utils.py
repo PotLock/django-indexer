@@ -1550,7 +1550,7 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
             stellar_sdk.scval.to_uint128(round_id),
             stellar_sdk.scval.to_uint32(pair_id),
         ]
-        public_key = "GAMFYFI7TIAPMLSAWIECFZCN52TR3NUIO74YM7ECBCPM6J743KENH367"  # TODO: move to settings
+        public_key = "GAA3KC7HAHPZ2OGSAV5WBOFCJ3NSSPHKCYZAEI36DQJP2EB2FCGKSEFB"  # TODO: move to settings
         acct = server.load_account(public_key)
 
         pair_result = server.simulate_transaction(
