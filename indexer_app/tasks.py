@@ -44,6 +44,7 @@ from .utils import (
     update_round_payout,
     handle_stellar_list,
     handle_new_stellar_list_registration,
+    update_list_registrations,
 )
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
@@ -485,6 +486,10 @@ def process_stellar_events():
                 )
             elif event_name == "c_reg":
                 event.processed = handle_new_stellar_list_registration(
+                    event_data, event.contract_id, event.transaction_hash
+                )
+            elif event_name == "u_reg":
+                event.processed = update_list_registrations(
                     event_data, event.contract_id, event.transaction_hash
                 )
             elif event_name == "u_adm":

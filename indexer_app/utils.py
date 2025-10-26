@@ -2133,7 +2133,6 @@ def handle_new_stellar_list_registration(
     # Prepare data for insertion
     data = data[2]
     chain = Chain.objects.get(name=chain_id)
-    parent_list = List.objects.get(on_chain_id=data["list_id"], chain=chain)
     try:
         project = Account.objects.get_or_create(
             defaults={"chain": chain}, id=data["registrant_id"]
@@ -2148,7 +2147,7 @@ def handle_new_stellar_list_registration(
             **{
                 "on_chain_id": data["id"],
                 "registrant_id": data["registrant_id"],
-                "list_id": parent_list.id,
+                "list_id": data["list_id"],
                 "status": data["status"],
                 "submitted_at": datetime.fromtimestamp(data["submitted_ms"] / 1000),
                 "updated_at": datetime.fromtimestamp(data["updated_ms"] / 1000),
@@ -2177,6 +2176,25 @@ def handle_new_stellar_list_registration(
     except Exception as e:
         logger.error(f"Encountered error trying to insert activity: {e}")
     return False
+
+
+def update_list_registrations(data, contract_id, chain_id="stellar"):
+    data = data[2]
+
+    regUpdate = {
+        "status": data["status"][0],
+        "admin_notes": data["admin_notes"],
+        "updated_at": datetime.fromtimestamp(data["updated_ms"] / 1000),
+    }
+
+    try:
+        # Perform the update
+        list = List.objects.get(on_chain_id=data["list_id"], chain__name=chain_id)
+        ListRegistration.objects.filter(on_chain_id=data["id"], list=list).update(
+            **regUpdate
+        )
+    except Exception as e:
+        logger.error(f"Encountered error trying to update ListRegistration: {e}")
 
 
 def handle_stellar_list_admin_ops(data, contract_id, timestamp, tx_hash):
