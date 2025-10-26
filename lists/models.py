@@ -203,3 +203,8 @@ class ListRegistration(models.Model):
         indexes = [models.Index(fields=["id", "status"], name="idx_list_id_status")]
 
         unique_together = (("list", "registrant"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "list"], name="unique_on_chain_id_list"
+            )
+        ]

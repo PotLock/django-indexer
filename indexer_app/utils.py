@@ -2187,6 +2187,10 @@ def update_list_registrations(data, contract_id, chain_id="stellar"):
         "updated_at": datetime.fromtimestamp(data["updated_ms"] / 1000),
     }
 
+    logger.info(
+        f"updating ListRegistration with data: {data} and updatdata: {regUpdate}"
+    )
+
     try:
         # Perform the update
         list = List.objects.get(on_chain_id=data["list_id"], chain__name=chain_id)
