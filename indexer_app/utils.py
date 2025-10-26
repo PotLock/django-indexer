@@ -2191,14 +2191,20 @@ def update_list_registrations(data, contract_id, chain_id="stellar"):
         f"updating ListRegistration with data: {data} and updatdata: {regUpdate}"
     )
 
+    logger.debug(
+        f"checkout list query: {List.objects.filter(on_chain_id=data['list_id'], chain__name=chain_id)}, chain: {chain_id}, data: {data['list_id']}"
+    )
+
     try:
         # Perform the update
         list = List.objects.get(on_chain_id=data["list_id"], chain__name=chain_id)
         ListRegistration.objects.filter(on_chain_id=data["id"], list=list).update(
             **regUpdate
         )
+        return True
     except Exception as e:
         logger.error(f"Encountered error trying to update ListRegistration: {e}")
+        return False
 
 
 def handle_stellar_list_admin_ops(data, contract_id, timestamp, tx_hash):
