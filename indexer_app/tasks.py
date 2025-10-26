@@ -490,7 +490,7 @@ def process_stellar_events():
                 )
             elif event_name == "u_reg":
                 event.processed = update_list_registrations(
-                    event_data, event.contract_id, event.transaction_hash
+                    event_data, event.contract_id
                 )
             elif event_name == "u_adm":
                 event.processed = handle_stellar_list_admin_ops(

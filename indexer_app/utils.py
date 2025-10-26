@@ -2191,10 +2191,6 @@ def update_list_registrations(data, contract_id, chain_id="stellar"):
         f"updating ListRegistration with data: {data} and updatdata: {regUpdate}"
     )
 
-    logger.info(
-        f"checkout list query: {List.objects.filter(on_chain_id=data['list_id'], chain__name=chain_id)}, chain: {chain_id}, data: {data['list_id']}"
-    )
-
     try:
         # Perform the update
         list = List.objects.get(on_chain_id=data["list_id"], chain__name=chain_id)
