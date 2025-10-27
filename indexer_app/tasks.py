@@ -25,7 +25,27 @@ from indexer_app.handler import handle_streamer_message
 from pots.models import Pot, PotApplication, PotApplicationStatus, PotPayout
 
 from .logging import logger
-from .utils import create_or_update_round, create_round_application, create_round_payout, get_block_height, get_ledger_sequence, process_application_to_round, process_project_event, process_rounds_deposit_event, process_vote_event, save_block_height, update_application, update_approved_projects, update_ledger_sequence, update_round_payout
+from .utils import (
+    create_or_update_round,
+    create_round_application,
+    create_round_payout,
+    get_block_height,
+    get_ledger_sequence,
+    handle_stellar_list_admin_ops,
+    handle_stellar_list_update,
+    process_application_to_round,
+    process_project_event,
+    process_rounds_deposit_event,
+    process_vote_event,
+    save_block_height,
+    update_application,
+    update_approved_projects,
+    update_ledger_sequence,
+    update_round_payout,
+    handle_stellar_list,
+    handle_new_stellar_list_registration,
+    update_list_registrations,
+)
 
 CURRENT_BLOCK_HEIGHT_KEY = "current_block_height"
 
@@ -38,12 +58,10 @@ async def indexer(from_block: int, to_block: int):
     logger.info(f"from block: {from_block}")
 
     lake_config = LakeConfig(
-        Network.TESTNET
-        if settings.ENVIRONMENT == "testnet"
-        else Network.MAINNET,
+        Network.TESTNET if settings.ENVIRONMENT == "testnet" else Network.MAINNET,
         settings.AWS_ACCESS_KEY_ID,
         settings.AWS_SECRET_ACCESS_KEY,
-        from_block
+        from_block,
     )
     _, streamer_messages_queue = streamer(lake_config)
 
@@ -52,7 +70,9 @@ async def indexer(from_block: int, to_block: int):
             # Log time before fetching a new block
             fetch_start_time = time.time()
             # streamer_message is the current block
-            streamer_message = await asyncio.wait_for(streamer_messages_queue.get(), settings.INDEXER_STREAMER_WAIT_TIME)
+            streamer_message = await asyncio.wait_for(
+                streamer_messages_queue.get(), settings.INDEXER_STREAMER_WAIT_TIME
+            )
             fetch_end_time = time.time()
             logger.info(
                 f"Time to fetch new block: {fetch_end_time - fetch_start_time:.4f} seconds"
@@ -85,10 +105,11 @@ async def indexer(from_block: int, to_block: int):
             logger.info(
                 f"Total time for one iteration: {iteration_end_time - fetch_start_time:.4f} seconds"
             )
-        
 
         except asyncio.TimeoutError:
-            logger.warning("Stream stalled: no new blocks within timeout, restarting...") # raise Exception so sytemd can restart the worker
+            logger.warning(
+                "Stream stalled: no new blocks within timeout, restarting..."
+            )  # raise Exception so sytemd can restart the worker
             raise Exception("Stream stalled: restarting...")
 
         except Exception as e:
@@ -105,7 +126,7 @@ def listen_to_near_events():
         # Update below with desired network & block height
         start_block = get_block_height()
         # start_block = 112682360
-        logger.info(f"what's the start block, pray tell? {start_block-1}")
+        logger.info(f"what's the start block, pray tell? {start_block - 1}")
         loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
         pass  # don't log to Sentry
@@ -120,7 +141,7 @@ def spot_index_near_events(start_block):
     asyncio.set_event_loop(loop)
 
     try:
-        logger.info(f"Spot index start block: {start_block-1}")
+        logger.info(f"Spot index start block: {start_block - 1}")
         loop.run_until_complete(indexer(start_block - 1, None))
     except WorkerLostError:
         pass  # don't log to Sentry
@@ -276,7 +297,6 @@ def update_pot_statistics():
 
 @shared_task
 def update_account_statistics():
-
     accounts = Account.objects.all()
     accounts_count = accounts.count()
     jobs_logger.info(f"Updating statistics for {accounts_count} accounts...")
@@ -328,34 +348,43 @@ def update_account_statistics():
             )
     jobs_logger.info(f"Account stats for {accounts.count()} accounts updated.")
 
+
 def address_to_string(obj):
     if isinstance(obj, Address):
         return obj.address
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
+
+# Todo: Change model so thatthe event indexer saves the event and queues a task to immediately process the event,
+# so we don;t have a separate beat that's looping through
+
+
 @shared_task
 def stellar_event_indexer():
-    server = stellar_sdk.SorobanServer(
-        settings.STELLAR_RPC_URL
-    )
-    contract_ids = [settings.STELLAR_CONTRACT_ID, settings.STELLAR_PROJECTS_REGISTRY_CONTRACT]
-    if contract_ids == ['', '']:
+    server = stellar_sdk.SorobanServer(settings.STELLAR_RPC_URL)
+    contract_ids = [
+        settings.STELLAR_CONTRACT_ID,
+        settings.STELLAR_PROJECTS_REGISTRY_CONTRACT,
+        settings.STELLAR_LIST_CONTRACT,
+    ]
+    if contract_ids == ["", "", ""]:
         return
     start_sequence = get_ledger_sequence()
-    # start_sequence = 12169
+    # start_sequence = 668843
     if not start_sequence:
         start_sequence = 58655649
-    jobs_logger.info(f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}")
+    jobs_logger.info(
+        f"Ingesting Stellar events from ledger {start_sequence}... contracts: {contract_ids}"
+    )
     try:
         # Fetch events for the current sequence
         events = server.get_events(
             start_ledger=start_sequence,
             filters=[
                 EventFilter(
-                        event_type=EventFilterType.CONTRACT,
-                        contract_ids=contract_ids
-                    )
-            ]
+                    event_type=EventFilterType.CONTRACT, contract_ids=contract_ids
+                )
+            ],
         )
         stellar_events = []
         ledger_timestamp = datetime.now()
@@ -364,84 +393,120 @@ def stellar_event_indexer():
             event_value = event.value
             if event.value is not None:
                 event_value = stellar_sdk.scval.to_native(event.value)
-                event_value = json.loads(json.dumps(event_value, default=address_to_string))
-            stellar_events.append(StellarEvent(
-                ledger_sequence=event.ledger,
-                event_type=event_name,
-                contract_id=event.contract_id,
-                ingested_at=event.ledger_close_at,
-                transaction_hash=event.transaction_hash,
-                data=event_value
-            ))
+                event_value = json.loads(
+                    json.dumps(event_value, default=address_to_string)
+                )
+            stellar_events.append(
+                StellarEvent(
+                    ledger_sequence=event.ledger,
+                    event_type=event_name,
+                    contract_id=event.contract_id,
+                    ingested_at=event.ledger_close_at,
+                    transaction_hash=event.transaction_hash,
+                    data=event_value,
+                )
+            )
 
         if len(stellar_events) > 0:
-            StellarEvent.objects.bulk_create(
-                objs=stellar_events,
-                ignore_conflicts=True
-            )
+            StellarEvent.objects.bulk_create(objs=stellar_events, ignore_conflicts=True)
             ledger_timestamp = event.ledger_close_at
-            jobs_logger.info(f"Ingested {len(stellar_events)} Stellar events from ledger {start_sequence} to {events.latest_ledger}...")
+            jobs_logger.info(
+                f"Ingested {len(stellar_events)} Stellar events from ledger {start_sequence} to {events.latest_ledger}..."
+            )
         update_ledger_sequence(events.latest_ledger, ledger_timestamp)
 
     except Exception as e:
         jobs_logger.error(f"Error processing ledger {start_sequence}: {e}")
 
 
-
 @shared_task
 def process_stellar_events():
-    unprocessed_events = StellarEvent.objects.filter(processed=False).order_by('id')
-    jobs_logger.info(f"Processing {unprocessed_events.count()} unprocessed Stellar events...")
+    unprocessed_events = StellarEvent.objects.filter(processed=False).order_by("id")
+    jobs_logger.info(
+        f"Processing {unprocessed_events.count()} unprocessed Stellar events..."
+    )
 
     for event in unprocessed_events:
         try:
             event_data = event.data
             event_name = event.event_type
 
-            if event_name == 'c_project':
+            if event_name == "c_project":
                 event.processed = process_project_event(event_data)
 
-            elif event_name == 'c_round' or event_name == 'u_round':
-
+            elif event_name == "c_round" or event_name == "u_round":
                 # Mark event as processed
-                event.processed = create_or_update_round(event_data, event.contract_id, event.ingested_at)
+                event.processed = create_or_update_round(
+                    event_data, event.contract_id, event.ingested_at
+                )
 
-            elif event_name == 'apply_to_round':
-
+            elif event_name == "apply_to_round":
                 # Mark event as processed
-                event.processed = process_application_to_round(event_data, event.transaction_hash)
+                event.processed = process_application_to_round(
+                    event_data, event.transaction_hash
+                )
 
-            elif event_name == 'c_app':
+            elif event_name == "c_app":
+                event.processed = create_round_application(
+                    event_data, event.transaction_hash
+                )
 
-                event.processed = create_round_application(event_data, event.transaction_hash)
-
-
-            elif event_name == 'u_app': # application review and aproval
+            elif event_name == "u_app":  # application review and aproval
                 event.processed = update_application(event_data, event.transaction_hash)
 
-            elif event_name == 'u_ap':
-                event.processed = update_approved_projects(event_data)
+            elif event_name == "u_ap":
+                event.processed = update_approved_projects(
+                    event_data,
+                    time_stamp=event.ingested_at,
+                    tx_hash=event.transaction_hash,
+                )
 
-            elif event_name == 'c_depo':
+            elif event_name == "c_depo":
+                event.processed = process_rounds_deposit_event(
+                    event_data, event.transaction_hash
+                )
 
-                event.processed = process_rounds_deposit_event(event_data, event.transaction_hash)
-
-            elif event_name == 'c_vote':
-
+            elif event_name == "c_vote":
                 event.processed = process_vote_event(event_data, event.transaction_hash)
             elif event_name == "c_pay":
-                event.processed = create_round_payout(event_data, event.transaction_hash)
+                event.processed = create_round_payout(
+                    event_data, event.transaction_hash
+                )
             elif event_name == "u_pay":
-
-                event.processed = update_round_payout(event_data, event.transaction_hash)
+                event.processed = update_round_payout(
+                    event_data, event.transaction_hash
+                )
+            elif event_name == "c_list":
+                event.processed = handle_stellar_list(
+                    event_data, event.contract_id, event.ingested_at
+                )
+            elif event_name == "u_list":
+                event.processed = handle_stellar_list_update(
+                    event_data, event.contract_id, event.ingested_at
+                )
+            elif event_name == "c_reg":
+                event.processed = handle_new_stellar_list_registration(
+                    event_data, event.contract_id, event.transaction_hash
+                )
+            elif event_name == "u_reg":
+                event.processed = update_list_registrations(
+                    event_data, event.contract_id
+                )
+            elif event_name == "u_adm":
+                event.processed = handle_stellar_list_admin_ops(
+                    event_data,
+                    event.contract_id,
+                    event.ingested_at,
+                    event.transaction_hash,
+                )
             event.save()
 
         except Exception as e:
-            jobs_logger.error(f"Error processing Stellar event { event_name, event.id}: {e}")
+            jobs_logger.error(
+                f"Error processing Stellar event {event_name, event.id}: {e}"
+            )
 
     jobs_logger.info(f"Finished processing Stellar events.")
-
-
 
 
 @task_revoked.connect

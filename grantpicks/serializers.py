@@ -130,6 +130,7 @@ class ApplicationReviewSerializer(ModelSerializer):
 
 
 class RoundApplicationSerializer(ModelSerializer):
+    project = serializers.SerializerMethodField()
 
     class Meta:
         model = PotApplication
@@ -149,7 +150,12 @@ class RoundApplicationSerializer(ModelSerializer):
     reviews = ApplicationReviewSerializer(many=True)
     round = RoundSerializer()
     applicant = AccountSerializer()
-    project = AccountSerializer()
+
+    def get_project(self, obj):
+        if obj.project:
+            round_project = Project.objects.filter(owner=obj.project.id).first()
+            return ProjectSerializer(round_project).data
+        return None
 
 
 SIMPLE_PROJECT_EXAMPLE = {

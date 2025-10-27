@@ -28,7 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # TODO: update before prod release
-SECRET_KEY = os.environ.get("PL_DJANGO_SECRET_KEY", "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju")
+SECRET_KEY = os.environ.get(
+    "PL_DJANGO_SECRET_KEY",
+    "django-insecure-=r_v_es6w6rxv42^#kc2hca6p%=fe_*cog_5!t%19zea!enlju",
+)
 
 ALLOWED_HOSTS = [
     "ec2-100-27-57-47.compute-1.amazonaws.com",
@@ -36,7 +39,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "dev.potlock.io",
     "test-dev.potlock.io",
-    "api.potlock.io"
+    "api.potlock.io",
     # "alpha.potlock.io",
 ]
 
@@ -62,28 +65,45 @@ SENTRY_DSN = os.environ.get("PL_SENTRY_DSN")
 RECLAIM_APP_ID = os.environ.get("PL_RECLAIM_APP_ID")
 RECLAIM_APP_SECRET = os.environ.get("PL_RECLAIM_APP_SECRET")
 RECLAIM_TWITTER_PROVIDER_ID = os.environ.get("PL_RECLAIM_TWITTER_PROVIDER_ID")
-INDEXER_STREAMER_WAIT_TIME = os.environ.get("PL_INDEXER_STREAMER_WAIT_TIME", 300)  # in seconds
+INDEXER_STREAMER_WAIT_TIME = os.environ.get(
+    "PL_INDEXER_STREAMER_WAIT_TIME", 300
+)  # in seconds
 
 # POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else "potlock.near"
-POTLOCK_TLA = "potlock.testnet" if ENVIRONMENT == "testnet" else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
+POTLOCK_TLA = (
+    "potlock.testnet"
+    if ENVIRONMENT == "testnet"
+    else ("staging.potlock.near" if ENVIRONMENT == "dev" else "potlock.near")
+)
 # NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else "nadabot.near"
-NADABOT_TLA = "nadabot.testnet" if ENVIRONMENT == "testnet" else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
+NADABOT_TLA = (
+    "nadabot.testnet"
+    if ENVIRONMENT == "testnet"
+    else ("staging.nadabot.near" if ENVIRONMENT == "dev" else "nadabot.near")
+)
 STELLAR_CONTRACT_ID = os.environ.get("PL_STELLAR_CONTRACT_ID", "")
-STELLAR_PROJECTS_REGISTRY_CONTRACT = os.environ.get("PL_STELLAR_PROJECTS_REGISTRY_CONTRACT", "")
+STELLAR_PROJECTS_REGISTRY_CONTRACT = os.environ.get(
+    "PL_STELLAR_PROJECTS_REGISTRY_CONTRACT", ""
+)
+STELLAR_LIST_CONTRACT = os.environ.get("PL_STELLAR_LIST_CONTRACT", "")
 NEAR_SOCIAL_CONTRACT_ADDRESS = (
     "v1.social08.testnet" if ENVIRONMENT == "testnet" else "social.near"
 )
-NEAR_GRANTPICKS_CONTRACT_ID = "v2.grantpicks.potlock.testnet" if ENVIRONMENT == "testnet" else ("" if ENVIRONMENT == "dev" else "")
+NEAR_GRANTPICKS_CONTRACT_ID = (
+    "v2.grantpicks.potlock.testnet"
+    if ENVIRONMENT == "testnet"
+    else ("" if ENVIRONMENT == "dev" else "")
+)
 # TODO: split settigns file by enviroment
 if ENVIRONMENT == "testnet":
-    POTLOCK_PATTERN = r'\.potlock\.testnet$'
-    NADABOT_PATTERN = r'\.nadabot\.testnet$'
+    POTLOCK_PATTERN = r"\.potlock\.testnet$"
+    NADABOT_PATTERN = r"\.nadabot\.testnet$"
 elif ENVIRONMENT == "dev":
-    POTLOCK_PATTERN = r'\.staging\.potlock\.near$'
-    NADABOT_PATTERN = r'\.staging\.nadabot\.near$'
+    POTLOCK_PATTERN = r"\.staging\.potlock\.near$"
+    NADABOT_PATTERN = r"\.staging\.nadabot\.near$"
 else:  # mainnet/prod
-    POTLOCK_PATTERN = r'(?<!\.staging)\.potlock\.near$'
-    NADABOT_PATTERN = r'(?<!\.staging)\.nadabot\.near$'
+    POTLOCK_PATTERN = r"(?<!\.staging)\.potlock\.near$"
+    NADABOT_PATTERN = r"(?<!\.staging)\.nadabot\.near$"
 
 FASTNEAR_RPC_URL = (
     "https://rpc.web4.testnet.page"
@@ -133,7 +153,7 @@ INSTALLED_APPS = [
     "nadabot",
     "chains",
     "grantpicks",
-    "campaigns"
+    "campaigns",
 ]
 
 DEFAULT_PAGE_SIZE = 30
@@ -205,7 +225,7 @@ if ENVIRONMENT == "testnet":
         "https://testnet.potlock.org",
         "https://testnet.potlock.xyz",
         "https://testnet.potlock.app",
-        "https://testnet.potlock.io"
+        "https://testnet.potlock.io",
     ]
 elif ENVIRONMENT == "dev":
     CORS_ALLOWED_ORIGINS = [
@@ -216,6 +236,9 @@ elif ENVIRONMENT == "dev":
         "https://dev.local",
         "https://app.potlock.app",
         "https://app.potlock.org",
+        "http://alpha.potlock.org",
+        "https://alpha.potlock.xyz",
+        "https://alpha.potlock.app",
     ]
 else:
     CORS_ALLOWED_ORIGINS = [
@@ -242,14 +265,14 @@ else:
         "https://bos.potlock.io",
         "https://app.potlock.io",
         "https://bos.potlock.app",
-        "https://app.potlock.app"
+        "https://app.potlock.app",
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     "^https:\/\/potlock-next-[\w-]+-potlock\.vercel\.app\/?$",
     "^https?:\/\/.*\.?grantpicks\.com$",
     "^https:\/\/staging\.app\.potlock\.(org|io|xyz|app)\/?$",
-    "^https:\/\/staging\.alpha\.potlock\.(org|io|xyz|app)\/?$"
+    "^https:\/\/staging\.alpha\.potlock\.(org|io|xyz|app)\/?$",
 ]
 
 # REDIS / CACHE CONFIGS
