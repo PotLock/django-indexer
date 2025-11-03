@@ -74,7 +74,6 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         lists = List.objects.all().select_related("owner").prefetch_related("admins", "upvotes").annotate(registrations_count=Count('registrations'))
         account_id = request.query_params.get("account")
@@ -140,7 +139,7 @@ class ListDetailAPI(APIView):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 3))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         chain = request.query_params.get("chain")
@@ -203,7 +202,6 @@ class ListRegistrationsAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         list_id = kwargs.get("list_id")
         chain = request.query_params.get("chain")

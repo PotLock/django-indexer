@@ -1462,7 +1462,7 @@ def update_approved_projects(
 
 
 def update_application(event_data, txhash, reviewer_id=None, chain_id="stellar"):
-    if type(event_data) == list:
+    if isinstance(event_data, list):
         round_id, application_data, reviewer_id = (
             event_data[0],
             event_data[1],
@@ -1540,8 +1540,8 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
     if chain_id == "stellar":
         server = stellar_sdk.SorobanServer(
             "https://soroban-testnet.stellar.org"
-            if settings.ENVIRONMENT == "testnet" or settings.ENVIRONMENT == "local"
-            else "https://horizon.stellar.org"
+            if settings.ENVIRONMENT == "testnet"
+            else "https://rpc.lightsail.network"
         )
 
         contract_id = settings.STELLAR_CONTRACT_ID
@@ -1550,7 +1550,8 @@ def get_pair_projects(pair_id: int, round_id: int, chain_id: str) -> Dict:
             stellar_sdk.scval.to_uint128(round_id),
             stellar_sdk.scval.to_uint32(pair_id),
         ]
-        public_key = "GAA3KC7HAHPZ2OGSAV5WBOFCJ3NSSPHKCYZAEI36DQJP2EB2FCGKSEFB"  # TODO: move to settings
+        # TODO: move to settings
+        public_key = "GAA3KC7HAHPZ2OGSAV5WBOFCJ3NSSPHKCYZAEI36DQJP2EB2FCGKSEFB"
         acct = server.load_account(public_key)
 
         pair_result = server.simulate_transaction(
@@ -1581,7 +1582,7 @@ def process_vote_event(event_data, tx_hash, chain_id="stellar"):
     try:
         logger.info(f"process_vote_event: {event_data}, {tx_hash}, {chain_id}")
         with transaction.atomic():
-            if type(event_data) == list:
+            if isinstance(event_data, list):
                 round_id, vote_data = event_data[0], event_data[1]
             else:
                 # vote_event_data = event_data['vote']
@@ -2165,7 +2166,7 @@ def handle_new_stellar_list_registration(
         defaults = {
             "signer_id": data["registered_by"],
             "receiver_id": contract_id,
-            "timestamp": data["submitted_ms"],
+            "timestamp": datetime.fromtimestamp(data["submitted_ms"] / 1000),
             "tx_hash": tx_hash,
         }
 
