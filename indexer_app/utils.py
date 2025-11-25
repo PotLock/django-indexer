@@ -5,13 +5,13 @@ from math import log
 from typing import Dict
 
 import requests
+import stellar_sdk
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from near_lake_framework.near_primitives import ExecutionOutcome, Receipt
-import stellar_sdk
 
 from accounts.models import Account
 from activities.models import Activity
@@ -2381,11 +2381,13 @@ async def handle_update_campaign(data: dict):
         logger.error(f"Failed to update campaign: {e}")
 
 
-async def handle_delete_campaign(campaign_id: int):
+async def handle_delete_campaign(data: dict):
     """
     Index a campaign deletion event.
     campaign_id: on_chain_id of the campaign to delete
     """
+
+    campaign_id = data["campaign_id"]
 
     try:
         logger.info(f"Deleting campaign: {campaign_id}")
