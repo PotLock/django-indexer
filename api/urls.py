@@ -17,6 +17,11 @@ from accounts.api import (
     AccountsListAPI,
     DonorsAPI,
 )
+from api.sync import (
+    ListSyncAPI,
+    ListRegistrationsSyncAPI,
+    SingleRegistrationSyncAPI,
+)
 from base.api import StatsAPI, ReclaimProofRequestView
 from donations.api import DonationContractConfigAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
@@ -167,5 +172,21 @@ urlpatterns = [
         "v1/mpdao/voters/<str:voter_id>",
         MpdaoVoterDetailAPI.as_view(),
         name="mpdao_voter_detail",
+    ),
+    # sync endpoints (for on-demand data fetching from blockchain)
+    path(
+        "v1/lists/<int:list_id>/sync",
+        ListSyncAPI.as_view(),
+        name="list_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/registrations/sync",
+        ListRegistrationsSyncAPI.as_view(),
+        name="list_registrations_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
+        SingleRegistrationSyncAPI.as_view(),
+        name="single_registration_sync_api",
     ),
 ]
