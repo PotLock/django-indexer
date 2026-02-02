@@ -6,7 +6,7 @@ Replaces the 24/7 indexer - now we fetch on-demand when user acts.
 
 Endpoints:
     POST /api/v1/campaigns/{campaign_id}/sync - Sync single campaign
-    POST /api/v1/campaigns/{campaign_id}/donations/sync - Sync donations for a campaign
+    POST /api/v1/campaigns/{campaign_id}/donations/sync - Sync single donation via tx_hash
 """
 import base64
 import json
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 import requests
 from django.conf import settings
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -75,6 +75,191 @@ def fetch_from_rpc(method_name: str, args: dict = None, contract_id: str = None)
     return json.loads(result_bytes.decode())
 
 
+def fetch_tx_result(tx_hash: str, sender_id: str):
+    """
+    Fetch transaction result from NEAR RPC.
+    Returns the parsed result from the transaction execution.
+    """
+    rpc_url = (
+        "https://test.rpc.fastnear.com"
+        if settings.ENVIRONMENT == "testnet"
+        else "https://free.rpc.fastnear.com"
+    )
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "dontcare",
+        "method": "tx",
+        "params": {
+            "tx_hash": tx_hash,
+            "sender_account_id": sender_id,
+            "wait_until": "EXECUTED_OPTIMISTIC",
+        },
+    }
+
+    response = requests.post(rpc_url, json=payload, timeout=30)
+    result = response.json()
+
+    if "error" in result:
+        raise Exception(f"RPC error fetching tx: {result['error']}")
+
+    return result.get("result")
+
+
+def parse_donation_from_tx(tx_result: dict) -> dict:
+    """
+    Parse donation data from transaction execution result.
+    Looks through receipts_outcome to find the SuccessValue containing donation data.
+    """
+    receipts_outcome = tx_result.get("receipts_outcome", [])
+
+    for outcome in receipts_outcome:
+        status = outcome.get("outcome", {}).get("status", {})
+        if isinstance(status, dict) and "SuccessValue" in status:
+            success_value = status["SuccessValue"]
+            if success_value:
+                try:
+                    decoded = base64.b64decode(success_value).decode()
+                    data = json.loads(decoded)
+                    # Check if this looks like donation data
+                    if isinstance(data, dict) and "donor_id" in data and "total_amount" in data:
+                        return data
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+
+    return None
+
+
+def sync_campaign_from_chain(campaign_id: int) -> tuple[Campaign, bool]:
+    """
+    Fetch campaign from blockchain and sync to database.
+    Returns (campaign, created) tuple.
+
+    This is a shared utility used by both CampaignSyncAPI and when
+    ensuring a campaign exists before syncing donations.
+    """
+    data = fetch_from_rpc("get_campaign", {"campaign_id": int(campaign_id)})
+
+    if not data:
+        return None, False
+
+    # Upsert accounts
+    owner, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=data["owner"])
+    recipient, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=data["recipient"])
+
+    # Get token (Account must exist first since Token PK is a OneToOneField)
+    token_id = data.get("ft_id") or "near"
+    token_acct, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=token_id)
+    token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+
+    # Timestamps
+    start_at = datetime.fromtimestamp(data["start_ms"] / 1000, tz=timezone.utc)
+    end_at = (
+        datetime.fromtimestamp(data["end_ms"] / 1000, tz=timezone.utc)
+        if data.get("end_ms")
+        else None
+    )
+
+    campaign_defaults = {
+        "owner": owner,
+        "name": data["name"],
+        "description": data.get("description"),
+        "cover_image_url": data.get("cover_image_url"),
+        "recipient": recipient,
+        "token": token,
+        "start_at": start_at,
+        "end_at": end_at,
+        "created_at": datetime.fromtimestamp(data["created_ms"] / 1000, tz=timezone.utc)
+        if data.get("created_ms")
+        else datetime.now(tz=timezone.utc),
+        "target_amount": str(data["target_amount"]),
+        "min_amount": str(data["min_amount"]) if data.get("min_amount") else None,
+        "max_amount": str(data["max_amount"]) if data.get("max_amount") else None,
+        "total_raised_amount": str(data.get("total_raised_amount", "0")),
+        "net_raised_amount": str(data.get("net_raised_amount", "0")),
+        "escrow_balance": str(data.get("escrow_balance", "0")),
+        "referral_fee_basis_points": data["referral_fee_basis_points"],
+        "creator_fee_basis_points": data["creator_fee_basis_points"],
+        "allow_fee_avoidance": data.get("allow_fee_avoidance", False),
+    }
+
+    campaign, created = Campaign.objects.update_or_create(
+        on_chain_id=int(campaign_id),
+        defaults=campaign_defaults,
+    )
+
+    # Note: USD price fetching is skipped here intentionally.
+    # A daily cron job will handle USD price updates for all records.
+
+    return campaign, created
+
+
+def sync_donation_from_data(campaign: Campaign, donation_data: dict, tx_hash: str = None) -> CampaignDonation:
+    """
+    Sync a single donation from parsed data to database.
+
+    This is a shared utility for creating/updating a campaign donation.
+    """
+    # Upsert accounts
+    donor, _ = Account.objects.get_or_create(
+        defaults={"chain_id": 1}, id=donation_data["donor_id"]
+    )
+
+    referrer = None
+    if donation_data.get("referrer_id"):
+        referrer, _ = Account.objects.get_or_create(
+            defaults={"chain_id": 1}, id=donation_data["referrer_id"]
+        )
+
+    donated_at = datetime.fromtimestamp(
+        donation_data["donated_at_ms"] / 1000, tz=timezone.utc
+    )
+    returned_at = (
+        datetime.fromtimestamp(donation_data["returned_at_ms"] / 1000, tz=timezone.utc)
+        if donation_data.get("returned_at_ms")
+        else None
+    )
+
+    # Get token if specified, otherwise use campaign's token
+    token = campaign.token
+    if donation_data.get("ft_id"):
+        token_acct, _ = Account.objects.get_or_create(
+            defaults={"chain_id": 1}, id=donation_data["ft_id"]
+        )
+        token, _ = Token.objects.get_or_create(
+            account=token_acct, defaults={"decimals": 24}
+        )
+
+    donation_defaults = {
+        "token": token,
+        "total_amount": str(donation_data["total_amount"]),
+        "net_amount": str(donation_data["net_amount"]),
+        "message": donation_data.get("message"),
+        "donated_at": donated_at,
+        "protocol_fee": str(donation_data["protocol_fee"]),
+        "referrer": referrer,
+        "referrer_fee": str(donation_data["referrer_fee"]) if donation_data.get("referrer_fee") else None,
+        "creator_fee": str(donation_data["creator_fee"]),
+        "returned_at": returned_at,
+        "escrowed": donation_data.get("is_in_escrow", False),
+    }
+
+    if tx_hash:
+        donation_defaults["tx_hash"] = tx_hash
+
+    donation, created = CampaignDonation.objects.update_or_create(
+        on_chain_id=donation_data["id"],
+        campaign=campaign,
+        donor=donor,
+        defaults=donation_defaults,
+    )
+
+    # Note: USD price fetching is skipped here intentionally.
+    # A daily cron job will handle USD price updates for all records.
+
+    return donation
+
+
 class CampaignSyncAPI(APIView):
     """
     Sync a campaign from blockchain to database.
@@ -93,61 +278,10 @@ class CampaignSyncAPI(APIView):
     )
     def post(self, request, campaign_id: int):
         try:
-            data = fetch_from_rpc("get_campaign", {"campaign_id": int(campaign_id)})
+            campaign, created = sync_campaign_from_chain(campaign_id)
 
-            if not data:
+            if not campaign:
                 return Response({"error": "Campaign not found on chain"}, status=404)
-
-            # Upsert accounts
-            owner, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=data["owner"])
-            recipient, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=data["recipient"])
-
-            # Get token (Account must exist first since Token PK is a OneToOneField)
-            token_id = data.get("ft_id") or "near"
-            token_acct, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=token_id)
-            token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
-
-            # Timestamps
-            start_at = datetime.fromtimestamp(data["start_ms"] / 1000, tz=timezone.utc)
-            end_at = (
-                datetime.fromtimestamp(data["end_ms"] / 1000, tz=timezone.utc)
-                if data.get("end_ms")
-                else None
-            )
-
-            campaign_defaults = {
-                "owner": owner,
-                "name": data["name"],
-                "description": data.get("description"),
-                "cover_image_url": data.get("cover_image_url"),
-                "recipient": recipient,
-                "token": token,
-                "start_at": start_at,
-                "end_at": end_at,
-                "created_at": datetime.fromtimestamp(data["created_ms"] / 1000, tz=timezone.utc)
-                if data.get("created_ms")
-                else datetime.now(tz=timezone.utc),
-                "target_amount": str(data["target_amount"]),
-                "min_amount": str(data["min_amount"]) if data.get("min_amount") else None,
-                "max_amount": str(data["max_amount"]) if data.get("max_amount") else None,
-                "total_raised_amount": str(data.get("total_raised_amount", "0")),
-                "net_raised_amount": str(data.get("net_raised_amount", "0")),
-                "escrow_balance": str(data.get("escrow_balance", "0")),
-                "referral_fee_basis_points": data["referral_fee_basis_points"],
-                "creator_fee_basis_points": data["creator_fee_basis_points"],
-                "allow_fee_avoidance": data.get("allow_fee_avoidance", False),
-            }
-
-            campaign, created = Campaign.objects.update_or_create(
-                on_chain_id=int(campaign_id),
-                defaults=campaign_defaults,
-            )
-
-            # Fetch USD prices (matches indexer behavior)
-            try:
-                campaign.fetch_usd_prices()
-            except Exception as e:
-                logger.warning(f"Failed to fetch USD prices for campaign {campaign_id}: {e}")
 
             return Response(
                 {
@@ -162,113 +296,104 @@ class CampaignSyncAPI(APIView):
             return Response({"error": str(e)}, status=502)
 
 
-class CampaignDonationsSyncAPI(APIView):
+class CampaignDonationSyncAPI(APIView):
     """
-    Sync all donations for a campaign from blockchain.
+    Sync a single donation for a campaign from blockchain.
 
     Called by frontend after a user donates to a campaign.
-    Fetches donations via get_donations_for_campaign RPC call.
+    Frontend passes the transaction hash, backend parses the donation from tx result.
     """
 
     @extend_schema(
-        summary="Sync donations for a campaign",
+        summary="Sync a donation for a campaign",
+        description="Sync a single donation using the transaction hash from the donation response.",
+        parameters=[
+            OpenApiParameter(
+                name="tx_hash",
+                description="Transaction hash from the donation transaction",
+                required=True,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="sender_id",
+                description="Account ID of the transaction sender (donor)",
+                required=True,
+                type=str,
+            ),
+        ],
         responses={
-            200: OpenApiResponse(description="Donations synced"),
-            404: OpenApiResponse(description="Campaign not found"),
+            200: OpenApiResponse(description="Donation synced"),
+            400: OpenApiResponse(description="Missing required parameters"),
+            404: OpenApiResponse(description="Campaign or donation not found"),
             502: OpenApiResponse(description="RPC failed"),
         },
     )
     def post(self, request, campaign_id: int):
         try:
+            # Get required parameters
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
             # Ensure campaign exists in DB
             campaign = Campaign.objects.filter(on_chain_id=int(campaign_id)).first()
             if not campaign:
-                # Sync campaign first
-                campaign_sync = CampaignSyncAPI()
-                resp = campaign_sync.post(request, campaign_id)
-                if resp.status_code != 200:
+                # Sync campaign first using shared utility
+                campaign, _ = sync_campaign_from_chain(campaign_id)
+                if not campaign:
                     return Response({"error": "Campaign not found"}, status=404)
-                campaign = Campaign.objects.get(on_chain_id=int(campaign_id))
 
-            # Fetch donations from RPC
-            donations = fetch_from_rpc(
-                "get_donations_for_campaign", {"campaign_id": int(campaign_id)}
-            )
+            # Fetch transaction result and parse donation data
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
 
-            if not donations:
-                donations = []
-
-            synced = 0
-            for don in donations:
-                # Upsert accounts
-                donor, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=don["donor_id"])
-
-                referrer = None
-                if don.get("referrer_id"):
-                    referrer, _ = Account.objects.get_or_create(defaults={"chain_id": 1}, id=don["referrer_id"])
-
-                donated_at = datetime.fromtimestamp(don["donated_at_ms"] / 1000, tz=timezone.utc)
-                returned_at = (
-                    datetime.fromtimestamp(don["returned_at_ms"] / 1000, tz=timezone.utc)
-                    if don.get("returned_at_ms")
-                    else None
+            donation_data = parse_donation_from_tx(tx_result)
+            if not donation_data:
+                return Response(
+                    {"error": "Could not parse donation from transaction result"},
+                    status=404,
                 )
 
-                donation_defaults = {
-                    "token": campaign.token,
-                    "total_amount": str(don["total_amount"]),
-                    "net_amount": str(don["net_amount"]),
-                    "message": don.get("message"),
-                    "donated_at": donated_at,
-                    "protocol_fee": str(don["protocol_fee"]),
-                    "referrer": referrer,
-                    "referrer_fee": str(don["referrer_fee"]) if don.get("referrer_fee") else None,
-                    "creator_fee": str(don["creator_fee"]),
-                    "returned_at": returned_at,
-                    "escrowed": don.get("is_in_escrow", False),
-                }
-
-                donation, _ = CampaignDonation.objects.update_or_create(
-                    on_chain_id=don["id"],
-                    campaign=campaign,
-                    donor=donor,
-                    defaults=donation_defaults,
+            # Verify this donation belongs to the specified campaign
+            if donation_data.get("campaign_id") != int(campaign_id):
+                return Response(
+                    {"error": "Donation does not belong to this campaign"},
+                    status=400,
                 )
 
-                # Fetch USD prices (matches indexer behavior)
-                try:
-                    donation.fetch_usd_prices()
-                except Exception as e:
-                    logger.warning(f"Failed to fetch USD prices for donation {don['id']}: {e}")
+            # Sync the donation using shared utility
+            donation = sync_donation_from_data(campaign, donation_data, tx_hash)
 
-                synced += 1
-
-            # Also update campaign totals from chain
+            # Update campaign totals from chain (single RPC call to get fresh totals)
             campaign_data = fetch_from_rpc(
                 "get_campaign", {"campaign_id": int(campaign_id)}
             )
             if campaign_data:
-                campaign.total_raised_amount = str(campaign_data.get(
-                    "total_raised_amount", campaign.total_raised_amount
-                ))
-                campaign.net_raised_amount = str(campaign_data.get(
-                    "net_raised_amount", campaign.net_raised_amount
-                ))
-                campaign.escrow_balance = str(campaign_data.get(
-                    "escrow_balance", campaign.escrow_balance
-                ))
+                campaign.total_raised_amount = str(
+                    campaign_data.get("total_raised_amount", campaign.total_raised_amount)
+                )
+                campaign.net_raised_amount = str(
+                    campaign_data.get("net_raised_amount", campaign.net_raised_amount)
+                )
+                campaign.escrow_balance = str(
+                    campaign_data.get("escrow_balance", campaign.escrow_balance)
+                )
                 campaign.save()
 
             return Response(
                 {
                     "success": True,
-                    "message": f"Synced {synced} donations",
-                    "synced_count": synced,
+                    "message": "Donation synced",
+                    "donation_id": donation.on_chain_id,
                 }
             )
 
         except Exception as e:
-            logger.error(
-                f"Error syncing donations for campaign {campaign_id}: {e}"
-            )
+            logger.error(f"Error syncing donation for campaign {campaign_id}: {e}")
             return Response({"error": str(e)}, status=502)
