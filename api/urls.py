@@ -21,6 +21,13 @@ from api.sync import (
     ListSyncAPI,
     ListRegistrationsSyncAPI,
     SingleRegistrationSyncAPI,
+    PotSyncAPI,
+    PotDonationsSyncAPI,
+    PotApplicationsSyncAPI,
+    PotPayoutsSyncAPI,
+    PotPayoutChallengesSyncAPI,
+    DirectDonationsSyncAPI,
+    AccountSyncAPI,
 )
 from base.api import StatsAPI, ReclaimProofRequestView
 from donations.api import DonationContractConfigAPI
@@ -188,5 +195,43 @@ urlpatterns = [
         "v1/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
         SingleRegistrationSyncAPI.as_view(),
         name="single_registration_sync_api",
+    ),
+    # pot (campaign) sync endpoints
+    path(
+        "v1/pots/<str:pot_id>/sync",
+        PotSyncAPI.as_view(),
+        name="pot_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/donations/sync",
+        PotDonationsSyncAPI.as_view(),
+        name="pot_donations_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/applications/sync",
+        PotApplicationsSyncAPI.as_view(),
+        name="pot_applications_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/payouts/sync",
+        PotPayoutsSyncAPI.as_view(),
+        name="pot_payouts_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/challenges/sync",
+        PotPayoutChallengesSyncAPI.as_view(),
+        name="pot_challenges_sync_api",
+    ),
+    # direct donations sync
+    path(
+        "v1/donations/sync",
+        DirectDonationsSyncAPI.as_view(),
+        name="direct_donations_sync_api",
+    ),
+    # account sync
+    path(
+        "v1/accounts/<str:account_id>/sync",
+        AccountSyncAPI.as_view(),
+        name="account_sync_api",
     ),
 ]
