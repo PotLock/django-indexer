@@ -24,7 +24,11 @@ from .utils import (
     create_round_payout,
     handle_add_nadabot_admin,  # handle_batch_donations,
     handle_add_stamp,
+    handle_campaign_donation,
+    handle_campaign_donation_refund,
+    handle_campaign_donation_unescrowed,
     handle_default_list_status_change,
+    handle_delete_campaign,
     handle_delete_list,
     handle_list_admin_ops,
     handle_list_owner_change,
@@ -32,6 +36,7 @@ from .utils import (
     handle_list_registration_update,
     handle_list_update,
     handle_list_upvote,
+    handle_new_campaign,
     handle_new_donation,
     handle_new_group,
     handle_new_list,
@@ -53,6 +58,7 @@ from .utils import (
     handle_set_payouts,
     handle_social_profile_update,
     handle_transfer_payout,
+    handle_update_campaign,
     handle_update_default_human_threshold,
     process_rounds_deposit_event,
     process_vote_event,
@@ -205,6 +211,18 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                         )
                     if event_name == "payouts_challenge_created":
                         pass
+                    if event_name == "campaign_create":
+                        await handle_new_campaign(parsed_log.get("data")[0], now_datetime)
+                    if event_name == "campaign_update":
+                        await handle_update_campaign(parsed_log.get("data")[0])
+                    if event_name == "campaign_delete":
+                        await handle_delete_campaign(parsed_log.get("data")[0])
+                    if event_name == "donation" or event_name == "escrow_insert":
+                        await handle_campaign_donation(parsed_log.get("data")[0], receipt.receipt_id)
+                    if event_name == "escrow_refund":
+                        await handle_campaign_donation_refund(parsed_log.get("data")[0], now_datetime)
+                    if event_name == "escrow_process":
+                        await handle_campaign_donation_unescrowed(parsed_log.get("data")[0])
                 except json.JSONDecodeError:
                     logger.warning(
                         f"Receipt ID: `{receipt_execution_outcome.receipt.receipt_id}`\nError during parsing logs from JSON string to dict"
@@ -359,6 +377,9 @@ async def handle_streamer_message(streamer_message: near_primitives.StreamerMess
                             donation_type = (
                                 "direct" if receiver_id == DONATE_CONTRACT else "pot"
                             )
+                            if args_dict.get("campaign_id"):
+                                logger.info("Campaign donation. Skipping...")
+                                break
                             logger.info(
                                 f"New {donation_type} donation ({method_name}) --- ARGS: {args_dict}, RECEIPT: {receipt}, STATUS: {status_obj}, OUTCOME: {receipt_execution_outcome}, LOGS: {log_data}"
                             )

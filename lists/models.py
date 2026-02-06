@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Account
+from chains.models import Chain
 
 
 class ListRegistrationStatus(models.TextChoices):
@@ -21,8 +22,15 @@ class List(models.Model):
     on_chain_id = models.IntegerField(
         _("contract list ID"),
         null=False,
-        unique=True,
         help_text=_("List ID in contract"),
+    )
+    chain = models.ForeignKey(
+        Chain,
+        default=1,
+        on_delete=models.CASCADE,
+        related_name="lists",
+        related_query_name="list",
+        help_text=_("Blockchain this list was created on."),
     )
     owner = models.ForeignKey(
         Account,
@@ -79,7 +87,12 @@ class List(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["created_at", "updated_at"], name="idx_list_stamps")
+            models.Index(fields=["created_at", "updated_at"], name="idx_list_stamps"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "chain"], name="unique_on_chain_id_per_chain"
+            )
         ]
 
 
@@ -120,6 +133,11 @@ class ListRegistration(models.Model):
         _("registration id"),
         primary_key=True,
         help_text=_("Registration id."),
+    )
+    on_chain_id = models.IntegerField(
+        _("list registration id on chain"),
+        null=True,
+        help_text=_("list registration id in contract"),
     )
     list = models.ForeignKey(
         List,
@@ -185,3 +203,8 @@ class ListRegistration(models.Model):
         indexes = [models.Index(fields=["id", "status"], name="idx_list_id_status")]
 
         unique_together = (("list", "registrant"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["on_chain_id", "list"], name="unique_on_chain_id_list"
+            )
+        ]

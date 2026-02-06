@@ -26,10 +26,12 @@ class ProjectContact(models.Model):
     name = models.CharField(max_length=255)
     value = models.CharField(max_length=255)
 
+
 class ProjectContract(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     contract_address = models.CharField(max_length=255)
+
 
 class ProjectRepository(models.Model):
     id = models.AutoField(primary_key=True)
@@ -44,22 +46,23 @@ class ProjectFundingHistory(models.Model):
     denomination = models.CharField(max_length=255)
     description = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    
+
 
 class Project(models.Model):
     id = models.AutoField(primary_key=True)
-    on_chain_id =models.IntegerField(
+    on_chain_id = models.IntegerField(
         _("contract project id"),
         null=False,
         unique=True,
         help_text=_("Project id in contract"),
     )
     image_url = models.URLField(max_length=200)
-    video_url = models.URLField(max_length=200)
+    video_url = models.URLField(max_length=200, null=True, blank=True)
     name = models.CharField(max_length=255)
     overview = models.TextField()
-    owner = models.ForeignKey(Account, related_name='owned_projects', on_delete=models.CASCADE)
-    payout_address = models.ForeignKey(Account, related_name='payout_projects', on_delete=models.CASCADE)
+    owner = models.ForeignKey(
+        Account, related_name="owned_projects", on_delete=models.CASCADE
+    )
     contacts = models.ManyToManyField(
         ProjectContact,
         related_name="contact_lists",
@@ -88,8 +91,6 @@ class Project(models.Model):
         related_name="admin_projects",
         help_text=_("Project Admin"),
     )
-
-
 
 
 class Round(models.Model):
@@ -156,7 +157,7 @@ class Round(models.Model):
         null=False,
         help_text=_("Expected amount."),
     )
-    
+
     base_currency = models.CharField(
         _("base currency"),
         max_length=64,
@@ -333,6 +334,11 @@ class Round(models.Model):
         blank=True,
         help_text=_("Vault total deposits in USD."),
     )
+
+    minimum_deposit = models.CharField(
+        _("minimum deposit"),
+        help_text=_("Minimum deposit."),
+    )
     round_complete = models.DateTimeField(
         _("round complete"),
         null=True,
@@ -341,10 +347,7 @@ class Round(models.Model):
     )
 
     class Meta:
-        unique_together = ('chain', 'on_chain_id')
-
-
-
+        unique_together = ("chain", "on_chain_id")
 
     def update_vault_usd_equivalent(self):
         # first, see if there is a TokenHistoricalPrice within 1 day (or HISTORICAL_PRICE_QUERY_HOURS) of self.paid_at
@@ -356,16 +359,17 @@ class Round(models.Model):
                     f"No USD price found for token {token.symbol} at {datetime.now()}"
                 )
                 return
-            self.vault_total_deposits_usd = token.format_price(self.vault_total_deposits) * price_usd
-            self.current_vault_balance_usd = token.format_price(self.current_vault_balance) * price_usd
-            self.save()
-            logger.info(
-                f"Saved USD prices for round vault for round id: {self.id}"
+            self.vault_total_deposits_usd = (
+                token.format_price(self.vault_total_deposits) * price_usd
             )
+            self.current_vault_balance_usd = (
+                token.format_price(self.current_vault_balance) * price_usd
+            )
+            self.save()
+            logger.info(f"Saved USD prices for round vault for round id: {self.id}")
         except Exception as e:
             logger.error(f"Failed to calculate and  stellar vault USD prices: {e}")
-        
-    
+
     def save(self, *args, **kwargs):
         if self._state.adding:  # If the account is being created (not updated)
             if not self.chain_id:
@@ -452,11 +456,12 @@ class RoundDeposit(models.Model):
     )
 
     class Meta:
-        unique_together = ('round', 'on_chain_id')
+        unique_together = ("round", "on_chain_id")
+
 
 class Vote(models.Model):
-    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name='votes')
-    voter = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='votes')
+    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="votes")
+    voter = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="votes")
     tx_hash = models.CharField(
         _("transaction hash"),
         null=True,
@@ -466,25 +471,24 @@ class Vote(models.Model):
     voted_at = models.DateTimeField()
 
     class Meta:
-        unique_together = ('round', 'voter', 'voted_at')
-
+        unique_together = ("round", "voter", "voted_at")
 
 
 class VotePair(models.Model):
-    vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name='pairs')
+    vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name="pairs")
     pair_id = models.PositiveIntegerField()
-    projects = models.ManyToManyField(Account, related_name='vote_pairs_included_in')
+    projects = models.ManyToManyField(Account, related_name="vote_pairs_included_in")
     voted_project = models.ForeignKey(
         Account,
-        on_delete=models.CASCADE, 
-        related_name='vote_pairs_voted_for_in', 
+        on_delete=models.CASCADE,
+        related_name="vote_pairs_voted_for_in",
         null=True,
-        blank=True
+        blank=True,
     )
-    #old_project = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='vote_pairs')
+    # old_project = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='vote_pairs')
 
     class Meta:
-        unique_together = ('vote', 'pair_id')
+        unique_together = ("vote", "pair_id")
 
 
 class StellarEvent(models.Model):

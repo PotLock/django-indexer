@@ -83,7 +83,6 @@ class RoundsListAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         account_id = kwargs.get("account_id")
         if account_id:
@@ -136,11 +135,10 @@ class RoundDetailAPI(APIView):
             404: OpenApiResponse(description="Round not found"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         round_id = kwargs.get("round_id")
         try:
-            round = Round.objects.get(id=round_id)
+            round = Round.objects.get(on_chain_id=round_id)
         except Round.DoesNotExist:
             return Response({"message": f"Round with ID {round_id} not found."}, status=404)
         serializer = RoundSerializer(round)
@@ -171,11 +169,10 @@ class RoundApplicationsAPI(APIView, CustomSizePageNumberPagination):
             404: OpenApiResponse(description="Round not found"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         round_id = kwargs.get("round_id")
         try:
-            round = Round.objects.get(id=round_id)
+            round = Round.objects.get(on_chain_id=round_id)
         except Round.DoesNotExist:
             return Response({"message": f"Round with ID {round_id} not found."}, status=404)
 
@@ -210,12 +207,11 @@ class ProjectRoundVotesAPI(APIView, CustomSizePageNumberPagination):
             404: OpenApiResponse(description="Round or project not found"),
         },
     )
-    @method_decorator(cache_page(60 * 1))
     def get(self, request: Request, *args, **kwargs):
         round_id = kwargs.get("round_id")
         project_id = kwargs.get("project_id")  # Get project_id from kwargs
         try:
-            round_obj = Round.objects.get(id=round_id)
+            round_obj = Round.objects.get(on_chain_id=round_id)
             # project = Project.objects.get(id=project_id) # comment out now, might use later if decide to return vote pairs instead
         except Round.DoesNotExist:
             return Response({"message": f"Round with ID {round_id} not found."}, status=404)
@@ -278,7 +274,7 @@ class ProjectListAPI(APIView, CustomSizePageNumberPagination):
             500: OpenApiResponse(description="Internal server error"),
         },
     )
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 2))
     def get(self, request: Request, *args, **kwargs):
         projects = Project.objects.all()
         status_param = request.query_params.get("status")
