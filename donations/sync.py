@@ -161,18 +161,26 @@ class DirectDonationSyncAPI(APIView):
                 donation_data["donated_at_ms"] / 1000, tz=timezone.utc
             )
 
+            # Calculate net_amount if not provided (total - protocol_fee - referrer_fee)
+            total_amount = int(donation_data["total_amount"])
+            protocol_fee = int(donation_data.get("protocol_fee", 0))
+            referrer_fee = int(donation_data.get("referrer_fee", 0) or 0)
+            net_amount = donation_data.get("net_amount")
+            if net_amount is None:
+                net_amount = total_amount - protocol_fee - referrer_fee
+
             # Create or update donation
             donation_defaults = {
                 "donor": donor,
                 "recipient": recipient,
                 "token": token,
-                "total_amount": str(donation_data["total_amount"]),
-                "net_amount": str(donation_data["net_amount"]),
+                "total_amount": str(total_amount),
+                "net_amount": str(net_amount),
                 "message": donation_data.get("message"),
                 "donated_at": donated_at,
-                "protocol_fee": str(donation_data.get("protocol_fee", "0")),
+                "protocol_fee": str(protocol_fee),
                 "referrer": referrer,
-                "referrer_fee": str(donation_data["referrer_fee"]) if donation_data.get("referrer_fee") else None,
+                "referrer_fee": str(referrer_fee) if referrer_fee else None,
                 "matching_pool": False,
                 "tx_hash": tx_hash,
             }
