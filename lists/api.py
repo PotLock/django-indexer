@@ -81,14 +81,6 @@ class ListsListAPI(APIView, CustomSizePageNumberPagination):
         lists = lists.filter(chain__name=chain)
         if account_id:
             try:
-                account = Chain.objects.get(name=account_id)
-                lists = lists.filter(owner=account)
-            except Account.DoesNotExist:
-                return Response(
-                    {"message": f"Account with ID {account_id} not found."}, status=404
-                )
-        if account_id:
-            try:
                 account = Account.objects.get(id=account_id)
                 lists = lists.filter(owner=account)
             except Account.DoesNotExist:
