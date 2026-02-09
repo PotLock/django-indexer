@@ -36,6 +36,7 @@ from campaigns.sync import (
     CampaignDonationSyncAPI,
 )
 from donations.api import DonationContractConfigAPI
+from donations.sync import DirectDonationSyncAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
 from lists.api import (
     ListDetailAPI,
@@ -118,6 +119,12 @@ urlpatterns = [
         "v1/donate_contract_config",
         DonationContractConfigAPI.as_view(),
         name="donate_contract_config_api",
+    ),
+    # direct donation sync
+    path(
+        "v1/donations/sync",
+        DirectDonationSyncAPI.as_view(),
+        name="direct_donation_sync_api",
     ),
     # campaigns
     path("v1/campaigns", CampaignsAPI.as_view(), name="campaigns_api"),
