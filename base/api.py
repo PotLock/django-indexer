@@ -13,7 +13,6 @@ from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from reclaim_python_sdk import ReclaimProofRequest
 from accounts.models import Account
 from donations.models import Donation
 from pots.models import PotPayout
@@ -115,6 +114,8 @@ class ReclaimProofRequestView(APIView):
         }
     )
     def post(self, request: Request, *args, **kwargs):
+        from reclaim_python_sdk import ReclaimProofRequest
+
         APP_ID = settings.RECLAIM_APP_ID
         APP_SECRET = settings.RECLAIM_APP_SECRET
         PROVIDER_ID = settings.RECLAIM_TWITTER_PROVIDER_ID
