@@ -39,6 +39,9 @@ from campaigns.api import (
 from campaigns.sync import (
     CampaignSyncAPI,
     CampaignDonationSyncAPI,
+    CampaignDeleteSyncAPI,
+    CampaignRefundSyncAPI,
+    CampaignUnescrowSyncAPI,
 )
 from donations.api import DonationContractConfigAPI
 from donations.sync import DirectDonationSyncAPI
@@ -163,6 +166,21 @@ urlpatterns = [
         "v1/campaigns/<int:campaign_id>/donations/sync",
         CampaignDonationSyncAPI.as_view(),
         name="campaign_donation_sync_api",
+    ),
+    path(
+        "v1/campaigns/<int:campaign_id>/delete/sync",
+        CampaignDeleteSyncAPI.as_view(),
+        name="campaign_delete_sync_api",
+    ),
+    path(
+        "v1/campaigns/<int:campaign_id>/refunds/sync",
+        CampaignRefundSyncAPI.as_view(),
+        name="campaign_refund_sync_api",
+    ),
+    path(
+        "v1/campaigns/<int:campaign_id>/unescrow/sync",
+        CampaignUnescrowSyncAPI.as_view(),
+        name="campaign_unescrow_sync_api",
     ),
     # donors
     path("v1/donors", DonorsAPI.as_view(), name="donors_api"),
