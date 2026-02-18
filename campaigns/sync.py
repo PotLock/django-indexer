@@ -1,12 +1,16 @@
 """
 Sync endpoints - fetch data from blockchain RPC and store in database.
 
-Called by frontend after user creates/updates a campaign or donates.
+Called by frontend after user creates/updates/deletes a campaign, donates,
+or processes refunds/escrowed donations.
 Replaces the 24/7 indexer - now we fetch on-demand when user acts.
 
 Endpoints:
     POST /api/v1/campaigns/{campaign_id}/sync - Sync single campaign
     POST /api/v1/campaigns/{campaign_id}/donations/sync - Sync single donation via tx_hash
+    POST /api/v1/campaigns/{campaign_id}/delete/sync - Sync campaign deletion via tx_hash
+    POST /api/v1/campaigns/{campaign_id}/refunds/sync - Sync donation refunds via tx_hash
+    POST /api/v1/campaigns/{campaign_id}/unescrow/sync - Sync donation unescrow via tx_hash
 """
 import base64
 import json
@@ -104,6 +108,27 @@ def fetch_tx_result(tx_hash: str, sender_id: str):
         raise Exception(f"RPC error fetching tx: {result['error']}")
 
     return result.get("result")
+
+
+def parse_events_from_tx(tx_result: dict, event_name: str) -> list[dict]:
+  
+    events = []
+    receipts_outcome = tx_result.get("receipts_outcome", [])
+
+    for outcome in receipts_outcome:
+        logs = outcome.get("outcome", {}).get("logs", [])
+        for log in logs:
+            if not log.startswith("EVENT_JSON:"):
+                continue
+            try:
+                parsed = json.loads(log[len("EVENT_JSON:"):])
+                if parsed.get("event") == event_name:
+                    for data_item in parsed.get("data", []):
+                        events.append(data_item)
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    return events
 
 
 def parse_donation_from_tx(tx_result: dict) -> dict:
@@ -396,4 +421,229 @@ class CampaignDonationSyncAPI(APIView):
 
         except Exception as e:
             logger.error(f"Error syncing donation for campaign {campaign_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class CampaignDeleteSyncAPI(APIView):
+
+
+    @extend_schema(
+        summary="Sync campaign deletion from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="Campaign deleted from DB"),
+            400: OpenApiResponse(description="Missing parameters or no delete event found"),
+            404: OpenApiResponse(description="Campaign not found in DB"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, campaign_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            # Fetch transaction and parse campaign_delete events
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            delete_events = parse_events_from_tx(tx_result, "campaign_delete")
+
+            # Find the delete event for this specific campaign
+            matching_event = None
+            for event in delete_events:
+                if event.get("campaign_id") == int(campaign_id):
+                    matching_event = event
+                    break
+
+            if not matching_event:
+                return Response(
+                    {"error": f"No campaign_delete event found for campaign {campaign_id} in this transaction"},
+                    status=400,
+                )
+
+            # Event verified — delete from DB
+            deleted_count, _ = Campaign.objects.filter(on_chain_id=int(campaign_id)).delete()
+
+            if deleted_count > 0:
+                logger.info(f"Campaign {campaign_id} deleted from DB (verified via tx {tx_hash})")
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Campaign deleted",
+                        "on_chain_id": campaign_id,
+                    }
+                )
+
+            return Response({"error": "Campaign not found in database"}, status=404)
+
+        except Exception as e:
+            logger.error(f"Error syncing campaign deletion {campaign_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class CampaignRefundSyncAPI(APIView):
+
+    @extend_schema(
+        summary="Sync donation refunds from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="Refunds synced"),
+            400: OpenApiResponse(description="Missing parameters or no refund event found"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, campaign_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            refund_events = parse_events_from_tx(tx_result, "escrow_refund")
+
+            # Find refund events for this campaign
+            matching_events = [
+                e for e in refund_events if e.get("campaign_id") == int(campaign_id)
+            ]
+
+            if not matching_events:
+                return Response(
+                    {"error": f"No escrow_refund event found for campaign {campaign_id} in this transaction"},
+                    status=400,
+                )
+
+            total_refunded = 0
+            now = datetime.now(tz=timezone.utc)
+
+            for event_data in matching_events:
+                donation_ids = event_data.get("donations", [])
+
+                # Mark donations as refunded (mirrors handle_campaign_donation_refund)
+                updated_count = CampaignDonation.objects.filter(
+                    on_chain_id__in=donation_ids, campaign__on_chain_id=int(campaign_id)
+                ).update(returned_at=now)
+
+                total_refunded += updated_count
+
+                # Update campaign escrow balance and totals
+                try:
+                    campaign = Campaign.objects.get(on_chain_id=int(campaign_id))
+                    escrow_balance = event_data.get("escrow_balance", "0")
+                    campaign.escrow_balance = str(
+                        int(campaign.escrow_balance) - int(escrow_balance)
+                    )
+
+                    refunded_donations = CampaignDonation.objects.filter(
+                        on_chain_id__in=donation_ids, campaign__on_chain_id=int(campaign_id)
+                    ).values_list("total_amount", "net_amount")
+
+                    total_amount_refunded = sum(int(d[0]) for d in refunded_donations)
+                    net_amount_refunded = sum(int(d[1]) for d in refunded_donations)
+
+                    campaign.total_raised_amount = str(
+                        int(campaign.total_raised_amount) - total_amount_refunded
+                    )
+                    campaign.net_raised_amount = str(
+                        int(campaign.net_raised_amount) - net_amount_refunded
+                    )
+                    campaign.save()
+
+                except Campaign.DoesNotExist:
+                    logger.error(f"Campaign {campaign_id} not found for refund update")
+
+            logger.info(f"Synced {total_refunded} refunds for campaign {campaign_id} (tx {tx_hash})")
+            return Response(
+                {
+                    "success": True,
+                    "message": f"{total_refunded} donation(s) marked as refunded",
+                    "refunded_count": total_refunded,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error syncing refunds for campaign {campaign_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class CampaignUnescrowSyncAPI(APIView):
+
+    @extend_schema(
+        summary="Sync donation unescrow from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="Unescrow synced"),
+            400: OpenApiResponse(description="Missing parameters or no unescrow event found"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, campaign_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            unescrow_events = parse_events_from_tx(tx_result, "escrow_process")
+
+            if not unescrow_events:
+                return Response(
+                    {"error": "No escrow_process event found in this transaction"},
+                    status=400,
+                )
+
+            total_unescrowed = 0
+
+            for event_data in unescrow_events:
+                donation_ids = event_data.get("donation_ids", [])
+
+                # Mark donations as unescrowed (mirrors handle_campaign_donation_unescrowed)
+                updated_count = CampaignDonation.objects.filter(
+                    on_chain_id__in=donation_ids
+                ).update(escrowed=False)
+
+                total_unescrowed += updated_count
+
+            logger.info(f"Synced {total_unescrowed} unescrows for campaign {campaign_id} (tx {tx_hash})")
+            return Response(
+                {
+                    "success": True,
+                    "message": f"{total_unescrowed} donation(s) marked as unescrowed",
+                    "unescrowed_count": total_unescrowed,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error syncing unescrow for campaign {campaign_id}: {e}")
             return Response({"error": str(e)}, status=502)
