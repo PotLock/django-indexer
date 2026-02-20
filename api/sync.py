@@ -9,6 +9,9 @@ Endpoints:
         POST /api/v1/lists/{list_id}/sync - Sync single list
         POST /api/v1/lists/{list_id}/registrations/sync - Sync all registrations
         POST /api/v1/lists/{list_id}/registrations/{registrant_id}/sync - Sync single registration
+        POST /api/v1/lists/{list_id}/delete/sync - Sync list deletion via tx_hash
+        POST /api/v1/lists/{list_id}/upvote/sync - Sync list upvote via tx_hash
+        POST /api/v1/lists/{list_id}/remove-upvote/sync - Sync list remove-upvote via tx_hash
 
     Accounts:
         POST /api/v1/accounts/{account_id}/sync - Sync account profile and recalculate stats
@@ -20,13 +23,14 @@ from datetime import datetime
 
 import requests
 from django.conf import settings
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Account
+from activities.models import Activity
 from donations.models import Donation
-from lists.models import List, ListRegistration
+from lists.models import List, ListRegistration, ListUpvote
 from pots.models import Pot, PotApplication, PotApplicationReview, PotFactory, PotPayout, PotPayoutChallenge, PotPayoutChallengeAdminResponse
 from tokens.models import Token
 
@@ -117,6 +121,58 @@ def fetch_from_rpc(method_name: str, args: dict = None, contract_id: str = None,
             last_error = str(e)
 
     raise Exception(f"All RPC endpoints failed. Last error: {last_error}")
+
+
+def fetch_tx_result(tx_hash: str, sender_id: str):
+    """
+    Fetch transaction result from NEAR RPC.
+    Returns the parsed result from the transaction execution.
+    """
+    rpc_url = (
+        "https://test.rpc.fastnear.com"
+        if settings.ENVIRONMENT == "testnet"
+        else "https://free.rpc.fastnear.com"
+    )
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "dontcare",
+        "method": "tx",
+        "params": {
+            "tx_hash": tx_hash,
+            "sender_account_id": sender_id,
+            "wait_until": "EXECUTED_OPTIMISTIC",
+        },
+    }
+
+    response = requests.post(rpc_url, json=payload, timeout=30)
+    result = response.json()
+
+    if "error" in result:
+        raise Exception(f"RPC error fetching tx: {result['error']}")
+
+    return result.get("result")
+
+
+def parse_events_from_tx(tx_result: dict, event_name: str) -> list[dict]:
+    """Parse EVENT_JSON logs from transaction receipts matching a specific event name."""
+    events = []
+    receipts_outcome = tx_result.get("receipts_outcome", [])
+
+    for outcome in receipts_outcome:
+        logs = outcome.get("outcome", {}).get("logs", [])
+        for log in logs:
+            if not log.startswith("EVENT_JSON:"):
+                continue
+            try:
+                parsed = json.loads(log[len("EVENT_JSON:"):])
+                if parsed.get("event") == event_name:
+                    for data_item in parsed.get("data", []):
+                        events.append(data_item)
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    return events
 
 
 class ListSyncAPI(APIView):
@@ -840,6 +896,218 @@ class PotPayoutChallengesSyncAPI(APIView):
 
         except Exception as e:
             logger.error(f"Error syncing payout challenges for pot {pot_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class ListDeleteSyncAPI(APIView):
+    """
+    Sync a list deletion from blockchain via tx_hash.
+
+    Called by frontend after user deletes a list on-chain.
+    Fetches the transaction, parses the delete_list EVENT_JSON, and deletes from DB.
+    """
+
+    @extend_schema(
+        summary="Sync list deletion from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="List deleted from DB"),
+            400: OpenApiResponse(description="Missing parameters or no delete event found"),
+            404: OpenApiResponse(description="List not found in DB"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, list_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            # Fetch transaction and parse delete_list events
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            delete_events = parse_events_from_tx(tx_result, "delete_list")
+
+            # Find the delete event for this specific list
+            matching_event = None
+            for event in delete_events:
+                if event.get("list_id") == int(list_id):
+                    matching_event = event
+                    break
+
+            if not matching_event:
+                return Response(
+                    {"error": f"No delete_list event found for list {list_id} in this transaction"},
+                    status=400,
+                )
+
+            # Event verified — delete from DB
+            deleted_count, _ = List.objects.filter(on_chain_id=int(list_id)).delete()
+
+            if deleted_count > 0:
+                logger.info(f"List {list_id} deleted from DB (verified via tx {tx_hash})")
+                return Response(
+                    {
+                        "success": True,
+                        "message": "List deleted",
+                        "on_chain_id": list_id,
+                    }
+                )
+
+            return Response({"error": "List not found in database"}, status=404)
+
+        except Exception as e:
+            logger.error(f"Error syncing list deletion {list_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class ListUpvoteSyncAPI(APIView):
+    """
+    Sync a list upvote from blockchain via tx_hash.
+
+    Called by frontend after user upvotes a list on-chain.
+    Fetches the transaction to verify it succeeded, then creates the upvote record.
+    """
+
+    @extend_schema(
+        summary="Sync list upvote from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="Upvote synced"),
+            400: OpenApiResponse(description="Missing parameters"),
+            404: OpenApiResponse(description="List not found"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, list_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            # Fetch transaction to verify it succeeded
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            # Find the list
+            try:
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+            except List.DoesNotExist:
+                return Response({"error": "List not found in database"}, status=404)
+
+            # Create account if needed
+            account, _ = Account.objects.get_or_create(id=sender_id)
+
+            # Create or update the upvote
+            now = datetime.now()
+            ListUpvote.objects.update_or_create(
+                list=list_obj,
+                account=account,
+                defaults={"created_at": now},
+            )
+
+            # Create activity record
+            Activity.objects.update_or_create(
+                action_result={"list_id": int(list_id)},
+                type="Upvote",
+                defaults={
+                    "signer": account,
+                    "receiver_id": LISTS_CONTRACT,
+                    "timestamp": now,
+                    "tx_hash": tx_hash,
+                },
+            )
+
+            logger.info(f"List {list_id} upvoted by {sender_id} (verified via tx {tx_hash})")
+            return Response(
+                {
+                    "success": True,
+                    "message": "Upvote synced",
+                    "on_chain_id": list_id,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error syncing list upvote {list_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class ListRemoveUpvoteSyncAPI(APIView):
+    """
+    Sync a list remove-upvote from blockchain via tx_hash.
+
+    Called by frontend after user removes their upvote from a list on-chain.
+    Fetches the transaction to verify it succeeded, then deletes the upvote record.
+    """
+
+    @extend_schema(
+        summary="Sync list remove-upvote from blockchain via tx_hash",
+        parameters=[
+            OpenApiParameter(name="tx_hash", required=True, type=str),
+            OpenApiParameter(name="sender_id", required=True, type=str),
+        ],
+        responses={
+            200: OpenApiResponse(description="Upvote removed"),
+            400: OpenApiResponse(description="Missing parameters"),
+            404: OpenApiResponse(description="List not found"),
+            502: OpenApiResponse(description="RPC failed"),
+        },
+    )
+    def post(self, request, list_id: int):
+        try:
+            tx_hash = request.data.get("tx_hash") or request.query_params.get("tx_hash")
+            sender_id = request.data.get("sender_id") or request.query_params.get("sender_id")
+
+            if not tx_hash or not sender_id:
+                return Response(
+                    {"error": "tx_hash and sender_id are required"},
+                    status=400,
+                )
+
+            # Fetch transaction to verify it succeeded
+            tx_result = fetch_tx_result(tx_hash, sender_id)
+            if not tx_result:
+                return Response({"error": "Transaction not found"}, status=404)
+
+            # Find the list
+            try:
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+            except List.DoesNotExist:
+                return Response({"error": "List not found in database"}, status=404)
+
+            # Delete the upvote
+            ListUpvote.objects.filter(list=list_obj, account_id=sender_id).delete()
+
+            logger.info(f"Upvote removed from list {list_id} by {sender_id} (verified via tx {tx_hash})")
+            return Response(
+                {
+                    "success": True,
+                    "message": "Upvote removed",
+                    "on_chain_id": list_id,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error syncing list remove-upvote {list_id}: {e}")
             return Response({"error": str(e)}, status=502)
 
 

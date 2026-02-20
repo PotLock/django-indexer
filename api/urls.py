@@ -22,6 +22,9 @@ from api.sync import (
     ListSyncAPI,
     ListRegistrationsSyncAPI,
     SingleRegistrationSyncAPI,
+    ListDeleteSyncAPI,
+    ListUpvoteSyncAPI,
+    ListRemoveUpvoteSyncAPI,
     PotSyncAPI,
     PotDonationsSyncAPI,
     PotApplicationsSyncAPI,
@@ -201,6 +204,21 @@ urlpatterns = [
         "v1/donations/sync",
         DirectDonationSyncAPI.as_view(),
         name="direct_donation_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/delete/sync",
+        ListDeleteSyncAPI.as_view(),
+        name="list_delete_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/upvote/sync",
+        ListUpvoteSyncAPI.as_view(),
+        name="list_upvote_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/remove-upvote/sync",
+        ListRemoveUpvoteSyncAPI.as_view(),
+        name="list_remove_upvote_sync_api",
     ),
     # pot sync endpoints
     path(
