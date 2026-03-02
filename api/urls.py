@@ -35,6 +35,7 @@ from base.api import StatsAPI, ReclaimProofRequestView
 from donations.api import DonationContractConfigAPI
 from donations.sync import DirectDonationSyncAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
+from grantpicks.sync import ProjectSyncAPI, ProjectsListSyncAPI
 from lists.api import (
     ListDetailAPI,
     ListRandomRegistrationAPI,
@@ -172,6 +173,9 @@ urlpatterns = [
     ),
     path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
     path("v1/<str:account_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_stat__api"),
+    # grantpicks project sync
+    path("v1/projects/<int:project_id>/sync", ProjectSyncAPI.as_view(), name="project_sync_api"),
+    path("v1/projects/sync", ProjectsListSyncAPI.as_view(), name="projects_list_sync_api"),
 
     path(
         "v1/mpdao/voters",
