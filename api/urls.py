@@ -49,6 +49,7 @@ from campaigns.sync import (
 from donations.api import DonationContractConfigAPI
 from donations.sync import DirectDonationSyncAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
+from grantpicks.sync import ProjectSyncAPI, ProjectsListSyncAPI
 from lists.api import (
     ListDetailAPI,
     ListRandomRegistrationAPI,
@@ -240,6 +241,9 @@ urlpatterns = [
     ),
     path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
     path("v1/<str:account_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_stat__api"),
+    # grantpicks project sync
+    path("v1/projects/<int:project_id>/sync", ProjectSyncAPI.as_view(), name="project_sync_api"),
+    path("v1/projects/sync", ProjectsListSyncAPI.as_view(), name="projects_list_sync_api"),
 
     path(
         "v1/mpdao/voters",
@@ -266,6 +270,47 @@ urlpatterns = [
         "v1/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
         SingleRegistrationSyncAPI.as_view(),
         name="single_registration_sync_api",
+    ),
+    # pot sync endpoints
+    path(
+        "v1/pots/<str:pot_id>/sync",
+        PotSyncAPI.as_view(),
+        name="pot_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/donations/sync",
+        PotDonationsSyncAPI.as_view(),
+        name="pot_donations_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/applications/sync",
+        PotApplicationsSyncAPI.as_view(),
+        name="pot_applications_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/payouts/sync",
+        PotPayoutsSyncAPI.as_view(),
+        name="pot_payouts_sync_api",
+    ),
+    path(
+        "v1/pots/<str:pot_id>/challenges/sync",
+        PotPayoutChallengesSyncAPI.as_view(),
+        name="pot_challenges_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/delete/sync",
+        ListDeleteSyncAPI.as_view(),
+        name="list_delete_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/upvote/sync",
+        ListUpvoteSyncAPI.as_view(),
+        name="list_upvote_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/remove-upvote/sync",
+        ListRemoveUpvoteSyncAPI.as_view(),
+        name="list_remove_upvote_sync_api",
     ),
     # pot sync endpoints
     path(
