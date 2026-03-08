@@ -188,17 +188,22 @@ urlpatterns = [
     ),
     path("v1/<str:account_id>/projects", AccountProjectListAPI.as_view(), name="user_projects_api"),
     path("v1/<str:account_id>/project-stats", ProjectStatsAPI.as_view(), name="projects_stat__api"),
-    # grantpicks sync
-    path("v1/projects/<int:project_id>/sync", ProjectSyncAPI.as_view(), name="project_sync_api"),
-    path("v1/projects/sync", ProjectsListSyncAPI.as_view(), name="projects_list_sync_api"),
-    path("v1/rounds/<int:round_id>/sync", RoundSyncAPI.as_view(), name="round_sync_api"),
-    path("v1/rounds/sync", RoundsListSyncAPI.as_view(), name="rounds_list_sync_api"),
-    path("v1/rounds/<int:round_id>/applications/sync", RoundApplicationsSyncAPI.as_view(), name="round_applications_sync_api"),
-    path("v1/rounds/<int:round_id>/applications/review/sync", ApplicationReviewSyncAPI.as_view(), name="application_review_sync_api"),
-    path("v1/rounds/<int:round_id>/approved-projects/sync", ApprovedProjectsSyncAPI.as_view(), name="approved_projects_sync_api"),
-    path("v1/rounds/<int:round_id>/deposits/sync", RoundDepositsSyncAPI.as_view(), name="round_deposits_sync_api"),
-    path("v1/rounds/<int:round_id>/votes/sync", RoundVotesSyncAPI.as_view(), name="round_votes_sync_api"),
-    path("v1/rounds/<int:round_id>/payouts/sync", RoundPayoutsSyncAPI.as_view(), name="round_payouts_sync_api"),
+    # =========================================================================
+    # GRANTPICKS sync endpoints (Stellar chain — grantpicks frontend)
+    # All prefixed with v1/grantpicks/ to avoid conflicts with Potlock/NEAR
+    # =========================================================================
+    # Projects
+    path("v1/grantpicks/projects/<int:project_id>/sync", ProjectSyncAPI.as_view(), name="grantpicks_project_sync_api"),
+    path("v1/grantpicks/projects/sync", ProjectsListSyncAPI.as_view(), name="grantpicks_projects_list_sync_api"),
+    # Rounds
+    path("v1/grantpicks/rounds/<int:round_id>/sync", RoundSyncAPI.as_view(), name="grantpicks_round_sync_api"),
+    path("v1/grantpicks/rounds/sync", RoundsListSyncAPI.as_view(), name="grantpicks_rounds_list_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/applications/sync", RoundApplicationsSyncAPI.as_view(), name="grantpicks_round_applications_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/applications/review/sync", ApplicationReviewSyncAPI.as_view(), name="grantpicks_application_review_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/approved-projects/sync", ApprovedProjectsSyncAPI.as_view(), name="grantpicks_approved_projects_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/deposits/sync", RoundDepositsSyncAPI.as_view(), name="grantpicks_round_deposits_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/votes/sync", RoundVotesSyncAPI.as_view(), name="grantpicks_round_votes_sync_api"),
+    path("v1/grantpicks/rounds/<int:round_id>/payouts/sync", RoundPayoutsSyncAPI.as_view(), name="grantpicks_round_payouts_sync_api"),
 
     path(
         "v1/mpdao/voters",
@@ -210,54 +215,32 @@ urlpatterns = [
         MpdaoVoterDetailAPI.as_view(),
         name="mpdao_voter_detail",
     ),
-    # sync endpoints (for on-demand data fetching from blockchain)
-    # NEAR list sync endpoints (kept for NEAR/potlock frontend)
+    # Lists
     path(
-        "v1/near/lists/<int:list_id>/sync",
-        ListSyncAPI.as_view(),
-        name="near_list_sync_api",
-    ),
-    path(
-        "v1/near/lists/<int:list_id>/registrations/sync",
-        ListRegistrationsSyncAPI.as_view(),
-        name="near_list_registrations_sync_api",
-    ),
-    path(
-        "v1/near/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
-        SingleRegistrationSyncAPI.as_view(),
-        name="near_single_registration_sync_api",
-    ),
-    # Stellar list sync endpoints (grantpicks frontend)
-    path(
-        "v1/lists/<int:list_id>/sync",
+        "v1/grantpicks/lists/<int:list_id>/sync",
         StellarListSyncAPI.as_view(),
-        name="list_sync_api",
+        name="grantpicks_list_sync_api",
     ),
     path(
-        "v1/lists/<int:list_id>/registrations/sync",
+        "v1/grantpicks/lists/<int:list_id>/registrations/sync",
         StellarListRegistrationsSyncAPI.as_view(),
-        name="list_registrations_sync_api",
+        name="grantpicks_list_registrations_sync_api",
     ),
     path(
-        "v1/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
+        "v1/grantpicks/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
         StellarSingleRegistrationSyncAPI.as_view(),
-        name="single_registration_sync_api",
+        name="grantpicks_single_registration_sync_api",
+    ),
+    path(
+        "v1/grantpicks/lists/<int:list_id>/delete/sync",
+        StellarListDeleteSyncAPI.as_view(),
+        name="grantpicks_list_delete_sync_api",
     ),
     # direct donation sync
     path(
         "v1/donations/sync",
         DirectDonationSyncAPI.as_view(),
         name="direct_donation_sync_api",
-    ),
-    path(
-        "v1/near/lists/<int:list_id>/delete/sync",
-        ListDeleteSyncAPI.as_view(),
-        name="near_list_delete_sync_api",
-    ),
-    path(
-        "v1/lists/<int:list_id>/delete/sync",
-        StellarListDeleteSyncAPI.as_view(),
-        name="list_delete_sync_api",
     ),
     path(
         "v1/lists/<int:list_id>/upvote/sync",
