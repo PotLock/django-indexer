@@ -60,6 +60,10 @@ from grantpicks.sync import (
     RoundDepositsSyncAPI,
     RoundVotesSyncAPI,
     RoundPayoutsSyncAPI,
+    StellarListSyncAPI,
+    StellarListRegistrationsSyncAPI,
+    StellarSingleRegistrationSyncAPI,
+    StellarListDeleteSyncAPI,
 )
 from lists.api import (
     ListDetailAPI,
@@ -275,19 +279,36 @@ urlpatterns = [
         name="mpdao_voter_detail",
     ),
     # sync endpoints (for on-demand data fetching from blockchain)
+    # NEAR list sync endpoints (kept for NEAR/potlock frontend)
+    path(
+        "v1/near/lists/<int:list_id>/sync",
+        ListSyncAPI.as_view(),
+        name="near_list_sync_api",
+    ),
+    path(
+        "v1/near/lists/<int:list_id>/registrations/sync",
+        ListRegistrationsSyncAPI.as_view(),
+        name="near_list_registrations_sync_api",
+    ),
+    path(
+        "v1/near/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
+        SingleRegistrationSyncAPI.as_view(),
+        name="near_single_registration_sync_api",
+    ),
+    # Stellar list sync endpoints (grantpicks frontend)
     path(
         "v1/lists/<int:list_id>/sync",
-        ListSyncAPI.as_view(),
+        StellarListSyncAPI.as_view(),
         name="list_sync_api",
     ),
     path(
         "v1/lists/<int:list_id>/registrations/sync",
-        ListRegistrationsSyncAPI.as_view(),
+        StellarListRegistrationsSyncAPI.as_view(),
         name="list_registrations_sync_api",
     ),
     path(
         "v1/lists/<int:list_id>/registrations/<str:registrant_id>/sync",
-        SingleRegistrationSyncAPI.as_view(),
+        StellarSingleRegistrationSyncAPI.as_view(),
         name="single_registration_sync_api",
     ),
     # pot sync endpoints
@@ -358,8 +379,13 @@ urlpatterns = [
         name="pot_challenges_sync_api",
     ),
     path(
-        "v1/lists/<int:list_id>/delete/sync",
+        "v1/near/lists/<int:list_id>/delete/sync",
         ListDeleteSyncAPI.as_view(),
+        name="near_list_delete_sync_api",
+    ),
+    path(
+        "v1/lists/<int:list_id>/delete/sync",
+        StellarListDeleteSyncAPI.as_view(),
         name="list_delete_sync_api",
     ),
     path(
