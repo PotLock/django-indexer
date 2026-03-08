@@ -1,7 +1,7 @@
 """
 Sync endpoints for grantpicks - fetch data from Stellar RPC and store in database.
 
-Called by frontend after user performs on-chain actions (create/update project, round, application).
+Called by frontend after user performs on-chain actions (create/update project, round, application, list).
 
 Endpoints:
     POST /api/v1/projects/{project_id}/sync - Sync single project from chain
@@ -14,6 +14,10 @@ Endpoints:
     POST /api/v1/rounds/{round_id}/deposits/sync - Sync deposits for a round from chain
     POST /api/v1/rounds/{round_id}/votes/sync - Sync votes for a round from chain
     POST /api/v1/rounds/{round_id}/payouts/sync - Sync payouts for a round from chain
+    POST /api/v1/lists/{list_id}/sync - Sync single list from chain
+    POST /api/v1/lists/{list_id}/registrations/sync - Sync registrations for a list from chain
+    POST /api/v1/lists/{list_id}/registrations/{registrant_id}/sync - Sync single registration from chain
+    POST /api/v1/lists/{list_id}/delete/sync - Delete list from DB after on-chain deletion
 """
 import json
 import logging
@@ -23,6 +27,9 @@ import stellar_sdk
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from accounts.models import Account
+from lists.models import List, ListRegistration
 
 from indexer_app.tasks import address_to_string
 from indexer_app.utils import (
@@ -48,6 +55,11 @@ _STELLAR_ROUND_CONTRACT = {
 _STELLAR_PROJECT_CONTRACT = {
     "testnet": "CA56XSY7YEZ7CJ5FYG7YODQIWE3JNRGZ5S7E7VJAQ675KDS4BLZJ5NJH",
     "dev": "CD6X5JVK6ITAZGOMIUBVJUHFMK34YW2ZEWQ2BDLV6XFRFGNV56A4L3RC",
+}.get(settings.ENVIRONMENT, "")
+
+_STELLAR_LISTS_CONTRACT = {
+    "testnet": "CCLXSELRRF67M3K5JJYNT6HRTJN26JDJKZYKR5QTZAEZU2TSCF6OGFZT",
+    "dev": "CAIYXP5CNFB5WUBAWEPBZHIKYZGP3IEFXILFMDUT37FZBKNGFJGNJPNT",
 }.get(settings.ENVIRONMENT, "")
 
 
@@ -365,3 +377,237 @@ class RoundPayoutsSyncAPI(APIView):
             synced += 1
 
         return Response({"success": True, "synced": synced, "total": len(data)})
+
+
+class StellarListSyncAPI(APIView):
+    """POST /api/v1/lists/{list_id}/sync - Sync a single list from Stellar chain."""
+
+    def post(self, request, list_id: int):
+        try:
+            data = fetch_from_stellar_rpc(
+                _STELLAR_LISTS_CONTRACT,
+                "get_list",
+                [stellar_sdk.scval.to_uint128(list_id)],
+            )
+            if not data:
+                return Response({"error": "List not found on chain"}, status=404)
+
+            # Map Stellar field names to DB fields
+            owner_id = data.get("owner", "")
+            Account.objects.get_or_create(id=owner_id)
+
+            # default_registration_status comes as array like ["Pending"] from Stellar
+            default_status = data.get("default_registration_status", "Pending")
+            if isinstance(default_status, list):
+                default_status = default_status[0] if default_status else "Pending"
+
+            created_at = datetime.fromtimestamp(data.get("created_ms", 0) / 1000) if data.get("created_ms") else datetime.now()
+            updated_at = datetime.fromtimestamp(data.get("updated_ms", 0) / 1000) if data.get("updated_ms") else datetime.now()
+
+            existing_list = List.objects.filter(on_chain_id=int(list_id)).first()
+
+            if existing_list:
+                existing_list.name = data.get("name", "")
+                existing_list.description = data.get("description", "")
+                existing_list.cover_image_url = data.get("cover_img_url") or data.get("cover_image_url")
+                existing_list.admin_only_registrations = data.get("admin_only_registrations", False)
+                existing_list.default_registration_status = default_status
+                existing_list.updated_at = updated_at
+                existing_list.save()
+
+                existing_list.admins.clear()
+                for admin_id in data.get("admins", []):
+                    admin, _ = Account.objects.get_or_create(id=admin_id)
+                    existing_list.admins.add(admin)
+
+                return Response({"success": True, "message": "List updated", "on_chain_id": list_id})
+
+            list_obj = List.objects.create(
+                on_chain_id=data.get("id", list_id),
+                owner_id=owner_id,
+                name=data.get("name", ""),
+                description=data.get("description", ""),
+                cover_image_url=data.get("cover_img_url") or data.get("cover_image_url"),
+                admin_only_registrations=data.get("admin_only_registrations", False),
+                default_registration_status=default_status,
+                created_at=created_at,
+                updated_at=updated_at,
+            )
+
+            for admin_id in data.get("admins", []):
+                admin, _ = Account.objects.get_or_create(id=admin_id)
+                list_obj.admins.add(admin)
+
+            return Response({"success": True, "message": "List created", "on_chain_id": list_obj.on_chain_id})
+
+        except Exception as e:
+            logger.error(f"Error syncing list {list_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class StellarListRegistrationsSyncAPI(APIView):
+    """POST /api/v1/lists/{list_id}/registrations/sync - Sync registrations for a list from Stellar chain."""
+
+    def post(self, request, list_id: int):
+        try:
+            # Ensure list exists in DB
+            try:
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+            except List.DoesNotExist:
+                sync = StellarListSyncAPI()
+                resp = sync.post(request, list_id)
+                if resp.status_code != 200:
+                    return Response({"error": "List not found"}, status=404)
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+
+            # Fetch all registrations (no status filter — pass None)
+            registrations = fetch_from_stellar_rpc(
+                _STELLAR_LISTS_CONTRACT,
+                "get_registrations_for_list",
+                [
+                    stellar_sdk.scval.to_uint128(list_id),
+                    stellar_sdk.scval.to_void(),
+                    stellar_sdk.scval.to_uint64(0),
+                    stellar_sdk.scval.to_uint64(100),
+                ],
+            )
+
+            if not registrations:
+                registrations = []
+
+            synced = 0
+            for reg in registrations:
+                registrant_id = reg.get("registrant_id", "")
+                registered_by = reg.get("registered_by", registrant_id)
+                Account.objects.get_or_create(id=registrant_id)
+                Account.objects.get_or_create(id=registered_by)
+
+                status = reg.get("status", "Pending")
+                if isinstance(status, list):
+                    status = status[0] if status else "Pending"
+
+                submitted_at = datetime.fromtimestamp(reg.get("submitted_ms", 0) / 1000) if reg.get("submitted_ms") else datetime.now()
+                updated_at = datetime.fromtimestamp(reg.get("updated_ms", 0) / 1000) if reg.get("updated_ms") else datetime.now()
+
+                ListRegistration.objects.update_or_create(
+                    list=list_obj,
+                    registrant_id=registrant_id,
+                    defaults={
+                        "registered_by_id": registered_by,
+                        "status": status,
+                        "submitted_at": submitted_at,
+                        "updated_at": updated_at,
+                        "admin_notes": reg.get("admin_notes"),
+                        "registrant_notes": reg.get("registrant_notes"),
+                    }
+                )
+                synced += 1
+
+            return Response({"success": True, "message": f"Synced {synced} registrations", "synced_count": synced})
+
+        except Exception as e:
+            logger.error(f"Error syncing registrations for list {list_id}: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class StellarSingleRegistrationSyncAPI(APIView):
+    """POST /api/v1/lists/{list_id}/registrations/{registrant_id}/sync - Sync single registration from Stellar chain."""
+
+    def post(self, request, list_id: int, registrant_id: str):
+        try:
+            # Ensure list exists in DB
+            try:
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+            except List.DoesNotExist:
+                sync = StellarListSyncAPI()
+                resp = sync.post(request, list_id)
+                if resp.status_code != 200:
+                    return Response({"error": "List not found"}, status=404)
+                list_obj = List.objects.get(on_chain_id=int(list_id))
+
+            # Fetch all registrations and find the one we need
+            registrations = fetch_from_stellar_rpc(
+                _STELLAR_LISTS_CONTRACT,
+                "get_registrations_for_list",
+                [
+                    stellar_sdk.scval.to_uint128(list_id),
+                    stellar_sdk.scval.to_void(),
+                    stellar_sdk.scval.to_uint64(0),
+                    stellar_sdk.scval.to_uint64(100),
+                ],
+            )
+
+            if not registrations:
+                return Response({"error": "No registrations found for list"}, status=404)
+
+            reg = next((r for r in registrations if r.get("registrant_id") == registrant_id), None)
+            if not reg:
+                return Response({"error": "Registration not found"}, status=404)
+
+            Account.objects.get_or_create(id=reg["registrant_id"])
+            registered_by = reg.get("registered_by", reg["registrant_id"])
+            Account.objects.get_or_create(id=registered_by)
+
+            status = reg.get("status", "Pending")
+            if isinstance(status, list):
+                status = status[0] if status else "Pending"
+
+            submitted_at = datetime.fromtimestamp(reg.get("submitted_ms", 0) / 1000) if reg.get("submitted_ms") else datetime.now()
+            updated_at = datetime.fromtimestamp(reg.get("updated_ms", 0) / 1000) if reg.get("updated_ms") else datetime.now()
+
+            registration, created = ListRegistration.objects.update_or_create(
+                list=list_obj,
+                registrant_id=reg["registrant_id"],
+                defaults={
+                    "registered_by_id": registered_by,
+                    "status": status,
+                    "submitted_at": submitted_at,
+                    "updated_at": updated_at,
+                    "admin_notes": reg.get("admin_notes"),
+                    "registrant_notes": reg.get("registrant_notes"),
+                }
+            )
+
+            return Response({"success": True, "message": "Registration synced", "registrant_id": registrant_id, "status": registration.status})
+
+        except Exception as e:
+            logger.error(f"Error syncing registration: {e}")
+            return Response({"error": str(e)}, status=502)
+
+
+class StellarListDeleteSyncAPI(APIView):
+    """POST /api/v1/lists/{list_id}/delete/sync - Delete list from DB after on-chain deletion."""
+
+    def post(self, request, list_id: int):
+        try:
+            # Verify list no longer exists on chain
+            data = fetch_from_stellar_rpc(
+                _STELLAR_LISTS_CONTRACT,
+                "get_list",
+                [stellar_sdk.scval.to_uint128(list_id)],
+            )
+
+            if data:
+                return Response({"error": "List still exists on chain — not deleted"}, status=400)
+
+            # List doesn't exist on chain — safe to delete from DB
+            deleted_count, _ = List.objects.filter(on_chain_id=int(list_id)).delete()
+
+            if deleted_count > 0:
+                logger.info(f"List {list_id} deleted from DB (verified not on chain)")
+                return Response({"success": True, "message": "List deleted", "on_chain_id": list_id})
+
+            return Response({"error": "List not found in database"}, status=404)
+
+        except Exception as e:
+            # If RPC call fails (e.g. contract panics with "List does not exist"), that confirms deletion
+            error_str = str(e)
+            if "does not exist" in error_str or "not found" in error_str.lower():
+                deleted_count, _ = List.objects.filter(on_chain_id=int(list_id)).delete()
+                if deleted_count > 0:
+                    logger.info(f"List {list_id} deleted from DB (RPC confirmed not on chain)")
+                    return Response({"success": True, "message": "List deleted", "on_chain_id": list_id})
+                return Response({"error": "List not found in database"}, status=404)
+
+            logger.error(f"Error syncing list deletion {list_id}: {e}")
+            return Response({"error": str(e)}, status=502)
