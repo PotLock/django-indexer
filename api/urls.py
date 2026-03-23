@@ -56,6 +56,10 @@ from lists.api import (
     ListRegistrationsAPI,
     ListsListAPI,
 )
+from tax_verification.api import (
+    OrgVerificationSubmitAPI,
+    OrgVerificationDetailAPI,
+)
 from pots.api import (
     MpdaoVotersListAPI,
     MpdaoVoterDetailAPI,
@@ -384,5 +388,16 @@ urlpatterns = [
         "v1/accounts/<str:account_id>/sync",
         AccountSyncAPI.as_view(),
         name="account_sync_api",
+    ),
+    # tax verification
+    path(
+        "v1/tax-verification/org-verification",
+        OrgVerificationSubmitAPI.as_view(),
+        name="org_verification_submit",
+    ),
+    path(
+        "v1/tax-verification/org-verification/<str:account_id>",
+        OrgVerificationDetailAPI.as_view(),
+        name="org_verification_detail",
     ),
 ]

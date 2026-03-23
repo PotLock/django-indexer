@@ -154,6 +154,7 @@ INSTALLED_APPS = [
     "chains",
     "grantpicks",
     "campaigns",
+    "tax_verification",
 ]
 
 DEFAULT_PAGE_SIZE = 30
