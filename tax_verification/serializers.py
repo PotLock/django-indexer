@@ -9,29 +9,9 @@ from .models import OrganizationVerification
 class OrgVerificationSubmitSerializer(serializers.Serializer):
     account_id = serializers.CharField(required=True, help_text="NEAR account ID")
     ein = serializers.CharField(
-        max_length=10, required=True, help_text="EIN in XX-XXXXXXX format"
-    )
-    legal_name = serializers.CharField(
-        max_length=255, required=True, help_text="Legal name as registered with IRS"
-    )
-    address_line1 = serializers.CharField(max_length=255, required=True)
-    address_line2 = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, default=""
-    )
-    city = serializers.CharField(max_length=100, required=True)
-    state = serializers.CharField(
-        max_length=2, required=True, help_text="US state code (e.g. CA, NY)"
-    )
-    zip_code = serializers.CharField(max_length=10, required=True)
-    signer_name = serializers.CharField(
-        max_length=255,
+        max_length=10,
         required=True,
-        help_text="Name of person authorized to sign tax receipts",
-    )
-    signer_title = serializers.CharField(
-        max_length=100,
-        required=True,
-        help_text="Title of authorized signer (e.g. Executive Director)",
+        help_text="EIN in XX-XXXXXXX format (e.g. 53-0196605)",
     )
 
 
@@ -45,15 +25,15 @@ class OrganizationVerificationSerializer(ModelSerializer):
             "account",
             "ein",
             "legal_name",
-            "address_line1",
-            "address_line2",
+            "address",
             "city",
             "state",
             "zip_code",
-            "signer_name",
-            "signer_title",
+            "subsection_code",
+            "ntee_code",
+            "ruling_date",
             "status",
-            "admin_notes",
+            "rejection_reason",
             "submitted_at",
             "updated_at",
         ]
