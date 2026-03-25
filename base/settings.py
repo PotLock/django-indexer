@@ -125,7 +125,8 @@ INSTALLED_APPS = [
     "tokens",
     "nadabot",
     "chains",
-    "grantpicks"
+    "grantpicks",
+    "tax_verification",
 ]
 
 DEFAULT_PAGE_SIZE = 30

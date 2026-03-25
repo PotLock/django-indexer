@@ -32,6 +32,10 @@ from api.sync import (
     PotPayoutChallengesSyncAPI,
 )
 from base.api import StatsAPI, ReclaimProofRequestView
+from tax_verification.api import (
+    OrgVerificationSubmitAPI,
+    OrgVerificationDetailAPI,
+)
 from donations.api import DonationContractConfigAPI
 from donations.sync import DirectDonationSyncAPI
 from grantpicks.api import AccountProjectListAPI, ProjectListAPI, ProjectRoundVotesAPI, ProjectStatsAPI, RoundApplicationsAPI, RoundDetailAPI, RoundsListAPI
@@ -252,4 +256,7 @@ urlpatterns = [
         AccountSyncAPI.as_view(),
         name="account_sync_api",
     ),
+    # tax verification
+    path("v1/tax-verification/org-verification", OrgVerificationSubmitAPI.as_view(), name="org_verification_submit"),
+    path("v1/tax-verification/org-verification/<str:account_id>", OrgVerificationDetailAPI.as_view(), name="org_verification_detail"),
 ]
