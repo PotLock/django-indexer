@@ -71,6 +71,10 @@ from lists.api import (
     ListRegistrationsAPI,
     ListsListAPI,
 )
+from tax_verification.api import (
+    OrgVerificationSubmitAPI,
+    OrgVerificationDetailAPI,
+)
 from pots.api import (
     MpdaoVotersListAPI,
     MpdaoVoterDetailAPI,
@@ -305,4 +309,7 @@ urlpatterns = [
     path("v1/pots/<str:pot_id>/challenges/sync", PotPayoutChallengesSyncAPI.as_view(), name="pot_challenges_sync_api"),
     # Accounts
     path("v1/accounts/<str:account_id>/sync", AccountSyncAPI.as_view(), name="account_sync_api"),
+    # tax verification
+    path("v1/tax-verification/org-verification", OrgVerificationSubmitAPI.as_view(), name="org_verification_submit"),
+    path("v1/tax-verification/org-verification/<str:account_id>", OrgVerificationDetailAPI.as_view(), name="org_verification_detail"),
 ]
