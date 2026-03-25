@@ -25,21 +25,21 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
-    "update_account_statistics_every_5_minutes": {
-        "task": "indexer_app.tasks.update_account_statistics",
-        "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
-        "options": {"queue": "beat_tasks"},
-    },
-    "fetch_usd_prices_every_5_minutes": {
-        "task": "indexer_app.tasks.fetch_usd_prices",
-        "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
-        "options": {"queue": "beat_tasks"},
-    },
-    "update_pot_statistics_every_5_minutes": {
-        "task": "indexer_app.tasks.update_pot_statistics",
-        "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
-        "options": {"queue": "beat_tasks"},
-    },
+    # "update_account_statistics_every_5_minutes": {
+    #     "task": "indexer_app.tasks.update_account_statistics",
+    #     "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+    #     "options": {"queue": "beat_tasks"},
+    # },
+    # "fetch_usd_prices_every_5_minutes": {
+    #     "task": "indexer_app.tasks.fetch_usd_prices",
+    #     "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+    #     "options": {"queue": "beat_tasks"},
+    # },
+    # "update_pot_statistics_every_5_minutes": {
+    #     "task": "indexer_app.tasks.update_pot_statistics",
+    #     "schedule": crontab(minute="*/5"),  # Executes every 5 minutes
+    #     "options": {"queue": "beat_tasks"},
+    # },
     "fetch_stellar_events_every_minute": {
         "task": "indexer_app.tasks.stellar_event_indexer",
         "schedule": crontab(minute="*/1"),  # Executes every 1 minutes

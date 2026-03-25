@@ -19,6 +19,7 @@ class ListSerializer(ModelSerializer):
         fields = [
             "id",
             "on_chain_id",
+            "chain",
             "owner",
             "admins",
             "name",
