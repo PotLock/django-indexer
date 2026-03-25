@@ -26,17 +26,14 @@ class OrganizationVerification(models.Model):
         max_length=10,
         help_text=_("Employer Identification Number (XX-XXXXXXX)."),
     )
+    # Fields auto-populated from IRS data via ProPublica
     legal_name = models.CharField(
         _("legal name"),
         max_length=255,
-        help_text=_("Organization legal name as registered with IRS."),
+        help_text=_("Organization legal name from IRS records."),
     )
-    address_line1 = models.CharField(
-        _("address line 1"),
-        max_length=255,
-    )
-    address_line2 = models.CharField(
-        _("address line 2"),
+    address = models.CharField(
+        _("address"),
         max_length=255,
         null=True,
         blank=True,
@@ -44,25 +41,41 @@ class OrganizationVerification(models.Model):
     city = models.CharField(
         _("city"),
         max_length=100,
+        null=True,
+        blank=True,
     )
     state = models.CharField(
         _("state"),
         max_length=2,
+        null=True,
+        blank=True,
         help_text=_("US state code (e.g. CA, NY)."),
     )
     zip_code = models.CharField(
         _("zip code"),
         max_length=10,
+        null=True,
+        blank=True,
     )
-    signer_name = models.CharField(
-        _("authorized signer name"),
-        max_length=255,
-        help_text=_("Name of person authorized to sign tax receipts."),
+    subsection_code = models.IntegerField(
+        _("subsection code"),
+        null=True,
+        blank=True,
+        help_text=_("IRS subsection code. 3 = 501(c)(3)."),
     )
-    signer_title = models.CharField(
-        _("authorized signer title"),
-        max_length=100,
-        help_text=_("Title of authorized signer (e.g. Executive Director)."),
+    ntee_code = models.CharField(
+        _("NTEE code"),
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text=_("National Taxonomy of Exempt Entities code."),
+    )
+    ruling_date = models.CharField(
+        _("ruling date"),
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text=_("Date IRS granted tax-exempt status."),
     )
     status = models.CharField(
         _("verification status"),
@@ -71,11 +84,12 @@ class OrganizationVerification(models.Model):
         default=VerificationStatus.PENDING,
         db_index=True,
     )
-    admin_notes = models.TextField(
-        _("admin notes"),
-        max_length=1024,
+    rejection_reason = models.CharField(
+        _("rejection reason"),
+        max_length=255,
         null=True,
         blank=True,
+        help_text=_("Reason for rejection if verification failed."),
     )
     submitted_at = models.DateTimeField(
         _("submitted at"),

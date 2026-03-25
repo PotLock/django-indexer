@@ -10,40 +10,26 @@ class OrganizationVerificationAdmin(admin.ModelAdmin):
         "account",
         "legal_name",
         "ein",
+        "subsection_code",
         "status",
         "submitted_at",
-        "updated_at",
     )
-    list_filter = ("status", "submitted_at", "updated_at")
+    list_filter = ("status", "submitted_at")
     search_fields = ("account__id", "legal_name", "ein")
     ordering = ("-submitted_at",)
     readonly_fields = (
         "account",
         "ein",
         "legal_name",
-        "address_line1",
-        "address_line2",
+        "address",
         "city",
         "state",
         "zip_code",
-        "signer_name",
-        "signer_title",
-        "submitted_at",
-        "updated_at",
-    )
-    fields = (
-        "account",
-        "legal_name",
-        "ein",
-        "address_line1",
-        "address_line2",
-        "city",
-        "state",
-        "zip_code",
-        "signer_name",
-        "signer_title",
+        "subsection_code",
+        "ntee_code",
+        "ruling_date",
         "status",
-        "admin_notes",
+        "rejection_reason",
         "submitted_at",
         "updated_at",
     )
@@ -52,4 +38,7 @@ class OrganizationVerificationAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
