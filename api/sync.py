@@ -23,6 +23,7 @@ from datetime import datetime
 
 import requests
 from django.conf import settings
+from django.db import connection
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -37,6 +38,61 @@ from tokens.models import Token
 logger = logging.getLogger(__name__)
 
 LISTS_CONTRACT = f"lists.{settings.POTLOCK_TLA}"
+
+
+def safe_update_or_create(model, lookup, defaults):
+    """
+    update_or_create that handles PostgreSQL sequence collisions.
+
+    The Celery indexer manually sets IDs (bypassing AutoField), which can desync
+    the sequence counter. If INSERT fails with a duplicate key on id, we reset
+    the sequence and retry once.
+    """
+    from django.db import IntegrityError
+
+    try:
+        return model.objects.update_or_create(**lookup, defaults=defaults)
+    except IntegrityError as e:
+        if "pkey" not in str(e) and "_pkey" not in str(e):
+            raise  # not a sequence collision, re-raise
+
+        # Fix the sequence and retry
+        table = model._meta.db_table
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
+            )
+        logger.info(f"Reset sequence for {table} after collision, retrying...")
+        return model.objects.update_or_create(**lookup, defaults=defaults)
+
+
+def fetch_from_rpc_paginated(method_name: str, args: dict = None, contract_id: str = None, page_size: int = 300, timeout: int = 120):
+    """
+    Fetch all results from a paginated NEAR contract view method.
+    Uses from_index and limit params to loop through all pages.
+    """
+    import time as _time
+
+    all_results = []
+    page = 0
+
+    while True:
+        paginated_args = {**(args or {}), "from_index": page * page_size, "limit": page_size}
+        results = fetch_from_rpc(method_name, paginated_args, contract_id=contract_id, timeout=timeout)
+
+        if results is None:
+            break
+
+        all_results.extend(results)
+
+        if len(results) < page_size:
+            break
+
+        page += 1
+        _time.sleep(0.5)
+
+    return all_results
 
 
 def fetch_from_rpc(method_name: str, args: dict = None, contract_id: str = None, timeout: int = 60):
@@ -284,8 +340,8 @@ class ListRegistrationsSyncAPI(APIView):
                     return Response({"error": "List not found"}, status=404)
                 list_obj = List.objects.get(on_chain_id=int(list_id))
 
-            # Fetch registrations from RPC (use longer timeout for large lists)
-            registrations = fetch_from_rpc("get_registrations_for_list", {"list_id": int(list_id)}, timeout=120)
+            # Fetch registrations from RPC with pagination for large lists
+            registrations = fetch_from_rpc_paginated("get_registrations_for_list", {"list_id": int(list_id)})
 
             if not registrations:
                 registrations = []
@@ -296,10 +352,13 @@ class ListRegistrationsSyncAPI(APIView):
                 Account.objects.get_or_create(id=reg["registrant_id"])
                 Account.objects.get_or_create(id=reg.get("registered_by", reg["registrant_id"]))
 
-                # Create/update registration (id is AutoField, use list+registrant as unique key)
-                ListRegistration.objects.update_or_create(
-                    list=list_obj,
-                    registrant_id=reg["registrant_id"],
+                # Create/update registration (handles sequence collisions from Celery's manual IDs)
+                safe_update_or_create(
+                    ListRegistration,
+                    lookup={
+                        "list": list_obj,
+                        "registrant_id": reg["registrant_id"],
+                    },
                     defaults={
                         "registered_by_id": reg.get("registered_by", reg["registrant_id"]),
                         "status": reg.get("status", "Pending"),
@@ -349,26 +408,29 @@ class SingleRegistrationSyncAPI(APIView):
                     return Response({"error": "List not found"}, status=404)
                 list_obj = List.objects.get(on_chain_id=int(list_id))
 
-            # Fetch all registrations and filter (contract doesn't have single-registration lookup by registrant_id)
-            registrations = fetch_from_rpc("get_registrations_for_list", {"list_id": int(list_id)}, timeout=120)
+            # Fetch registrations for this specific registrant (more efficient than fetching all)
+            registrations = fetch_from_rpc("get_registrations_for_registrant", {"registrant_id": registrant_id})
 
             if not registrations:
-                return Response({"error": "No registrations found for list"}, status=404)
+                return Response({"error": "No registrations found for registrant"}, status=404)
 
-            # Find the specific registration
-            reg = next((r for r in registrations if r.get("registrant_id") == registrant_id), None)
+            # Find the registration for the specific list
+            reg = next((r for r in registrations if r.get("list_id") == int(list_id)), None)
 
             if not reg:
-                return Response({"error": "Registration not found"}, status=404)
+                return Response({"error": "Registration not found for this list"}, status=404)
 
             # Create accounts
             Account.objects.get_or_create(id=reg["registrant_id"])
             Account.objects.get_or_create(id=reg.get("registered_by", reg["registrant_id"]))
 
-            # Create/update registration (id is AutoField, use list+registrant as unique key)
-            registration, created = ListRegistration.objects.update_or_create(
-                list=list_obj,
-                registrant_id=reg["registrant_id"],
+            # Create/update registration (handles sequence collisions from Celery's manual IDs)
+            registration, created = safe_update_or_create(
+                ListRegistration,
+                lookup={
+                    "list": list_obj,
+                    "registrant_id": reg["registrant_id"],
+                },
                 defaults={
                     "registered_by_id": reg.get("registered_by", reg["registrant_id"]),
                     "status": reg.get("status", "Pending"),
