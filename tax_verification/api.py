@@ -1,7 +1,6 @@
 import logging
 import re
 
-import requests
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -9,7 +8,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Account
 
-from .models import OrganizationVerification, VerificationStatus
+from .models import NonprofitRegistry, OrganizationVerification, VerificationStatus
 from .serializers import (
     OrganizationVerificationSerializer,
     OrgVerificationSubmitSerializer,
@@ -17,35 +16,39 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-PROPUBLICA_API_URL = (
-    "https://projects.propublica.org/nonprofits/api/v2/organizations/{ein}.json"
-)
 
-
-def verify_ein_with_propublica(ein: str) -> dict:
+def verify_ein_with_registry(ein: str) -> dict:
     """
-    Call ProPublica Nonprofit Explorer API to verify an EIN.
-    Returns dict with org data if found, or raises ValueError if not found / not 501(c)(3).
+    Look up an EIN in the local NonprofitRegistry (populated from IRS EO BMF).
+    Returns dict with org data if found, or raises ValueError if not found.
     """
-    # Strip dashes for the API call
+    # Strip dashes — registry stores 9-digit EINs without dashes
     clean_ein = ein.replace("-", "")
-    url = PROPUBLICA_API_URL.format(ein=clean_ein)
 
-    response = requests.get(url, timeout=15)
-    if response.status_code != 200:
-        raise ValueError("Could not verify EIN with IRS database.")
-
-    data = response.json()
-    org = data.get("organization", {})
-
-    # ProPublica returns "Unknown Organization" for non-existent EINs
-    if not org or org.get("name", "").strip() == "Unknown Organization":
+    try:
+        record = NonprofitRegistry.objects.get(ein=clean_ein)
+    except NonprofitRegistry.DoesNotExist:
         raise ValueError(
             f"EIN {ein} was not found in IRS records. "
             "Please check the number and try again."
         )
 
-    return org
+    # Convert subsection string ("03") to int (3) to match previous ProPublica response shape
+    try:
+        subsection_code = int(record.subsection) if record.subsection else None
+    except ValueError:
+        subsection_code = None
+
+    return {
+        "name": record.name,
+        "address": record.street,
+        "city": record.city,
+        "state": record.state,
+        "zipcode": record.zip,
+        "subsection_code": subsection_code,
+        "ntee_code": record.ntee_cd,
+        "ruling_date": record.ruling,
+    }
 
 
 class OrgVerificationSubmitAPI(APIView):
@@ -54,8 +57,8 @@ class OrgVerificationSubmitAPI(APIView):
         responses={200: OrganizationVerificationSerializer},
         summary="Submit 501(c)(3) verification",
         description=(
-            "Submit an EIN for automated 501(c)(3) verification against IRS records "
-            "via ProPublica. Auto-approves if subsection_code is 3 (501(c)(3)), "
+            "Submit an EIN for automated 501(c)(3) verification against local IRS "
+            "registry. Auto-approves if subsection_code is 3 (501(c)(3)), "
             "otherwise rejects."
         ),
     )
@@ -83,9 +86,9 @@ class OrgVerificationSubmitAPI(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Verify with ProPublica
+        # Verify against local IRS registry
         try:
-            org_data = verify_ein_with_propublica(ein)
+            org_data = verify_ein_with_registry(ein)
         except ValueError as e:
             # If existing record, update it to rejected
             if existing:
@@ -101,12 +104,6 @@ class OrgVerificationSubmitAPI(APIView):
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except requests.RequestException:
-            logger.exception("ProPublica API request failed")
-            return Response(
-                {"detail": "IRS verification service is temporarily unavailable."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
 
         # Determine approval based on subsection code
         subsection_code = org_data.get("subsection_code")
@@ -119,7 +116,7 @@ class OrgVerificationSubmitAPI(APIView):
         clean_ein = ein.replace("-", "")
         formatted_ein = f"{clean_ein[:2]}-{clean_ein[2:]}"
 
-        # Build verification data from ProPublica response
+        # Build verification data from registry lookup
         verification_data = {
             "ein": formatted_ein,
             "legal_name": org_data.get("name", ""),
