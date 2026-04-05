@@ -1,6 +1,23 @@
 from django.contrib import admin
 
-from .models import OrganizationVerification
+from .models import NonprofitRegistry, OrganizationVerification
+
+
+@admin.register(NonprofitRegistry)
+class NonprofitRegistryAdmin(admin.ModelAdmin):
+    list_display = ("ein", "name", "city", "state", "subsection", "deductibility", "status")
+    list_filter = ("subsection", "deductibility", "status", "state")
+    search_fields = ("ein", "name", "city")
+    readonly_fields = [f.name for f in NonprofitRegistry._meta.get_fields()]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OrganizationVerification)

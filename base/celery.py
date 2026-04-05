@@ -50,6 +50,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/1"),  # Executes every 1 minutes
         "options": {"queue": "beat_tasks"},
     },
+    "refresh_eo_bmf_monthly": {
+        "task": "tax_verification.tasks.refresh_eo_bmf",
+        "schedule": crontab(day_of_month="5", hour="4", minute="0"),  # 5th of each month, 4 AM UTC
+        "options": {"queue": "beat_tasks"},
+    },
 }
 
 app.conf.task_routes = {
@@ -58,6 +63,7 @@ app.conf.task_routes = {
     "indexer_app.tasks.update_pot_statistics": {"queue": "beat_tasks"},
     "indexer_app.tasks.stellar_event_indexer": {"queue": "beat_tasks"},
     "indexer_app.tasks.process_stellar_events": {"queue": "beat_tasks"},
+    "tax_verification.tasks.refresh_eo_bmf": {"queue": "beat_tasks"},
 }
 
 SPOT_INDEXER_QUEUE_NAME = "spot_indexing"
