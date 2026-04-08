@@ -509,6 +509,583 @@ def process_stellar_events():
     jobs_logger.info(f"Finished processing Stellar events.")
 
 
+@shared_task
+def backfill_missing_data(force=False):
+    """
+    Biweekly backfill task: compare on-chain state with DB and fill any gaps.
+
+    Catches data that was missed when on-demand sync API calls failed but the
+    transaction went through on-chain. Handles: accounts, lists, registrations,
+    donations, pots (applications & payouts), and campaigns (if app is installed).
+
+    Scheduled every Sunday at 3 AM UTC, but only runs on even ISO weeks
+    to achieve a biweekly (~every 14 days) cadence.
+
+    Args:
+        force: If True, skip the week parity check (for manual runs).
+    """
+    import base64
+    import json
+    import time as _time
+    from datetime import datetime, timezone
+
+    import requests
+    from django.apps import apps
+    from django.conf import settings
+    from django.db import connection
+
+    from accounts.models import Account
+    from donations.models import Donation
+    from lists.models import List, ListRegistration
+    from pots.models import Pot, PotApplication, PotPayout
+    from tokens.models import Token
+
+    # Only run on even ISO weeks for biweekly cadence (skip check if forced)
+    now = datetime.now(tz=timezone.utc)
+    if not force and now.isocalendar().week % 2 != 0:
+        jobs_logger.info("Backfill skipped — odd week (runs biweekly on even weeks).")
+        return
+
+    LISTS_CONTRACT = f"lists.{settings.POTLOCK_TLA}"
+    DONATE_CONTRACT = f"donate.{settings.POTLOCK_TLA}"
+
+    def rpc_call(contract_id, method_name, args=None, timeout=60):
+        rpc_endpoints = [
+            "https://free.rpc.fastnear.com" if settings.ENVIRONMENT != "testnet" else "https://test.rpc.fastnear.com",
+            "https://rpc.mainnet.near.org" if settings.ENVIRONMENT != "testnet" else "https://rpc.testnet.near.org",
+        ]
+        args_base64 = base64.b64encode(json.dumps(args or {}).encode()).decode()
+        payload = {
+            "jsonrpc": "2.0",
+            "id": "dontcare",
+            "method": "query",
+            "params": {
+                "request_type": "call_function",
+                "account_id": contract_id,
+                "method_name": method_name,
+                "args_base64": args_base64,
+                "finality": "optimistic",
+            },
+        }
+        for rpc_url in rpc_endpoints:
+            try:
+                response = requests.post(rpc_url, json=payload, timeout=timeout)
+                result = response.json()
+                if "error" in result:
+                    continue
+                if "error" in result.get("result", {}):
+                    continue
+                result_field = result.get("result", {})
+                if "result" not in result_field:
+                    return None
+                result_bytes = bytes(result_field["result"])
+                return json.loads(result_bytes.decode())
+            except Exception:
+                continue
+        return None
+
+    def rpc_call_paginated(contract_id, method_name, base_args, page_size=300, delay=0.5):
+        all_results = []
+        page = 0
+        while True:
+            args = {**base_args, "from_index": page * page_size, "limit": page_size}
+            results = rpc_call(contract_id, method_name, args, timeout=120)
+            if results is None:
+                break
+            all_results.extend(results)
+            if len(results) < page_size:
+                break
+            page += 1
+            _time.sleep(delay)
+        return all_results
+
+    def fix_sequences():
+        tables = [
+            ("lists_listregistration", "id"),
+            ("lists_list", "id"),
+            ("donations_donation", "id"),
+        ]
+        with connection.cursor() as cursor:
+            for table, col in tables:
+                try:
+                    seq_name = f"{table}_{col}_seq"
+                    cursor.execute(
+                        f"SELECT setval('{seq_name}', COALESCE((SELECT MAX({col}) FROM {table}), 0) + 1, false)"
+                    )
+                except Exception as e:
+                    jobs_logger.warning(f"Could not reset sequence for {table}: {e}")
+
+    def backfill_accounts():
+        """Backfill accounts from list registrations on-chain."""
+        jobs_logger.info("Backfill: checking accounts...")
+        db_lists = List.objects.all()
+        if not db_lists.exists():
+            return 0
+
+        missing_count = 0
+        for list_obj in db_lists:
+            on_chain_regs = rpc_call_paginated(
+                LISTS_CONTRACT,
+                "get_registrations_for_list",
+                {"list_id": list_obj.on_chain_id},
+                page_size=300,
+            )
+            if on_chain_regs is None:
+                continue
+
+            # Collect all account IDs referenced in registrations
+            account_ids = set()
+            for reg in on_chain_regs:
+                account_ids.add(reg["registrant_id"])
+                if reg.get("registered_by"):
+                    account_ids.add(reg["registered_by"])
+
+            # Also add list owner and admins from on-chain data
+            on_chain_list = rpc_call(LISTS_CONTRACT, "get_list", {"list_id": list_obj.on_chain_id})
+            if on_chain_list:
+                account_ids.add(on_chain_list["owner"])
+                for admin_id in on_chain_list.get("admins", []):
+                    account_ids.add(admin_id)
+
+            existing_ids = set(Account.objects.filter(id__in=account_ids).values_list("id", flat=True))
+            new_ids = account_ids - existing_ids
+
+            if new_ids:
+                Account.objects.bulk_create(
+                    [Account(id=aid) for aid in new_ids],
+                    ignore_conflicts=True,
+                )
+                jobs_logger.info(f"  Created {len(new_ids)} missing accounts from list {list_obj.on_chain_id}")
+                missing_count += len(new_ids)
+
+            _time.sleep(0.3)
+
+        jobs_logger.info(f"Backfill accounts: {missing_count} created.")
+        return missing_count
+
+    def backfill_lists():
+        jobs_logger.info("Backfill: checking lists...")
+        on_chain_lists = rpc_call(LISTS_CONTRACT, "get_lists")
+        if not on_chain_lists:
+            jobs_logger.error("Failed to fetch lists from contract")
+            return 0
+
+        db_list_ids = set(List.objects.values_list("on_chain_id", flat=True))
+        on_chain_ids = {l["id"] for l in on_chain_lists}
+        missing_ids = on_chain_ids - db_list_ids
+
+        if not missing_ids:
+            jobs_logger.info("Backfill lists: all in sync.")
+            return 0
+
+        missing_count = 0
+        for l in on_chain_lists:
+            if l["id"] not in missing_ids:
+                continue
+            owner, _ = Account.objects.get_or_create(id=l["owner"])
+            list_obj, _ = List.objects.update_or_create(
+                on_chain_id=l["id"],
+                defaults={
+                    "owner": owner,
+                    "name": l["name"],
+                    "description": l.get("description", ""),
+                    "cover_image_url": l.get("cover_image_url"),
+                    "admin_only_registrations": l.get("admin_only_registrations", False),
+                    "default_registration_status": l.get("default_registration_status", "Pending"),
+                    "created_at": datetime.fromtimestamp(l["created_at"] / 1000, tz=timezone.utc),
+                    "updated_at": datetime.fromtimestamp(l["updated_at"] / 1000, tz=timezone.utc),
+                },
+            )
+            for admin_id in l.get("admins", []):
+                admin, _ = Account.objects.get_or_create(id=admin_id)
+                list_obj.admins.add(admin)
+            missing_count += 1
+
+        jobs_logger.info(f"Backfill lists: {missing_count} created.")
+        return missing_count
+
+    def backfill_registrations():
+        jobs_logger.info("Backfill: checking registrations...")
+        db_lists = List.objects.all()
+        if not db_lists.exists():
+            return 0
+
+        total_missing = 0
+        for list_obj in db_lists:
+            on_chain_regs = rpc_call_paginated(
+                LISTS_CONTRACT,
+                "get_registrations_for_list",
+                {"list_id": list_obj.on_chain_id},
+                page_size=300,
+            )
+            if on_chain_regs is None:
+                continue
+
+            db_registrant_ids = set(
+                ListRegistration.objects.filter(list=list_obj).values_list("registrant_id", flat=True)
+            )
+            on_chain_registrant_ids = {r["registrant_id"] for r in on_chain_regs}
+            missing = on_chain_registrant_ids - db_registrant_ids
+
+            if not missing:
+                continue
+
+            for reg in on_chain_regs:
+                if reg["registrant_id"] not in missing:
+                    continue
+                registrant, _ = Account.objects.get_or_create(id=reg["registrant_id"])
+                registered_by, _ = Account.objects.get_or_create(
+                    id=reg.get("registered_by", reg["registrant_id"])
+                )
+                ListRegistration.objects.update_or_create(
+                    list=list_obj,
+                    registrant=registrant,
+                    defaults={
+                        "registered_by": registered_by,
+                        "status": reg["status"],
+                        "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000, tz=timezone.utc),
+                        "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000, tz=timezone.utc),
+                        "admin_notes": reg.get("admin_notes"),
+                        "registrant_notes": reg.get("registrant_notes"),
+                        "tx_hash": None,
+                    },
+                )
+                total_missing += 1
+
+            _time.sleep(0.5)
+
+        jobs_logger.info(f"Backfill registrations: {total_missing} created.")
+        return total_missing
+
+    def backfill_donations():
+        jobs_logger.info("Backfill: checking direct donations...")
+        on_chain_donations = rpc_call_paginated(
+            DONATE_CONTRACT, "get_donations", {}, page_size=300,
+        )
+        if on_chain_donations is None:
+            jobs_logger.error("Failed to fetch donations from contract")
+            return 0
+
+        db_donation_ids = set(
+            Donation.objects.filter(pot__isnull=True).values_list("on_chain_id", flat=True)
+        )
+        on_chain_ids = {d["id"] for d in on_chain_donations}
+        missing_ids = on_chain_ids - db_donation_ids
+
+        if not missing_ids:
+            jobs_logger.info("Backfill donations: all in sync.")
+            return 0
+
+        missing_count = 0
+        for d in on_chain_donations:
+            if d["id"] not in missing_ids:
+                continue
+
+            donor, _ = Account.objects.get_or_create(id=d.get("donor_id", ""))
+            recipient, _ = Account.objects.get_or_create(id=d.get("recipient_id", ""))
+            ft_id = d.get("ft_id", "near")
+            token_id = ft_id if ft_id != "near" else "near"
+            token, _ = Token.objects.get_or_create(id=token_id)
+
+            referrer = None
+            if d.get("referrer_id"):
+                referrer, _ = Account.objects.get_or_create(id=d["referrer_id"])
+
+            chef = None
+            if d.get("chef_id"):
+                chef, _ = Account.objects.get_or_create(id=d["chef_id"])
+
+            Donation.objects.update_or_create(
+                on_chain_id=d["id"],
+                pot__isnull=True,
+                defaults={
+                    "donor": donor,
+                    "total_amount": d.get("total_amount", "0"),
+                    "net_amount": d.get("net_amount", "0"),
+                    "token": token,
+                    "matching_pool": d.get("matching_pool", False),
+                    "message": d.get("message"),
+                    "donated_at": datetime.fromtimestamp(d["donated_at_ms"] / 1000, tz=timezone.utc),
+                    "recipient": recipient,
+                    "protocol_fee": d.get("protocol_fee", "0"),
+                    "referrer_fee": d.get("referrer_fee"),
+                    "referrer": referrer,
+                    "chef": chef,
+                    "chef_fee": d.get("chef_fee"),
+                    "tx_hash": None,
+                },
+            )
+            missing_count += 1
+
+        jobs_logger.info(f"Backfill donations: {missing_count} created.")
+        return missing_count
+
+    def backfill_pots():
+        jobs_logger.info("Backfill: checking pots (applications & payouts)...")
+        db_pots = Pot.objects.all()
+        if not db_pots.exists():
+            return 0
+
+        total_missing = 0
+        for pot in db_pots:
+            pot_contract = str(pot.account_id)
+            if not pot_contract or "." not in pot_contract:
+                continue
+
+            # Applications
+            on_chain_apps = rpc_call_paginated(pot_contract, "get_applications", {}, page_size=300)
+            if on_chain_apps is not None:
+                db_app_ids = set(
+                    PotApplication.objects.filter(pot=pot).values_list("applicant_id", flat=True)
+                )
+                on_chain_app_ids = {a.get("project_id", a.get("applicant_id", "")) for a in on_chain_apps}
+                missing_apps = on_chain_app_ids - db_app_ids
+
+                if missing_apps:
+                    for a in on_chain_apps:
+                        applicant_id = a.get("project_id", a.get("applicant_id", ""))
+                        if applicant_id not in missing_apps:
+                            continue
+                        applicant, _ = Account.objects.get_or_create(id=applicant_id)
+                        PotApplication.objects.update_or_create(
+                            pot=pot,
+                            applicant=applicant,
+                            defaults={
+                                "message": a.get("message", ""),
+                                "status": a.get("status", "Pending"),
+                                "submitted_at": datetime.fromtimestamp(
+                                    a["submitted_at"] / 1000, tz=timezone.utc
+                                ) if a.get("submitted_at") else now,
+                                "updated_at": datetime.fromtimestamp(
+                                    a["updated_at"] / 1000, tz=timezone.utc
+                                ) if a.get("updated_at") else None,
+                                "tx_hash": None,
+                            },
+                        )
+                    total_missing += len(missing_apps)
+
+            # Payouts
+            on_chain_payouts = rpc_call_paginated(pot_contract, "get_payouts", {}, page_size=300)
+            if on_chain_payouts is not None:
+                db_payout_recipients = set(
+                    PotPayout.objects.filter(pot=pot).values_list("recipient_id", flat=True)
+                )
+                on_chain_payout_recipients = {
+                    p.get("project_id", p.get("recipient_id", "")) for p in on_chain_payouts
+                }
+                missing_payouts = on_chain_payout_recipients - db_payout_recipients
+                if missing_payouts:
+                    for p in on_chain_payouts:
+                        recipient_id = p.get("project_id", p.get("recipient_id", ""))
+                        if recipient_id not in missing_payouts:
+                            continue
+                        recipient, _ = Account.objects.get_or_create(id=recipient_id)
+                        token = None
+                        if p.get("ft_id"):
+                            token, _ = Token.objects.get_or_create(id=p["ft_id"])
+                        PotPayout.objects.update_or_create(
+                            pot=pot,
+                            recipient=recipient,
+                            defaults={
+                                "amount": p.get("amount", "0"),
+                                "token": token,
+                                "paid_at": datetime.fromtimestamp(
+                                    p["paid_at"] / 1000, tz=timezone.utc
+                                ) if p.get("paid_at") else None,
+                                "tx_hash": None,
+                            },
+                        )
+                    total_missing += len(missing_payouts)
+
+            _time.sleep(0.5)
+
+        jobs_logger.info(f"Backfill pots: {total_missing} missing apps/payouts created.")
+        return total_missing
+
+    def backfill_campaigns():
+        """Backfill campaigns and campaign donations from on-chain data."""
+        if not apps.is_installed("campaigns"):
+            jobs_logger.info("Backfill campaigns: app not installed, skipping.")
+            return 0
+
+        from campaigns.models import Campaign, CampaignDonation
+
+        CAMPAIGNS_CONTRACT = (
+            f"v1.campaign.{settings.POTLOCK_TLA}"
+            if settings.ENVIRONMENT == "testnet"
+            else f"v1.campaigns.{settings.POTLOCK_TLA}"
+        )
+
+        jobs_logger.info("Backfill: checking campaigns...")
+
+        # Fetch all campaigns by iterating with get_campaign until we get None
+        # The contract uses sequential IDs starting from 1
+        on_chain_campaigns = []
+        campaign_id = 1
+        consecutive_failures = 0
+        while consecutive_failures < 3:
+            data = rpc_call(CAMPAIGNS_CONTRACT, "get_campaign", {"campaign_id": campaign_id})
+            if data is None:
+                consecutive_failures += 1
+                campaign_id += 1
+                continue
+            consecutive_failures = 0
+            data["_chain_id"] = campaign_id
+            on_chain_campaigns.append(data)
+            campaign_id += 1
+            _time.sleep(0.3)
+
+        if not on_chain_campaigns:
+            jobs_logger.info("Backfill campaigns: no campaigns found on chain.")
+            return 0
+
+        db_campaign_ids = set(Campaign.objects.values_list("on_chain_id", flat=True))
+        total_missing = 0
+
+        for data in on_chain_campaigns:
+            cid = data.get("id", data["_chain_id"])
+            if cid in db_campaign_ids:
+                # Still update existing campaigns to sync latest state (e.g. raised amounts)
+                try:
+                    campaign = Campaign.objects.get(on_chain_id=cid)
+                    campaign.total_raised_amount = str(data.get("total_raised_amount", "0"))
+                    campaign.net_raised_amount = str(data.get("net_raised_amount", "0"))
+                    campaign.escrow_balance = str(data.get("escrow_balance", "0"))
+                    campaign.save(update_fields=["total_raised_amount", "net_raised_amount", "escrow_balance"])
+                except Campaign.DoesNotExist:
+                    pass
+                continue
+
+            # Create missing campaign
+            owner, _ = Account.objects.get_or_create(id=data["owner"])
+            recipient, _ = Account.objects.get_or_create(id=data["recipient"])
+
+            token = None
+            token_id = data.get("ft_id")
+            if token_id:
+                token_acct, _ = Account.objects.get_or_create(id=token_id)
+                token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+
+            start_at = datetime.fromtimestamp(data["start_ms"] / 1000, tz=timezone.utc)
+            end_at = (
+                datetime.fromtimestamp(data["end_ms"] / 1000, tz=timezone.utc)
+                if data.get("end_ms") else None
+            )
+            created_at = (
+                datetime.fromtimestamp(data["created_ms"] / 1000, tz=timezone.utc)
+                if data.get("created_ms") else now
+            )
+
+            Campaign.objects.update_or_create(
+                on_chain_id=cid,
+                defaults={
+                    "owner": owner,
+                    "name": data["name"],
+                    "description": data.get("description"),
+                    "cover_image_url": data.get("cover_image_url"),
+                    "recipient": recipient,
+                    "token": token,
+                    "start_at": start_at,
+                    "end_at": end_at,
+                    "created_at": created_at,
+                    "target_amount": str(data["target_amount"]),
+                    "min_amount": str(data["min_amount"]) if data.get("min_amount") else None,
+                    "max_amount": str(data["max_amount"]) if data.get("max_amount") else None,
+                    "total_raised_amount": str(data.get("total_raised_amount", "0")),
+                    "net_raised_amount": str(data.get("net_raised_amount", "0")),
+                    "escrow_balance": str(data.get("escrow_balance", "0")),
+                    "referral_fee_basis_points": data["referral_fee_basis_points"],
+                    "creator_fee_basis_points": data["creator_fee_basis_points"],
+                    "allow_fee_avoidance": data.get("allow_fee_avoidance", False),
+                },
+            )
+            total_missing += 1
+
+        # Backfill campaign donations for all campaigns
+        for campaign in Campaign.objects.all():
+            on_chain_donations = rpc_call_paginated(
+                CAMPAIGNS_CONTRACT,
+                "get_donations_for_campaign",
+                {"campaign_id": campaign.on_chain_id},
+                page_size=300,
+            )
+            if on_chain_donations is None:
+                continue
+
+            db_donation_ids = set(
+                CampaignDonation.objects.filter(campaign=campaign).values_list("on_chain_id", flat=True)
+            )
+            on_chain_ids = {d["id"] for d in on_chain_donations}
+            missing = on_chain_ids - db_donation_ids
+
+            if not missing:
+                continue
+
+            for d in on_chain_donations:
+                if d["id"] not in missing:
+                    continue
+
+                donor, _ = Account.objects.get_or_create(id=d["donor_id"])
+                referrer = None
+                if d.get("referrer_id"):
+                    referrer, _ = Account.objects.get_or_create(id=d["referrer_id"])
+
+                don_token = campaign.token
+                if d.get("ft_id"):
+                    token_acct, _ = Account.objects.get_or_create(id=d["ft_id"])
+                    don_token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+
+                donated_at = datetime.fromtimestamp(d["donated_at_ms"] / 1000, tz=timezone.utc)
+                returned_at = (
+                    datetime.fromtimestamp(d["returned_at_ms"] / 1000, tz=timezone.utc)
+                    if d.get("returned_at_ms") else None
+                )
+
+                CampaignDonation.objects.update_or_create(
+                    on_chain_id=d["id"],
+                    campaign=campaign,
+                    donor=donor,
+                    defaults={
+                        "token": don_token,
+                        "total_amount": str(d["total_amount"]),
+                        "net_amount": str(d["net_amount"]),
+                        "message": d.get("message"),
+                        "donated_at": donated_at,
+                        "protocol_fee": str(d["protocol_fee"]),
+                        "referrer": referrer,
+                        "referrer_fee": str(d["referrer_fee"]) if d.get("referrer_fee") else None,
+                        "creator_fee": str(d["creator_fee"]),
+                        "returned_at": returned_at,
+                        "escrowed": d.get("is_in_escrow", False),
+                        "tx_hash": None,
+                    },
+                )
+                total_missing += 1
+
+            _time.sleep(0.5)
+
+        jobs_logger.info(f"Backfill campaigns: {total_missing} missing entries created.")
+        return total_missing
+
+    # === Main backfill execution ===
+    jobs_logger.info(f"=== Biweekly Backfill Starting (ISO week {now.isocalendar().week}) ===")
+
+    fix_sequences()
+
+    total = 0
+    total += backfill_accounts()
+    total += backfill_lists()
+    total += backfill_registrations()
+    total += backfill_donations()
+    total += backfill_pots()
+    total += backfill_campaigns()
+
+    if total == 0:
+        jobs_logger.info("=== Backfill complete: everything in sync! ===")
+    else:
+        jobs_logger.info(f"=== Backfill complete: {total} missing entries created. ===")
+
+
 @task_revoked.connect
 def on_task_revoked(request, terminated, signum, expired, **kwargs):
     logger.info(
