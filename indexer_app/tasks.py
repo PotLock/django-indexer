@@ -650,11 +650,9 @@ def backfill_missing_data(force=False):
             existing_ids = set(Account.objects.filter(id__in=account_ids).values_list("id", flat=True))
             new_ids = account_ids - existing_ids
 
+            for aid in new_ids:
+                Account.objects.get_or_create(id=aid)
             if new_ids:
-                Account.objects.bulk_create(
-                    [Account(id=aid) for aid in new_ids],
-                    ignore_conflicts=True,
-                )
                 jobs_logger.info(f"  Created {len(new_ids)} missing accounts from list {list_obj.on_chain_id}")
                 missing_count += len(new_ids)
 
@@ -785,7 +783,8 @@ def backfill_missing_data(force=False):
             recipient, _ = Account.objects.get_or_create(id=d.get("recipient_id", ""))
             ft_id = d.get("ft_id", "near")
             token_id = ft_id if ft_id != "near" else "near"
-            token, _ = Token.objects.get_or_create(id=token_id)
+            token_acct, _ = Account.objects.get_or_create(id=token_id)
+            token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
 
             referrer = None
             if d.get("referrer_id"):
@@ -882,7 +881,8 @@ def backfill_missing_data(force=False):
                         recipient, _ = Account.objects.get_or_create(id=recipient_id)
                         token = None
                         if p.get("ft_id"):
-                            token, _ = Token.objects.get_or_create(id=p["ft_id"])
+                            token_acct, _ = Account.objects.get_or_create(id=p["ft_id"])
+                            token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
                         PotPayout.objects.update_or_create(
                             pot=pot,
                             recipient=recipient,
