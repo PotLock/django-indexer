@@ -55,6 +55,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(day_of_month="5", hour="4", minute="0"),  # 5th of each month, 4 AM UTC
         "options": {"queue": "beat_tasks"},
     },
+    "backfill_missing_data_biweekly": {
+        "task": "indexer_app.tasks.backfill_missing_data",
+        "schedule": crontab(day_of_week="0", hour="3", minute="0"),  # Every Sunday 3 AM UTC; task self-skips odd weeks for biweekly
+        "options": {"queue": "beat_tasks"},
+    },
 }
 
 app.conf.task_routes = {
@@ -64,6 +69,7 @@ app.conf.task_routes = {
     "indexer_app.tasks.stellar_event_indexer": {"queue": "beat_tasks"},
     "indexer_app.tasks.process_stellar_events": {"queue": "beat_tasks"},
     "tax_verification.tasks.refresh_eo_bmf": {"queue": "beat_tasks"},
+    "indexer_app.tasks.backfill_missing_data": {"queue": "beat_tasks"},
 }
 
 SPOT_INDEXER_QUEUE_NAME = "spot_indexing"
