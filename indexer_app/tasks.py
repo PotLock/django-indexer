@@ -811,30 +811,35 @@ def backfill_missing_data(force=False):
             # --- Payouts ---
             on_chain_payouts = rpc_call_paginated(pot_contract, "get_payouts", {}, page_size=300)
             if on_chain_payouts is not None:
-                db_payout_ids = set(
-                    PotPayout.objects.filter(pot=pot).values_list("on_chain_id", flat=True)
+                # Use (pot, recipient) as lookup since existing DB records have on_chain_id=None
+                db_payout_recipients = set(
+                    PotPayout.objects.filter(pot=pot).values_list("recipient_id", flat=True)
                 )
-                on_chain_payout_ids = {p["id"] for p in on_chain_payouts if "id" in p}
-                missing_payout_ids = on_chain_payout_ids - db_payout_ids
+                on_chain_payout_recipients = {
+                    p.get("project_id", p.get("recipient_id", "")) for p in on_chain_payouts
+                }
+                missing_recipients = on_chain_payout_recipients - db_payout_recipients
 
-                if missing_payout_ids:
-                    # Bulk-create recipient accounts
-                    recipient_ids = {
-                        p.get("project_id", p.get("recipient_id", ""))
-                        for p in on_chain_payouts if p.get("id") in missing_payout_ids
-                    }
-                    ensure_accounts_exist(recipient_ids)
-
+                if missing_recipients:
+                    ensure_accounts_exist(missing_recipients)
                     for p in on_chain_payouts:
-                        if p.get("id") not in missing_payout_ids:
-                            continue
                         recipient_id = p.get("project_id", p.get("recipient_id", ""))
+                        if recipient_id not in missing_recipients:
+                            continue
                         token = get_token_for_ft(p.get("ft_id"), near_token)
+                        # Parse on_chain_id only if it's a valid integer
+                        payout_on_chain_id = None
+                        pid = p.get("id")
+                        if pid is not None:
+                            try:
+                                payout_on_chain_id = int(pid)
+                            except (ValueError, TypeError):
+                                pass
                         PotPayout.objects.update_or_create(
-                            on_chain_id=p["id"],
+                            pot=pot,
+                            recipient_id=recipient_id,
                             defaults={
-                                "pot": pot,
-                                "recipient_id": recipient_id,
+                                "on_chain_id": payout_on_chain_id,
                                 "amount": p.get("amount", "0"),
                                 "token": token,
                                 "paid_at": datetime.fromtimestamp(
@@ -843,7 +848,7 @@ def backfill_missing_data(force=False):
                                 "tx_hash": None,
                             },
                         )
-                    total_missing += len(missing_payout_ids)
+                    total_missing += len(missing_recipients)
 
             # --- Pot Donations ---
             on_chain_donations = rpc_call_paginated(pot_contract, "get_donations", {}, page_size=300)
