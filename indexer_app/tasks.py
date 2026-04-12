@@ -516,7 +516,8 @@ def backfill_missing_data(force=False):
 
     Catches data that was missed when on-demand sync API calls failed but the
     transaction went through on-chain. Handles: accounts, lists, registrations,
-    donations, pots (applications & payouts), and campaigns (if app is installed).
+    donations (direct + pot), pots (applications & payouts), and campaigns
+    (if app is installed).
 
     Scheduled every Sunday at 3 AM UTC, but only runs on even ISO weeks
     to achieve a biweekly (~every 14 days) cadence.
@@ -535,6 +536,7 @@ def backfill_missing_data(force=False):
     from django.db import connection
 
     from accounts.models import Account
+    from chains.models import Chain
     from donations.models import Donation
     from lists.models import List, ListRegistration
     from pots.models import Pot, PotApplication, PotPayout
@@ -548,6 +550,8 @@ def backfill_missing_data(force=False):
 
     LISTS_CONTRACT = f"lists.{settings.POTLOCK_TLA}"
     DONATE_CONTRACT = f"donate.{settings.POTLOCK_TLA}"
+
+    # --- Helpers ---
 
     def rpc_call(contract_id, method_name, args=None, timeout=60):
         rpc_endpoints = [
@@ -599,6 +603,39 @@ def backfill_missing_data(force=False):
             _time.sleep(delay)
         return all_results
 
+    def ensure_accounts_exist(account_ids):
+        """Bulk-create missing Account records, bypassing Account.save() to avoid
+        triggering NEAR Social profile fetches for every new account."""
+        if not account_ids:
+            return
+        account_ids = {aid for aid in account_ids if aid}
+        existing = set(Account.objects.filter(id__in=account_ids).values_list("id", flat=True))
+        missing = account_ids - existing
+        if missing:
+            near_chain = Chain.objects.get(name="NEAR")
+            Account.objects.bulk_create(
+                [Account(id=aid, chain=near_chain) for aid in missing],
+                ignore_conflicts=True,
+            )
+
+    def get_near_token():
+        """Get or create the NEAR token."""
+        near_acct, _ = Account.objects.get_or_create(id="near")
+        near_token, _ = Token.objects.get_or_create(
+            account=near_acct,
+            defaults={"name": "NEAR", "symbol": "NEAR", "decimals": 24},
+        )
+        return near_token
+
+    def get_token_for_ft(ft_id, default_token):
+        """Get the Token for an ft_id, falling back to default_token."""
+        if not ft_id or ft_id == "near":
+            return default_token
+        ensure_accounts_exist({ft_id})
+        token_acct = Account.objects.get(id=ft_id)
+        token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+        return token
+
     def fix_sequences():
         tables = [
             ("lists_listregistration", "id"),
@@ -615,51 +652,7 @@ def backfill_missing_data(force=False):
                 except Exception as e:
                     jobs_logger.warning(f"Could not reset sequence for {table}: {e}")
 
-    def backfill_accounts():
-        """Backfill accounts from list registrations on-chain."""
-        jobs_logger.info("Backfill: checking accounts...")
-        db_lists = List.objects.all()
-        if not db_lists.exists():
-            return 0
-
-        missing_count = 0
-        for list_obj in db_lists:
-            on_chain_regs = rpc_call_paginated(
-                LISTS_CONTRACT,
-                "get_registrations_for_list",
-                {"list_id": list_obj.on_chain_id},
-                page_size=300,
-            )
-            if on_chain_regs is None:
-                continue
-
-            # Collect all account IDs referenced in registrations
-            account_ids = set()
-            for reg in on_chain_regs:
-                account_ids.add(reg["registrant_id"])
-                if reg.get("registered_by"):
-                    account_ids.add(reg["registered_by"])
-
-            # Also add list owner and admins from on-chain data
-            on_chain_list = rpc_call(LISTS_CONTRACT, "get_list", {"list_id": list_obj.on_chain_id})
-            if on_chain_list:
-                account_ids.add(on_chain_list["owner"])
-                for admin_id in on_chain_list.get("admins", []):
-                    account_ids.add(admin_id)
-
-            existing_ids = set(Account.objects.filter(id__in=account_ids).values_list("id", flat=True))
-            new_ids = account_ids - existing_ids
-
-            for aid in new_ids:
-                Account.objects.get_or_create(id=aid)
-            if new_ids:
-                jobs_logger.info(f"  Created {len(new_ids)} missing accounts from list {list_obj.on_chain_id}")
-                missing_count += len(new_ids)
-
-            _time.sleep(0.3)
-
-        jobs_logger.info(f"Backfill accounts: {missing_count} created.")
-        return missing_count
+    # --- Backfill functions ---
 
     def backfill_lists():
         jobs_logger.info("Backfill: checking lists...")
@@ -676,15 +669,23 @@ def backfill_missing_data(force=False):
             jobs_logger.info("Backfill lists: all in sync.")
             return 0
 
+        # Bulk-create all accounts referenced in missing lists
+        all_account_ids = set()
+        for l in on_chain_lists:
+            if l["id"] not in missing_ids:
+                continue
+            all_account_ids.add(l["owner"])
+            all_account_ids.update(l.get("admins", []))
+        ensure_accounts_exist(all_account_ids)
+
         missing_count = 0
         for l in on_chain_lists:
             if l["id"] not in missing_ids:
                 continue
-            owner, _ = Account.objects.get_or_create(id=l["owner"])
             list_obj, _ = List.objects.update_or_create(
                 on_chain_id=l["id"],
                 defaults={
-                    "owner": owner,
+                    "owner_id": l["owner"],
                     "name": l["name"],
                     "description": l.get("description", ""),
                     "cover_image_url": l.get("cover_image_url"),
@@ -695,8 +696,7 @@ def backfill_missing_data(force=False):
                 },
             )
             for admin_id in l.get("admins", []):
-                admin, _ = Account.objects.get_or_create(id=admin_id)
-                list_obj.admins.add(admin)
+                list_obj.admins.add(Account.objects.get(id=admin_id))
             missing_count += 1
 
         jobs_logger.info(f"Backfill lists: {missing_count} created.")
@@ -728,18 +728,23 @@ def backfill_missing_data(force=False):
             if not missing:
                 continue
 
+            # Bulk-create accounts for this list's missing registrations
+            account_ids = set()
             for reg in on_chain_regs:
                 if reg["registrant_id"] not in missing:
                     continue
-                registrant, _ = Account.objects.get_or_create(id=reg["registrant_id"])
-                registered_by, _ = Account.objects.get_or_create(
-                    id=reg.get("registered_by", reg["registrant_id"])
-                )
+                account_ids.add(reg["registrant_id"])
+                account_ids.add(reg.get("registered_by", reg["registrant_id"]))
+            ensure_accounts_exist(account_ids)
+
+            for reg in on_chain_regs:
+                if reg["registrant_id"] not in missing:
+                    continue
                 ListRegistration.objects.update_or_create(
                     list=list_obj,
-                    registrant=registrant,
+                    registrant_id=reg["registrant_id"],
                     defaults={
-                        "registered_by": registered_by,
+                        "registered_by_id": reg.get("registered_by", reg["registrant_id"]),
                         "status": reg["status"],
                         "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000, tz=timezone.utc),
                         "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000, tz=timezone.utc),
@@ -774,42 +779,45 @@ def backfill_missing_data(force=False):
             jobs_logger.info("Backfill donations: all in sync.")
             return 0
 
+        # Bulk-create all accounts
+        account_ids = set()
+        for d in on_chain_donations:
+            if d["id"] not in missing_ids:
+                continue
+            account_ids.add(d.get("donor_id", ""))
+            account_ids.add(d.get("recipient_id", ""))
+            if d.get("referrer_id"):
+                account_ids.add(d["referrer_id"])
+            if d.get("chef_id"):
+                account_ids.add(d["chef_id"])
+            ft_id = d.get("ft_id", "near")
+            account_ids.add(ft_id if ft_id != "near" else "near")
+        ensure_accounts_exist(account_ids)
+
+        near_token = get_near_token()
         missing_count = 0
         for d in on_chain_donations:
             if d["id"] not in missing_ids:
                 continue
 
-            donor, _ = Account.objects.get_or_create(id=d.get("donor_id", ""))
-            recipient, _ = Account.objects.get_or_create(id=d.get("recipient_id", ""))
-            ft_id = d.get("ft_id", "near")
-            token_id = ft_id if ft_id != "near" else "near"
-            token_acct, _ = Account.objects.get_or_create(id=token_id)
-            token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
-
-            referrer = None
-            if d.get("referrer_id"):
-                referrer, _ = Account.objects.get_or_create(id=d["referrer_id"])
-
-            chef = None
-            if d.get("chef_id"):
-                chef, _ = Account.objects.get_or_create(id=d["chef_id"])
+            token = get_token_for_ft(d.get("ft_id", "near"), near_token)
 
             Donation.objects.update_or_create(
                 on_chain_id=d["id"],
                 pot__isnull=True,
                 defaults={
-                    "donor": donor,
+                    "donor_id": d.get("donor_id", ""),
                     "total_amount": d.get("total_amount", "0"),
                     "net_amount": d.get("net_amount", "0"),
                     "token": token,
                     "matching_pool": d.get("matching_pool", False),
                     "message": d.get("message"),
                     "donated_at": datetime.fromtimestamp(d["donated_at_ms"] / 1000, tz=timezone.utc),
-                    "recipient": recipient,
+                    "recipient_id": d.get("recipient_id", ""),
                     "protocol_fee": d.get("protocol_fee", "0"),
                     "referrer_fee": d.get("referrer_fee"),
-                    "referrer": referrer,
-                    "chef": chef,
+                    "referrer_id": d.get("referrer_id"),
+                    "chef_id": d.get("chef_id"),
                     "chef_fee": d.get("chef_fee"),
                     "tx_hash": None,
                 },
@@ -820,18 +828,20 @@ def backfill_missing_data(force=False):
         return missing_count
 
     def backfill_pots():
-        jobs_logger.info("Backfill: checking pots (applications & payouts)...")
+        jobs_logger.info("Backfill: checking pots (applications, payouts & donations)...")
         db_pots = Pot.objects.all()
         if not db_pots.exists():
             return 0
 
+        near_token = get_near_token()
         total_missing = 0
+
         for pot in db_pots:
             pot_contract = str(pot.account_id)
             if not pot_contract or "." not in pot_contract:
                 continue
 
-            # Applications
+            # --- Applications ---
             on_chain_apps = rpc_call_paginated(pot_contract, "get_applications", {}, page_size=300)
             if on_chain_apps is not None:
                 db_app_ids = set(
@@ -841,14 +851,14 @@ def backfill_missing_data(force=False):
                 missing_apps = on_chain_app_ids - db_app_ids
 
                 if missing_apps:
+                    ensure_accounts_exist(missing_apps)
                     for a in on_chain_apps:
                         applicant_id = a.get("project_id", a.get("applicant_id", ""))
                         if applicant_id not in missing_apps:
                             continue
-                        applicant, _ = Account.objects.get_or_create(id=applicant_id)
                         PotApplication.objects.update_or_create(
                             pot=pot,
-                            applicant=applicant,
+                            applicant_id=applicant_id,
                             defaults={
                                 "message": a.get("message", ""),
                                 "status": a.get("status", "Pending"),
@@ -863,30 +873,33 @@ def backfill_missing_data(force=False):
                         )
                     total_missing += len(missing_apps)
 
-            # Payouts
+            # --- Payouts ---
             on_chain_payouts = rpc_call_paginated(pot_contract, "get_payouts", {}, page_size=300)
             if on_chain_payouts is not None:
-                db_payout_recipients = set(
-                    PotPayout.objects.filter(pot=pot).values_list("recipient_id", flat=True)
+                db_payout_ids = set(
+                    PotPayout.objects.filter(pot=pot).values_list("on_chain_id", flat=True)
                 )
-                on_chain_payout_recipients = {
-                    p.get("project_id", p.get("recipient_id", "")) for p in on_chain_payouts
-                }
-                missing_payouts = on_chain_payout_recipients - db_payout_recipients
-                if missing_payouts:
+                on_chain_payout_ids = {p["id"] for p in on_chain_payouts if "id" in p}
+                missing_payout_ids = on_chain_payout_ids - db_payout_ids
+
+                if missing_payout_ids:
+                    # Bulk-create recipient accounts
+                    recipient_ids = {
+                        p.get("project_id", p.get("recipient_id", ""))
+                        for p in on_chain_payouts if p.get("id") in missing_payout_ids
+                    }
+                    ensure_accounts_exist(recipient_ids)
+
                     for p in on_chain_payouts:
-                        recipient_id = p.get("project_id", p.get("recipient_id", ""))
-                        if recipient_id not in missing_payouts:
+                        if p.get("id") not in missing_payout_ids:
                             continue
-                        recipient, _ = Account.objects.get_or_create(id=recipient_id)
-                        token = None
-                        if p.get("ft_id"):
-                            token_acct, _ = Account.objects.get_or_create(id=p["ft_id"])
-                            token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+                        recipient_id = p.get("project_id", p.get("recipient_id", ""))
+                        token = get_token_for_ft(p.get("ft_id"), near_token)
                         PotPayout.objects.update_or_create(
-                            pot=pot,
-                            recipient=recipient,
+                            on_chain_id=p["id"],
                             defaults={
+                                "pot": pot,
+                                "recipient_id": recipient_id,
                                 "amount": p.get("amount", "0"),
                                 "token": token,
                                 "paid_at": datetime.fromtimestamp(
@@ -895,11 +908,80 @@ def backfill_missing_data(force=False):
                                 "tx_hash": None,
                             },
                         )
-                    total_missing += len(missing_payouts)
+                    total_missing += len(missing_payout_ids)
+
+            # --- Pot Donations ---
+            on_chain_donations = rpc_call_paginated(pot_contract, "get_donations", {}, page_size=300)
+            if on_chain_donations is not None:
+                db_donation_ids = set(
+                    Donation.objects.filter(pot=pot).values_list("on_chain_id", flat=True)
+                )
+                on_chain_don_ids = {d["id"] for d in on_chain_donations}
+                missing_don_ids = on_chain_don_ids - db_donation_ids
+
+                if missing_don_ids:
+                    # Bulk-create accounts
+                    account_ids = set()
+                    for d in on_chain_donations:
+                        if d["id"] not in missing_don_ids:
+                            continue
+                        account_ids.add(d["donor_id"])
+                        if d.get("project_id"):
+                            account_ids.add(d["project_id"])
+                        elif d.get("recipient_id"):
+                            account_ids.add(d["recipient_id"])
+                        if d.get("referrer_id"):
+                            account_ids.add(d["referrer_id"])
+                        if d.get("chef_id"):
+                            account_ids.add(d["chef_id"])
+                    ensure_accounts_exist(account_ids)
+
+                    for d in on_chain_donations:
+                        if d["id"] not in missing_don_ids:
+                            continue
+
+                        recipient_id = d.get("project_id") or d.get("recipient_id")
+                        token = get_token_for_ft(d.get("ft_id", "near"), near_token)
+
+                        # Calculate net_amount if missing
+                        total_amount = d.get("total_amount", "0")
+                        net_amount = d.get("net_amount")
+                        if not net_amount or net_amount == "0":
+                            protocol_fee = int(d.get("protocol_fee", "0"))
+                            referrer_fee = int(d.get("referrer_fee") or "0")
+                            chef_fee = int(d.get("chef_fee") or "0")
+                            net_amount = str(int(total_amount) - protocol_fee - referrer_fee - chef_fee)
+
+                        donated_at = datetime.fromtimestamp(
+                            (d.get("donated_at") or d.get("donated_at_ms", 0)) / 1000,
+                            tz=timezone.utc,
+                        )
+
+                        Donation.objects.update_or_create(
+                            on_chain_id=d["id"],
+                            pot=pot,
+                            defaults={
+                                "donor_id": d["donor_id"],
+                                "total_amount": total_amount,
+                                "net_amount": net_amount,
+                                "token": token,
+                                "matching_pool": d.get("matching_pool", False),
+                                "message": d.get("message"),
+                                "donated_at": donated_at,
+                                "recipient_id": recipient_id,
+                                "protocol_fee": d.get("protocol_fee", "0"),
+                                "referrer_fee": d.get("referrer_fee"),
+                                "referrer_id": d.get("referrer_id"),
+                                "chef_id": d.get("chef_id"),
+                                "chef_fee": d.get("chef_fee"),
+                                "tx_hash": None,
+                            },
+                        )
+                    total_missing += len(missing_don_ids)
 
             _time.sleep(0.5)
 
-        jobs_logger.info(f"Backfill pots: {total_missing} missing apps/payouts created.")
+        jobs_logger.info(f"Backfill pots: {total_missing} missing apps/payouts/donations created.")
         return total_missing
 
     def backfill_campaigns():
@@ -939,6 +1021,16 @@ def backfill_missing_data(force=False):
             jobs_logger.info("Backfill campaigns: no campaigns found on chain.")
             return 0
 
+        # Bulk-create all accounts from campaigns
+        account_ids = set()
+        for data in on_chain_campaigns:
+            account_ids.add(data["owner"])
+            account_ids.add(data["recipient"])
+            if data.get("ft_id"):
+                account_ids.add(data["ft_id"])
+        ensure_accounts_exist(account_ids)
+
+        near_token = get_near_token()
         db_campaign_ids = set(Campaign.objects.values_list("on_chain_id", flat=True))
         total_missing = 0
 
@@ -957,14 +1049,7 @@ def backfill_missing_data(force=False):
                 continue
 
             # Create missing campaign
-            owner, _ = Account.objects.get_or_create(id=data["owner"])
-            recipient, _ = Account.objects.get_or_create(id=data["recipient"])
-
-            token = None
-            token_id = data.get("ft_id")
-            if token_id:
-                token_acct, _ = Account.objects.get_or_create(id=token_id)
-                token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+            token = get_token_for_ft(data.get("ft_id"), near_token)
 
             start_at = datetime.fromtimestamp(data["start_ms"] / 1000, tz=timezone.utc)
             end_at = (
@@ -979,11 +1064,11 @@ def backfill_missing_data(force=False):
             Campaign.objects.update_or_create(
                 on_chain_id=cid,
                 defaults={
-                    "owner": owner,
+                    "owner_id": data["owner"],
                     "name": data["name"],
                     "description": data.get("description"),
                     "cover_image_url": data.get("cover_image_url"),
-                    "recipient": recipient,
+                    "recipient_id": data["recipient"],
                     "token": token,
                     "start_at": start_at,
                     "end_at": end_at,
@@ -1021,19 +1106,23 @@ def backfill_missing_data(force=False):
             if not missing:
                 continue
 
+            # Bulk-create accounts for missing donations
+            don_account_ids = set()
+            for d in on_chain_donations:
+                if d["id"] not in missing:
+                    continue
+                don_account_ids.add(d["donor_id"])
+                if d.get("referrer_id"):
+                    don_account_ids.add(d["referrer_id"])
+                if d.get("ft_id"):
+                    don_account_ids.add(d["ft_id"])
+            ensure_accounts_exist(don_account_ids)
+
             for d in on_chain_donations:
                 if d["id"] not in missing:
                     continue
 
-                donor, _ = Account.objects.get_or_create(id=d["donor_id"])
-                referrer = None
-                if d.get("referrer_id"):
-                    referrer, _ = Account.objects.get_or_create(id=d["referrer_id"])
-
-                don_token = campaign.token
-                if d.get("ft_id"):
-                    token_acct, _ = Account.objects.get_or_create(id=d["ft_id"])
-                    don_token, _ = Token.objects.get_or_create(account=token_acct, defaults={"decimals": 24})
+                don_token = get_token_for_ft(d.get("ft_id"), campaign.token)
 
                 donated_at = datetime.fromtimestamp(d["donated_at_ms"] / 1000, tz=timezone.utc)
                 returned_at = (
@@ -1044,15 +1133,15 @@ def backfill_missing_data(force=False):
                 CampaignDonation.objects.update_or_create(
                     on_chain_id=d["id"],
                     campaign=campaign,
-                    donor=donor,
                     defaults={
+                        "donor_id": d["donor_id"],
                         "token": don_token,
                         "total_amount": str(d["total_amount"]),
                         "net_amount": str(d["net_amount"]),
                         "message": d.get("message"),
                         "donated_at": donated_at,
                         "protocol_fee": str(d["protocol_fee"]),
-                        "referrer": referrer,
+                        "referrer_id": d.get("referrer_id"),
                         "referrer_fee": str(d["referrer_fee"]) if d.get("referrer_fee") else None,
                         "creator_fee": str(d["creator_fee"]),
                         "returned_at": returned_at,
@@ -1072,13 +1161,20 @@ def backfill_missing_data(force=False):
 
     fix_sequences()
 
+    backfill_funcs = [
+        ("lists", backfill_lists),
+        ("registrations", backfill_registrations),
+        ("direct donations", backfill_donations),
+        ("pots", backfill_pots),
+        ("campaigns", backfill_campaigns),
+    ]
+
     total = 0
-    total += backfill_accounts()
-    total += backfill_lists()
-    total += backfill_registrations()
-    total += backfill_donations()
-    total += backfill_pots()
-    total += backfill_campaigns()
+    for name, func in backfill_funcs:
+        try:
+            total += func()
+        except Exception as e:
+            jobs_logger.error(f"Backfill {name} failed: {e}", exc_info=True)
 
     if total == 0:
         jobs_logger.info("=== Backfill complete: everything in sync! ===")

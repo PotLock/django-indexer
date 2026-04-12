@@ -272,10 +272,11 @@ def sync_donation_from_data(campaign: Campaign, donation_data: dict, tx_hash: st
     if tx_hash:
         donation_defaults["tx_hash"] = tx_hash
 
+    donation_defaults["donor"] = donor
+
     donation, created = CampaignDonation.objects.update_or_create(
         on_chain_id=donation_data["id"],
         campaign=campaign,
-        donor=donor,
         defaults=donation_defaults,
     )
 
