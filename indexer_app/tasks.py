@@ -550,6 +550,10 @@ def backfill_missing_data(force=False):
 
     LISTS_CONTRACT = f"lists.{settings.POTLOCK_TLA}"
     DONATE_CONTRACT = f"donate.{settings.POTLOCK_TLA}"
+    near_chain = Chain.objects.get(name="NEAR")
+
+    # Check if List model has chain field (dev has it, prod doesn't)
+    list_has_chain = hasattr(List, "chain")
 
     # --- Helpers ---
 
@@ -612,7 +616,6 @@ def backfill_missing_data(force=False):
         existing = set(Account.objects.filter(id__in=account_ids).values_list("id", flat=True))
         missing = account_ids - existing
         if missing:
-            near_chain = Chain.objects.get(name="NEAR")
             Account.objects.bulk_create(
                 [Account(id=aid, chain=near_chain) for aid in missing],
                 ignore_conflicts=True,
@@ -661,7 +664,8 @@ def backfill_missing_data(force=False):
             jobs_logger.error("Failed to fetch lists from contract")
             return 0
 
-        db_list_ids = set(List.objects.values_list("on_chain_id", flat=True))
+        list_qs = List.objects.filter(chain=near_chain) if list_has_chain else List.objects.all()
+        db_list_ids = set(list_qs.values_list("on_chain_id", flat=True))
         on_chain_ids = {l["id"] for l in on_chain_lists}
         missing_ids = on_chain_ids - db_list_ids
 
@@ -682,19 +686,20 @@ def backfill_missing_data(force=False):
         for l in on_chain_lists:
             if l["id"] not in missing_ids:
                 continue
-            list_obj, _ = List.objects.update_or_create(
-                on_chain_id=l["id"],
-                defaults={
-                    "owner_id": l["owner"],
-                    "name": l["name"],
-                    "description": l.get("description", ""),
-                    "cover_image_url": l.get("cover_image_url"),
-                    "admin_only_registrations": l.get("admin_only_registrations", False),
-                    "default_registration_status": l.get("default_registration_status", "Pending"),
-                    "created_at": datetime.fromtimestamp(l["created_at"] / 1000, tz=timezone.utc),
-                    "updated_at": datetime.fromtimestamp(l["updated_at"] / 1000, tz=timezone.utc),
-                },
-            )
+            lookup = {"on_chain_id": l["id"]}
+            if list_has_chain:
+                lookup["chain"] = near_chain
+            list_defaults = {
+                "owner_id": l["owner"],
+                "name": l["name"],
+                "description": l.get("description", ""),
+                "cover_image_url": l.get("cover_image_url"),
+                "admin_only_registrations": l.get("admin_only_registrations", False),
+                "default_registration_status": l.get("default_registration_status", "Pending"),
+                "created_at": datetime.fromtimestamp(l["created_at"] / 1000, tz=timezone.utc),
+                "updated_at": datetime.fromtimestamp(l["updated_at"] / 1000, tz=timezone.utc),
+            }
+            list_obj, _ = List.objects.update_or_create(**lookup, defaults=list_defaults)
             for admin_id in l.get("admins", []):
                 list_obj.admins.add(Account.objects.get(id=admin_id))
             missing_count += 1
@@ -704,7 +709,7 @@ def backfill_missing_data(force=False):
 
     def backfill_registrations():
         jobs_logger.info("Backfill: checking registrations...")
-        db_lists = List.objects.all()
+        db_lists = List.objects.filter(chain=near_chain) if list_has_chain else List.objects.all()
         if not db_lists.exists():
             return 0
 
