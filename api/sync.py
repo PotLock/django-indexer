@@ -19,11 +19,10 @@ Endpoints:
 import base64
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 from django.conf import settings
-from django.db import connection
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -38,61 +37,6 @@ from tokens.models import Token
 logger = logging.getLogger(__name__)
 
 LISTS_CONTRACT = f"lists.{settings.POTLOCK_TLA}"
-
-
-def safe_update_or_create(model, lookup, defaults):
-    """
-    update_or_create that handles PostgreSQL sequence collisions.
-
-    The Celery indexer manually sets IDs (bypassing AutoField), which can desync
-    the sequence counter. If INSERT fails with a duplicate key on id, we reset
-    the sequence and retry once.
-    """
-    from django.db import IntegrityError
-
-    try:
-        return model.objects.update_or_create(**lookup, defaults=defaults)
-    except IntegrityError as e:
-        if "pkey" not in str(e) and "_pkey" not in str(e):
-            raise  # not a sequence collision, re-raise
-
-        # Fix the sequence and retry
-        table = model._meta.db_table
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-                f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
-            )
-        logger.info(f"Reset sequence for {table} after collision, retrying...")
-        return model.objects.update_or_create(**lookup, defaults=defaults)
-
-
-def fetch_from_rpc_paginated(method_name: str, args: dict = None, contract_id: str = None, page_size: int = 300, timeout: int = 120):
-    """
-    Fetch all results from a paginated NEAR contract view method.
-    Uses from_index and limit params to loop through all pages.
-    """
-    import time as _time
-
-    all_results = []
-    page = 0
-
-    while True:
-        paginated_args = {**(args or {}), "from_index": page * page_size, "limit": page_size}
-        results = fetch_from_rpc(method_name, paginated_args, contract_id=contract_id, timeout=timeout)
-
-        if results is None:
-            break
-
-        all_results.extend(results)
-
-        if len(results) < page_size:
-            break
-
-        page += 1
-        _time.sleep(0.5)
-
-    return all_results
 
 
 def fetch_from_rpc(method_name: str, args: dict = None, contract_id: str = None, timeout: int = 60):
@@ -265,7 +209,7 @@ class ListSyncAPI(APIView):
                 existing_list.cover_image_url = data.get("cover_image_url")
                 existing_list.admin_only_registrations = data.get("admin_only_registrations", False)
                 existing_list.default_registration_status = data.get("default_registration_status", "Pending")
-                existing_list.updated_at = datetime.fromtimestamp(data["updated_at"] / 1000)
+                existing_list.updated_at = datetime.fromtimestamp(data["updated_at"] / 1000, tz=timezone.utc)
                 existing_list.save()
 
                 # Update admins
@@ -289,8 +233,8 @@ class ListSyncAPI(APIView):
                 cover_image_url=data.get("cover_image_url"),
                 admin_only_registrations=data.get("admin_only_registrations", False),
                 default_registration_status=data.get("default_registration_status", "Pending"),
-                created_at=datetime.fromtimestamp(data["created_at"] / 1000),
-                updated_at=datetime.fromtimestamp(data["updated_at"] / 1000),
+                created_at=datetime.fromtimestamp(data["created_at"] / 1000, tz=timezone.utc),
+                updated_at=datetime.fromtimestamp(data["updated_at"] / 1000, tz=timezone.utc),
             )
 
             # Create owner account
@@ -340,8 +284,8 @@ class ListRegistrationsSyncAPI(APIView):
                     return Response({"error": "List not found"}, status=404)
                 list_obj = List.objects.get(on_chain_id=int(list_id))
 
-            # Fetch registrations from RPC with pagination for large lists
-            registrations = fetch_from_rpc_paginated("get_registrations_for_list", {"list_id": int(list_id)})
+            # Fetch registrations from RPC (use longer timeout for large lists)
+            registrations = fetch_from_rpc("get_registrations_for_list", {"list_id": int(list_id)}, timeout=120)
 
             if not registrations:
                 registrations = []
@@ -352,18 +296,15 @@ class ListRegistrationsSyncAPI(APIView):
                 Account.objects.get_or_create(id=reg["registrant_id"])
                 Account.objects.get_or_create(id=reg.get("registered_by", reg["registrant_id"]))
 
-                # Create/update registration (handles sequence collisions from Celery's manual IDs)
-                safe_update_or_create(
-                    ListRegistration,
-                    lookup={
-                        "list": list_obj,
-                        "registrant_id": reg["registrant_id"],
-                    },
+                # Create/update registration (id is AutoField, use list+registrant as unique key)
+                ListRegistration.objects.update_or_create(
+                    list=list_obj,
+                    registrant_id=reg["registrant_id"],
                     defaults={
                         "registered_by_id": reg.get("registered_by", reg["registrant_id"]),
                         "status": reg.get("status", "Pending"),
-                        "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000),
-                        "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000),
+                        "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000, tz=timezone.utc),
+                        "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000, tz=timezone.utc),
                         "admin_notes": reg.get("admin_notes"),
                         "registrant_notes": reg.get("registrant_notes"),
                     }
@@ -408,34 +349,31 @@ class SingleRegistrationSyncAPI(APIView):
                     return Response({"error": "List not found"}, status=404)
                 list_obj = List.objects.get(on_chain_id=int(list_id))
 
-            # Fetch registrations for this specific registrant (more efficient than fetching all)
-            registrations = fetch_from_rpc("get_registrations_for_registrant", {"registrant_id": registrant_id})
+            # Fetch all registrations and filter (contract doesn't have single-registration lookup by registrant_id)
+            registrations = fetch_from_rpc("get_registrations_for_list", {"list_id": int(list_id)}, timeout=120)
 
             if not registrations:
-                return Response({"error": "No registrations found for registrant"}, status=404)
+                return Response({"error": "No registrations found for list"}, status=404)
 
-            # Find the registration for the specific list
-            reg = next((r for r in registrations if r.get("list_id") == int(list_id)), None)
+            # Find the specific registration
+            reg = next((r for r in registrations if r.get("registrant_id") == registrant_id), None)
 
             if not reg:
-                return Response({"error": "Registration not found for this list"}, status=404)
+                return Response({"error": "Registration not found"}, status=404)
 
             # Create accounts
             Account.objects.get_or_create(id=reg["registrant_id"])
             Account.objects.get_or_create(id=reg.get("registered_by", reg["registrant_id"]))
 
-            # Create/update registration (handles sequence collisions from Celery's manual IDs)
-            registration, created = safe_update_or_create(
-                ListRegistration,
-                lookup={
-                    "list": list_obj,
-                    "registrant_id": reg["registrant_id"],
-                },
+            # Create/update registration (id is AutoField, use list+registrant as unique key)
+            registration, created = ListRegistration.objects.update_or_create(
+                list=list_obj,
+                registrant_id=reg["registrant_id"],
                 defaults={
                     "registered_by_id": reg.get("registered_by", reg["registrant_id"]),
                     "status": reg.get("status", "Pending"),
-                    "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000),
-                    "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000),
+                    "submitted_at": datetime.fromtimestamp(reg["submitted_ms"] / 1000, tz=timezone.utc),
+                    "updated_at": datetime.fromtimestamp(reg["updated_ms"] / 1000, tz=timezone.utc),
                     "admin_notes": reg.get("admin_notes"),
                     "registrant_notes": reg.get("registrant_notes"),
                 }
@@ -500,10 +438,10 @@ class PotSyncAPI(APIView):
                 existing_pot.description = config.get("pot_description", "")
                 existing_pot.max_approved_applicants = config.get("max_projects", 0)
                 existing_pot.base_currency = config.get("base_currency", "near")
-                existing_pot.application_start = datetime.fromtimestamp(config["application_start_ms"] / 1000)
-                existing_pot.application_end = datetime.fromtimestamp(config["application_end_ms"] / 1000)
-                existing_pot.matching_round_start = datetime.fromtimestamp(config["public_round_start_ms"] / 1000)
-                existing_pot.matching_round_end = datetime.fromtimestamp(config["public_round_end_ms"] / 1000)
+                existing_pot.application_start = datetime.fromtimestamp(config["application_start_ms"] / 1000, tz=timezone.utc)
+                existing_pot.application_end = datetime.fromtimestamp(config["application_end_ms"] / 1000, tz=timezone.utc)
+                existing_pot.matching_round_start = datetime.fromtimestamp(config["public_round_start_ms"] / 1000, tz=timezone.utc)
+                existing_pot.matching_round_end = datetime.fromtimestamp(config["public_round_end_ms"] / 1000, tz=timezone.utc)
                 existing_pot.registry_provider = config.get("registry_provider")
                 existing_pot.min_matching_pool_donation_amount = config.get("min_matching_pool_donation_amount", "0")
                 existing_pot.sybil_wrapper_provider = config.get("sybil_wrapper_provider")
@@ -513,7 +451,7 @@ class PotSyncAPI(APIView):
                 existing_pot.referral_fee_public_round_basis_points = config["referral_fee_public_round_basis_points"]
                 existing_pot.chef_fee_basis_points = config["chef_fee_basis_points"]
                 if config.get("cooldown_end_ms"):
-                    existing_pot.cooldown_end = datetime.fromtimestamp(config["cooldown_end_ms"] / 1000)
+                    existing_pot.cooldown_end = datetime.fromtimestamp(config["cooldown_end_ms"] / 1000, tz=timezone.utc)
                 existing_pot.all_paid_out = config.get("all_paid_out", False)
                 existing_pot.protocol_config_provider = config.get("protocol_config_provider")
                 existing_pot.save()
@@ -530,18 +468,39 @@ class PotSyncAPI(APIView):
                     "pot_id": pot_id
                 })
             else:
-                # Ensure pot factory exists
+                # Auto-create pot factory if missing
                 if not PotFactory.objects.filter(account_id=factory_id).exists():
-                    return Response({
-                        "error": f"Pot factory {factory_id} not found in database. Sync the factory first."
-                    }, status=404)
+                    try:
+                        factory_config = fetch_from_rpc("get_config", contract_id=factory_id)
+                        if not factory_config:
+                            return Response({
+                                "error": f"Pot factory {factory_id} not found on chain."
+                            }, status=404)
+                        factory_owner, _ = Account.objects.get_or_create(id=factory_config.get("owner", factory_id))
+                        protocol_fee_recipient, _ = Account.objects.get_or_create(
+                            id=factory_config.get("protocol_fee_recipient_account", factory_config.get("owner", factory_id))
+                        )
+                        PotFactory.objects.create(
+                            account_id=factory_id,
+                            owner=factory_owner,
+                            deployed_at=datetime.now(tz=timezone.utc),
+                            protocol_fee_basis_points=factory_config.get("protocol_fee_basis_points", 0),
+                            protocol_fee_recipient=protocol_fee_recipient,
+                            require_whitelist=factory_config.get("require_whitelist", False),
+                        )
+                        logger.info(f"Auto-created PotFactory {factory_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to auto-create PotFactory {factory_id}: {e}")
+                        return Response({
+                            "error": f"Pot factory {factory_id} not found and auto-creation failed: {e}"
+                        }, status=404)
 
                 # Create new pot
                 pot = Pot.objects.create(
                     account_id=pot_id,
                     pot_factory_id=factory_id,
                     deployer=owner,
-                    deployed_at=datetime.now(),
+                    deployed_at=datetime.now(tz=timezone.utc),
                     source_metadata=config.get("source_metadata", {}),
                     owner=owner,
                     chef=chef,
@@ -549,10 +508,10 @@ class PotSyncAPI(APIView):
                     description=config.get("pot_description", ""),
                     max_approved_applicants=config.get("max_projects", 0),
                     base_currency=config.get("base_currency", "near"),
-                    application_start=datetime.fromtimestamp(config["application_start_ms"] / 1000),
-                    application_end=datetime.fromtimestamp(config["application_end_ms"] / 1000),
-                    matching_round_start=datetime.fromtimestamp(config["public_round_start_ms"] / 1000),
-                    matching_round_end=datetime.fromtimestamp(config["public_round_end_ms"] / 1000),
+                    application_start=datetime.fromtimestamp(config["application_start_ms"] / 1000, tz=timezone.utc),
+                    application_end=datetime.fromtimestamp(config["application_end_ms"] / 1000, tz=timezone.utc),
+                    matching_round_start=datetime.fromtimestamp(config["public_round_start_ms"] / 1000, tz=timezone.utc),
+                    matching_round_end=datetime.fromtimestamp(config["public_round_end_ms"] / 1000, tz=timezone.utc),
                     registry_provider=config.get("registry_provider"),
                     min_matching_pool_donation_amount=config.get("min_matching_pool_donation_amount", "0"),
                     sybil_wrapper_provider=config.get("sybil_wrapper_provider"),
@@ -668,7 +627,8 @@ class PotDonationsSyncAPI(APIView):
                     )
 
                 donated_at = datetime.fromtimestamp(
-                    (don.get("donated_at") or don.get("donated_at_ms", 0)) / 1000
+                    (don.get("donated_at") or don.get("donated_at_ms", 0)) / 1000,
+                    tz=timezone.utc,
                 )
 
                 Donation.objects.update_or_create(
@@ -741,8 +701,8 @@ class PotApplicationsSyncAPI(APIView):
                 # Upsert applicant account
                 applicant, _ = Account.objects.get_or_create(id=app["project_id"])
 
-                submitted_at = datetime.fromtimestamp(app["submitted_at"] / 1000)
-                updated_at = datetime.fromtimestamp(app["updated_at"] / 1000) if app.get("updated_at") else submitted_at
+                submitted_at = datetime.fromtimestamp(app["submitted_at"] / 1000, tz=timezone.utc)
+                updated_at = datetime.fromtimestamp(app["updated_at"] / 1000, tz=timezone.utc) if app.get("updated_at") else submitted_at
 
                 application, created = PotApplication.objects.update_or_create(
                     pot=pot,
@@ -834,7 +794,7 @@ class PotPayoutsSyncAPI(APIView):
 
             # Also update pot's cooldown_end and all_paid_out from config
             if config.get("cooldown_end_ms"):
-                pot.cooldown_end = datetime.fromtimestamp(config["cooldown_end_ms"] / 1000)
+                pot.cooldown_end = datetime.fromtimestamp(config["cooldown_end_ms"] / 1000, tz=timezone.utc)
             pot.all_paid_out = config.get("all_paid_out", False)
             pot.save()
 
@@ -846,17 +806,28 @@ class PotPayoutsSyncAPI(APIView):
                 # Parse paid_at if present
                 paid_at = None
                 if payout.get("paid_at"):
-                    paid_at = datetime.fromtimestamp(payout["paid_at"] / 1000)
+                    paid_at = datetime.fromtimestamp(payout["paid_at"] / 1000, tz=timezone.utc)
 
-                PotPayout.objects.update_or_create(
-                    pot=pot,
-                    recipient=recipient,
-                    defaults={
-                        "amount": payout["amount"],
-                        "token": near_token,
-                        "paid_at": paid_at,
-                    }
-                )
+                payout_defaults = {
+                    "amount": payout["amount"],
+                    "token": near_token,
+                    "paid_at": paid_at,
+                }
+
+                # Use on_chain_id as lookup if available, otherwise fall back to (pot, recipient)
+                if payout.get("id") is not None:
+                    payout_defaults["pot"] = pot
+                    payout_defaults["recipient"] = recipient
+                    PotPayout.objects.update_or_create(
+                        on_chain_id=payout["id"],
+                        defaults=payout_defaults,
+                    )
+                else:
+                    PotPayout.objects.update_or_create(
+                        pot=pot,
+                        recipient=recipient,
+                        defaults=payout_defaults,
+                    )
                 synced += 1
 
             return Response({
@@ -924,7 +895,7 @@ class PotPayoutChallengesSyncAPI(APIView):
             for c in all_challenges:
                 challenger, _ = Account.objects.get_or_create(id=c["challenger_id"])
 
-                created_at = datetime.fromtimestamp(c["created_at"] / 1000)
+                created_at = datetime.fromtimestamp(c["created_at"] / 1000, tz=timezone.utc)
 
                 challenge, _ = PotPayoutChallenge.objects.update_or_create(
                     pot=pot,
