@@ -1,9 +1,13 @@
-from django.db.models import Sum
-from django.http import JsonResponse
+from datetime import timedelta
+
+from django.db.models import Count, Sum
+from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import (
     OpenApiExample,
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
 )
@@ -15,7 +19,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from accounts.models import Account
 from donations.models import Donation
-from pots.models import PotPayout
+from pots.models import Pot, PotPayout
+
+try:
+    from campaigns.models import Campaign
+except ImportError:
+    Campaign = None
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -89,6 +98,169 @@ class StatsAPI(APIView):
                 "total_recipients_count": total_recipients_count,
             }
         )
+
+
+def _money(value) -> str:
+    return f"${(value or 0):,.2f}"
+
+
+def _aggregate_donations(qs):
+    agg = qs.aggregate(
+        volume=Sum("total_amount_usd"),
+        protocol_fees=Sum("protocol_fee_usd"),
+        referrer_fees=Sum("referrer_fee_usd"),
+        chef_fees=Sum("chef_fee_usd"),
+        count=Count("id"),
+        donors=Count("donor", distinct=True),
+        recipients=Count("recipient", distinct=True),
+    )
+    matching_pool_volume = (
+        qs.filter(matching_pool=True).aggregate(s=Sum("total_amount_usd"))["s"] or 0
+    )
+    direct_volume = (agg["volume"] or 0) - matching_pool_volume
+    return {
+        "volume": agg["volume"] or 0,
+        "direct_volume": direct_volume,
+        "matching_pool_volume": matching_pool_volume,
+        "protocol_fees": agg["protocol_fees"] or 0,
+        "referrer_fees": agg["referrer_fees"] or 0,
+        "chef_fees": agg["chef_fees"] or 0,
+        "count": agg["count"] or 0,
+        "donors": agg["donors"] or 0,
+        "recipients": agg["recipients"] or 0,
+    }
+
+
+def _payout_stats(qs):
+    paid = qs.filter(paid_at__isnull=False)
+    pending = qs.filter(paid_at__isnull=True)
+    return {
+        "paid_usd": paid.aggregate(s=Sum("amount_paid_usd"))["s"] or 0,
+        "paid_count": paid.count(),
+        "pending_count": pending.count(),
+    }
+
+
+def _campaign_stats(window_filter=None):
+    if Campaign is None:
+        return None
+    qs = Campaign.objects.all() if window_filter is None else Campaign.objects.filter(**window_filter)
+    return {
+        "count": qs.count(),
+        "raised_usd": qs.aggregate(s=Sum("total_raised_amount_usd"))["s"] or 0,
+    }
+
+
+def _build_daily_stats():
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+
+    donations_today = _aggregate_donations(Donation.objects.filter(donated_at__gte=today_start))
+    donations_7d = _aggregate_donations(Donation.objects.filter(donated_at__gte=seven_days_ago))
+    donations_all = _aggregate_donations(Donation.objects.all())
+
+    payouts_today = _payout_stats(PotPayout.objects.filter(paid_at__gte=today_start))
+    payouts_7d = _payout_stats(PotPayout.objects.filter(paid_at__gte=seven_days_ago))
+    payouts_all = _payout_stats(PotPayout.objects.all())
+
+    pots_today = Pot.objects.filter(deployed_at__gte=today_start).count()
+    pots_7d = Pot.objects.filter(deployed_at__gte=seven_days_ago).count()
+    pots_all = Pot.objects.count()
+
+    campaigns_today = _campaign_stats({"created_at__gte": today_start})
+    campaigns_7d = _campaign_stats({"created_at__gte": seven_days_ago})
+    campaigns_all = _campaign_stats()
+
+    return {
+        "date": now.strftime("%Y-%m-%d"),
+        "today": {
+            "donations": donations_today,
+            "payouts": payouts_today,
+            "new_pots": pots_today,
+            "campaigns": campaigns_today,
+        },
+        "last_7_days": {
+            "donations": donations_7d,
+            "payouts": payouts_7d,
+            "new_pots": pots_7d,
+            "campaigns": campaigns_7d,
+        },
+        "all_time": {
+            "donations": donations_all,
+            "payouts": payouts_all,
+            "pots": pots_all,
+            "campaigns": campaigns_all,
+        },
+    }
+
+
+def _format_window(label: str, window: dict, *, include_new_label: bool, all_time: bool = False) -> str:
+    d = window["donations"]
+    p = window["payouts"]
+    lines = [
+        label,
+        f"Volume: {_money(d['volume'])} (direct {_money(d['direct_volume'])} + matching {_money(d['matching_pool_volume'])})",
+        f"Fees: {_money(d['protocol_fees'] + d['referrer_fees'] + d['chef_fees'])}"
+        f" (protocol {_money(d['protocol_fees'])} + referrer {_money(d['referrer_fees'])} + chef {_money(d['chef_fees'])})",
+        f"Donations: {d['count']}",
+        f"Unique donors: {d['donors']}",
+        f"Unique recipients: {d['recipients']}",
+        f"Payouts: {_money(p['paid_usd'])} ({p['paid_count']})",
+        f"Pending payouts: {p['pending_count']}",
+    ]
+    pot_label = "Pots" if all_time else ("New pots" if include_new_label else "Pots")
+    if all_time:
+        lines.append(f"{pot_label}: {window['pots']}")
+    else:
+        lines.append(f"{pot_label}: {window['new_pots']}")
+
+    campaigns = window["campaigns"]
+    if campaigns is not None:
+        camp_label = "Campaigns" if all_time else ("New campaigns" if include_new_label else "Campaigns")
+        lines.append(f"{camp_label}: {campaigns['count']} (raised {_money(campaigns['raised_usd'])})")
+    return "\n".join(lines)
+
+
+def format_daily_stats_text(stats: dict) -> str:
+    divider = "-" * 20
+    parts = [
+        "POTLOCK metrics - Global",
+        f"Date: {stats['date']}",
+        divider,
+        _format_window("TODAY", stats["today"], include_new_label=True),
+        divider,
+        _format_window("LAST 7 DAYS", stats["last_7_days"], include_new_label=True),
+        divider,
+        _format_window("ALL-TIME", stats["all_time"], include_new_label=False, all_time=True),
+    ]
+    return "\n".join(parts)
+
+
+class DailyStatsAPI(APIView):
+    """Daily aggregated stats for POTLOCK. Default response is pre-formatted text
+    suitable for posting directly to Signal. Pass `?format=json` for raw numbers."""
+
+    @method_decorator(cache_page(60 * 5))
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="format",
+                description="`text` (default) or `json`",
+                required=False,
+                type=str,
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description="Daily stats (text/plain or application/json)"),
+            500: OpenApiResponse(description="Internal server error"),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs):
+        stats = _build_daily_stats()
+        if request.query_params.get("format", "text").lower() == "json":
+            return Response(stats)
+        return HttpResponse(format_daily_stats_text(stats), content_type="text/plain; charset=utf-8")
 
 
 class ReclaimProofRequestView(APIView):
