@@ -31,7 +31,7 @@ from api.sync import (
     PotPayoutsSyncAPI,
     PotPayoutChallengesSyncAPI,
 )
-from base.api import StatsAPI, ReclaimProofRequestView
+from base.api import DailyStatsAPI, StatsAPI, ReclaimProofRequestView
 from tax_verification.api import (
     OrgVerificationSubmitAPI,
     OrgVerificationDetailAPI,
@@ -162,6 +162,7 @@ urlpatterns = [
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),
+    path("v1/stats/daily", DailyStatsAPI.as_view(), name="daily_stats_api"),
     path("v1/reclaim/generate-request", ReclaimProofRequestView.as_view(), name="stats_api"),
 
     # grantpicks

@@ -1117,6 +1117,40 @@ def backfill_missing_data(force=False):
         jobs_logger.info(f"=== Backfill complete: {total} missing entries created. ===")
 
 
+@shared_task
+def post_daily_stats_to_signal():
+    """Build daily POTLOCK stats and POST them to signal-cli-rest-api.
+
+    Required env vars:
+        SIGNAL_API_URL          base URL of signal-cli-rest-api (e.g. http://localhost:8080)
+        SIGNAL_SENDER_NUMBER    registered Signal sender (E.164)
+        SIGNAL_RECIPIENT        group id or phone number to send to
+    """
+    import os
+
+    from base.api import _build_daily_stats, format_daily_stats_text
+
+    api_url = os.environ.get("SIGNAL_API_URL")
+    sender = os.environ.get("SIGNAL_SENDER_NUMBER")
+    recipient = os.environ.get("SIGNAL_RECIPIENT")
+
+    if not (api_url and sender and recipient):
+        jobs_logger.warning(
+            "post_daily_stats_to_signal skipped: missing one of "
+            "SIGNAL_API_URL / SIGNAL_SENDER_NUMBER / SIGNAL_RECIPIENT"
+        )
+        return
+
+    message = format_daily_stats_text(_build_daily_stats())
+    resp = requests.post(
+        f"{api_url.rstrip('/')}/v2/send",
+        json={"number": sender, "recipients": [recipient], "message": message},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    jobs_logger.info("Posted daily stats to Signal (%d chars).", len(message))
+
+
 @task_revoked.connect
 def on_task_revoked(request, terminated, signum, expired, **kwargs):
     logger.info(
