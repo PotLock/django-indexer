@@ -31,7 +31,7 @@ from api.sync import (
     PotPayoutsSyncAPI,
     PotPayoutChallengesSyncAPI,
 )
-from base.api import StatsAPI, CampaignStatsAPI, ReclaimProofRequestView
+from base.api import DailyStatsAPI, StatsAPI, CampaignStatsAPI, ReclaimProofRequestView
 from campaigns.api import (
     AllCampaignDonationsAPI,
     CampaignContractConfigAPI,
@@ -246,6 +246,7 @@ urlpatterns = [
     ),
     # stats
     path("v1/stats", StatsAPI.as_view(), name="stats_api"),
+    path("v1/stats/daily", DailyStatsAPI.as_view(), name="daily_stats_api"),
     path("v1/stats/campaigns", CampaignStatsAPI.as_view(), name="campaign_stats_api"),
     path("v1/reclaim/generate-request", ReclaimProofRequestView.as_view(), name="stats_api"),
 
