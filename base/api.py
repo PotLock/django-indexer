@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.db.models import Sum
 from django.http import JsonResponse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from drf_spectacular.utils import (
@@ -14,6 +17,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from accounts.models import Account
+from campaigns.models import Campaign
 from donations.models import Donation
 from pots.models import PotPayout
 
@@ -89,6 +93,47 @@ class StatsAPI(APIView):
                 "total_recipients_count": total_recipients_count,
             }
         )
+
+
+def _campaign_window_stats(window_filter=None):
+    qs = Campaign.objects.all() if window_filter is None else Campaign.objects.filter(**window_filter)
+    return {
+        "count": qs.count(),
+        "raised_usd": float(qs.aggregate(s=Sum("total_raised_amount_usd"))["s"] or 0),
+    }
+
+
+def _build_campaign_stats():
+    """Campaign aggregates for today / last 7 days / all-time.
+
+    Windows are based on `Campaign.created_at`; `raised_usd` sums each campaign's
+    `total_raised_amount_usd`. Consumed by the prod deployment's daily Signal
+    message (prod has no campaigns app, so it pulls this over HTTP)."""
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+    return {
+        "today": _campaign_window_stats({"created_at__gte": today_start}),
+        "last_7_days": _campaign_window_stats({"created_at__gte": seven_days_ago}),
+        "all_time": _campaign_window_stats(),
+    }
+
+
+class CampaignStatsAPI(APIView):
+    """Campaign aggregates (count + raised USD) for today / last 7 days / all-time.
+
+    Used by the prod deployment to merge campaign data into its daily stats
+    message, since the campaigns app only lives on this (dev) deployment."""
+
+    @method_decorator(cache_page(60 * 5))
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Campaign stats per window"),
+            500: OpenApiResponse(description="Internal server error"),
+        }
+    )
+    def get(self, request: Request, *args, **kwargs):
+        return Response(_build_campaign_stats())
 
 
 class ReclaimProofRequestView(APIView):
