@@ -263,6 +263,37 @@ class DailyStatsAPI(APIView):
         return HttpResponse(format_daily_stats_text(stats), content_type="text/plain; charset=utf-8")
 
 
+def _build_campaign_stats():
+    """Campaign aggregates (count + raised USD) for today / last 7 days / all-time.
+
+    Consumed by the prod deployment's daily Signal message: prod has no campaigns
+    app, so it pulls this over HTTP and merges it into the same message."""
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+    return {
+        "today": _campaign_stats({"created_at__gte": today_start}),
+        "last_7_days": _campaign_stats({"created_at__gte": seven_days_ago}),
+        "all_time": _campaign_stats(),
+    }
+
+
+class CampaignStatsAPI(APIView):
+    """Campaign aggregates (count + raised USD) per window. Used by the prod
+    deployment to merge campaign data into its daily stats message, since the
+    campaigns app only lives on this (dev) deployment."""
+
+    @method_decorator(cache_page(60 * 5))
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Campaign stats per window"),
+            500: OpenApiResponse(description="Internal server error"),
+        }
+    )
+    def get(self, request: Request, *args, **kwargs):
+        return Response(_build_campaign_stats())
+
+
 class ReclaimProofRequestView(APIView):
 
     @extend_schema(
