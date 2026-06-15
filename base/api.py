@@ -1,5 +1,8 @@
+import logging
+import os
 from datetime import timedelta
 
+import requests
 from django.db.models import Count, Sum
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -21,10 +24,7 @@ from accounts.models import Account
 from donations.models import Donation
 from pots.models import Pot, PotPayout
 
-try:
-    from campaigns.models import Campaign
-except ImportError:
-    Campaign = None
+logger = logging.getLogger("jobs")
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -141,14 +141,26 @@ def _payout_stats(qs):
     }
 
 
-def _campaign_stats(window_filter=None):
-    if Campaign is None:
+def _fetch_campaign_stats_from_dev():
+    """Fetch campaign stats from the dev deployment (which has the campaigns app
+    installed and indexes campaign data with USD computed).
+
+    The prod deployment does not have the campaigns app, so campaign data is
+    pulled over HTTP from `DEV_CAMPAIGN_STATS_URL` and merged into the same
+    daily-stats message. Returns a dict with `today`/`last_7_days`/`all_time`
+    keys (each `{"count", "raised_usd"}`), or `None` if the URL is unset or the
+    request fails — in which case the message simply omits campaign lines.
+    """
+    url = os.environ.get("DEV_CAMPAIGN_STATS_URL")
+    if not url:
         return None
-    qs = Campaign.objects.all() if window_filter is None else Campaign.objects.filter(**window_filter)
-    return {
-        "count": qs.count(),
-        "raised_usd": qs.aggregate(s=Sum("total_raised_amount_usd"))["s"] or 0,
-    }
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.warning("Failed to fetch campaign stats from dev (%s): %s", url, e)
+        return None
 
 
 def _build_daily_stats():
@@ -168,9 +180,10 @@ def _build_daily_stats():
     pots_7d = Pot.objects.filter(deployed_at__gte=seven_days_ago).count()
     pots_all = Pot.objects.count()
 
-    campaigns_today = _campaign_stats({"created_at__gte": today_start})
-    campaigns_7d = _campaign_stats({"created_at__gte": seven_days_ago})
-    campaigns_all = _campaign_stats()
+    campaign_stats = _fetch_campaign_stats_from_dev() or {}
+    campaigns_today = campaign_stats.get("today")
+    campaigns_7d = campaign_stats.get("last_7_days")
+    campaigns_all = campaign_stats.get("all_time")
 
     return {
         "date": now.strftime("%Y-%m-%d"),

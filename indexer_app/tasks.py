@@ -1125,6 +1125,13 @@ def post_daily_stats_to_signal():
         SIGNAL_API_URL          base URL of signal-cli-rest-api (e.g. http://localhost:8080)
         SIGNAL_SENDER_NUMBER    registered Signal sender (E.164)
         SIGNAL_RECIPIENT        group id or phone number to send to
+
+    Optional env vars:
+        DEV_CAMPAIGN_STATS_URL  URL of the dev deployment's campaign-stats endpoint
+                                (e.g. https://dev.potlock.io/api/v1/stats/campaigns).
+                                Prod has no campaigns app, so campaign data is merged
+                                into this message from dev. If unset/unreachable, the
+                                message is sent without campaign lines.
     """
     import os
 

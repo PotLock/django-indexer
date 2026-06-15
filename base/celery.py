@@ -62,7 +62,7 @@ app.conf.beat_schedule = {
     },
     "post_daily_stats_to_signal": {
         "task": "indexer_app.tasks.post_daily_stats_to_signal",
-        "schedule": crontab(hour="12", minute="0"),  # Daily at 12:00 UTC
+        "schedule": crontab(hour="7", minute="0"),  # Daily at 07:00 UTC
         "options": {"queue": "beat_tasks"},
     },
 }
