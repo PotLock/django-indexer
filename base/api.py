@@ -263,18 +263,46 @@ class DailyStatsAPI(APIView):
         return HttpResponse(format_daily_stats_text(stats), content_type="text/plain; charset=utf-8")
 
 
+def _campaign_raised_usd(campaign):
+    """USD raised for a single campaign. Uses the stored value if present,
+    otherwise converts the raw on-chain amount using the token's historical
+    price at the campaign's creation date (cached in TokenHistoricalPrice)."""
+    if campaign.total_raised_amount_usd is not None:
+        return campaign.total_raised_amount_usd
+    token = campaign.token
+    if not token or not campaign.total_raised_amount:
+        return 0
+    try:
+        price_usd = token.fetch_usd_prices_common(campaign.created_at)
+        if not price_usd:
+            return 0
+        return token.format_price(campaign.total_raised_amount) * price_usd
+    except Exception:
+        return 0
+
+
+def _campaign_window_stats(window_filter=None):
+    qs = Campaign.objects.all() if window_filter is None else Campaign.objects.filter(**window_filter)
+    qs = qs.select_related("token", "token__account")
+    return {
+        "count": qs.count(),
+        "raised_usd": float(sum(_campaign_raised_usd(c) for c in qs)),
+    }
+
+
 def _build_campaign_stats():
     """Campaign aggregates (count + raised USD) for today / last 7 days / all-time.
 
     Consumed by the prod deployment's daily Signal message: prod has no campaigns
-    app, so it pulls this over HTTP and merges it into the same message."""
+    app, so it pulls this over HTTP and merges it into the same message. USD is
+    computed on the fly (the periodic price task is disabled on this deployment)."""
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     seven_days_ago = now - timedelta(days=7)
     return {
-        "today": _campaign_stats({"created_at__gte": today_start}),
-        "last_7_days": _campaign_stats({"created_at__gte": seven_days_ago}),
-        "all_time": _campaign_stats(),
+        "today": _campaign_window_stats({"created_at__gte": today_start}),
+        "last_7_days": _campaign_window_stats({"created_at__gte": seven_days_ago}),
+        "all_time": _campaign_window_stats(),
     }
 
 
