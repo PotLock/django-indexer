@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.db.models import Count, Sum
 from django.http import HttpResponse, JsonResponse
@@ -20,6 +21,7 @@ from rest_framework.views import APIView
 from accounts.models import Account
 from donations.models import Donation
 from pots.models import Pot, PotPayout
+from tokens.models import Token
 
 try:
     from campaigns.models import Campaign, CampaignDonation
@@ -282,6 +284,19 @@ def _campaign_raised_usd(campaign):
         return 0
 
 
+def _near_usd_price():
+    """Current NEAR/USD price (approx) via the 'near' Token, mirroring the
+    frontend's CoinGecko conversion. Returns 0.0 if unavailable."""
+    token = Token.objects.filter(account_id="near").first()
+    if not token:
+        return 0.0
+    try:
+        price = token.fetch_usd_prices_common(timezone.now())
+        return float(price) if price else 0.0
+    except Exception:
+        return 0.0
+
+
 def _campaign_window_stats(start=None):
     """Per-window campaign aggregates: new campaigns (count + raised USD) plus the
     donations made into campaigns (count + USD, windowed by donated_at). `start`
@@ -296,11 +311,23 @@ def _campaign_window_stats(start=None):
     )
     donations = dqs.aggregate(usd=Sum("total_amount_usd"), count=Count("id"))
 
+    # Raw NEAR donated to campaigns. NEAR donations have a null token and no USD
+    # computed, so report the on-chain amount (yoctoNEAR, 24 decimals) as NEAR.
+    near_yocto = sum(
+        int(a) for a in dqs.filter(token__isnull=True).values_list("total_amount", flat=True) if a
+    )
+    donation_near = float(Decimal(near_yocto) / Decimal(10**24))
+    # Approx USD for the NEAR amount using the current NEAR price (like the
+    # frontend's live CoinGecko conversion), since these donations have no stored USD.
+    donation_near_usd = round(donation_near * _near_usd_price(), 2) if donation_near else 0.0
+
     return {
         "count": cqs.count(),
         "raised_usd": float(sum(_campaign_raised_usd(c) for c in cqs)),
         "donation_count": donations["count"] or 0,
         "donation_usd": float(donations["usd"] or 0),
+        "donation_near": donation_near,
+        "donation_near_usd": donation_near_usd,
     }
 
 
