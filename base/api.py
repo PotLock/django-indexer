@@ -22,9 +22,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from accounts.models import Account
 from donations.models import Donation
+from lists.models import List, ListRegistration
 from pots.models import Pot, PotPayout
 
 logger = logging.getLogger("jobs")
+
+# A "project" on POTLOCK is an approved registrant on the Public Goods Registry
+# list (PUBLIC_GOODS_REGISTRY_LIST_ID = 1 on the frontend). The homepage project
+# discovery defaults to this list + "Approved" status.
+REGISTRY_LIST_ON_CHAIN_ID = 1
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -104,31 +110,20 @@ def _money(value) -> str:
     return f"${(value or 0):,.2f}"
 
 
-def _aggregate_donations(qs):
-    agg = qs.aggregate(
-        volume=Sum("total_amount_usd"),
-        protocol_fees=Sum("protocol_fee_usd"),
-        referrer_fees=Sum("referrer_fee_usd"),
-        chef_fees=Sum("chef_fee_usd"),
-        count=Count("id"),
-        donors=Count("donor", distinct=True),
-        recipients=Count("recipient", distinct=True),
+def _sum_usd_count(qs):
+    """(count, total USD) for a donation-like queryset with a total_amount_usd field."""
+    agg = qs.aggregate(usd=Sum("total_amount_usd"), count=Count("id"))
+    return agg["count"] or 0, float(agg["usd"] or 0)
+
+
+def _registry_registrations(start=None):
+    """Approved registrants on the Public Goods Registry list = POTLOCK 'projects'."""
+    qs = ListRegistration.objects.filter(
+        list__on_chain_id=REGISTRY_LIST_ON_CHAIN_ID, status="Approved"
     )
-    matching_pool_volume = (
-        qs.filter(matching_pool=True).aggregate(s=Sum("total_amount_usd"))["s"] or 0
-    )
-    direct_volume = (agg["volume"] or 0) - matching_pool_volume
-    return {
-        "volume": agg["volume"] or 0,
-        "direct_volume": direct_volume,
-        "matching_pool_volume": matching_pool_volume,
-        "protocol_fees": agg["protocol_fees"] or 0,
-        "referrer_fees": agg["referrer_fees"] or 0,
-        "chef_fees": agg["chef_fees"] or 0,
-        "count": agg["count"] or 0,
-        "donors": agg["donors"] or 0,
-        "recipients": agg["recipients"] or 0,
-    }
+    if start is not None:
+        qs = qs.filter(submitted_at__gte=start)
+    return qs
 
 
 def _payout_stats(qs):
@@ -163,75 +158,112 @@ def _fetch_campaign_stats_from_dev():
         return None
 
 
+def _window_stats(start, campaign_window):
+    """Build one window (start=None means all-time). `campaign_window` is the
+    matching slice of the dev campaign-stats payload (or None when unavailable)."""
+    dqs = Donation.objects.all() if start is None else Donation.objects.filter(donated_at__gte=start)
+    direct_count, direct_usd = _sum_usd_count(dqs.filter(pot__isnull=True))
+    pot_count, pot_usd = _sum_usd_count(dqs.filter(pot__isnull=False))
+
+    if campaign_window is not None:
+        camp_don_count = campaign_window.get("donation_count", 0)
+        camp_don_usd = campaign_window.get("donation_usd", 0) or 0
+        new_campaigns = campaign_window.get("count")
+    else:
+        camp_don_count, camp_don_usd, new_campaigns = 0, 0, None
+
+    people = dqs.aggregate(
+        donors=Count("donor", distinct=True),
+        recipients=Count("recipient", distinct=True),
+    )
+    fees = dqs.aggregate(
+        protocol=Sum("protocol_fee_usd"),
+        referrer=Sum("referrer_fee_usd"),
+        chef=Sum("chef_fee_usd"),
+    )
+
+    payout_qs = PotPayout.objects.all() if start is None else PotPayout.objects.filter(paid_at__gte=start)
+    pots = (Pot.objects.all() if start is None else Pot.objects.filter(deployed_at__gte=start)).count()
+    lists = (List.objects.all() if start is None else List.objects.filter(created_at__gte=start)).count()
+
+    return {
+        "donations": {
+            "count": direct_count + pot_count + camp_don_count,
+            "usd": direct_usd + pot_usd + camp_don_usd,
+            "direct_count": direct_count,
+            "direct_usd": direct_usd,
+            "pot_count": pot_count,
+            "pot_usd": pot_usd,
+            "campaign_count": camp_don_count,
+            "campaign_usd": camp_don_usd,
+            "has_campaigns": campaign_window is not None,
+        },
+        "donors": people["donors"] or 0,
+        "recipients": people["recipients"] or 0,
+        "fees": {
+            "protocol": fees["protocol"] or 0,
+            "referrer": fees["referrer"] or 0,
+            "chef": fees["chef"] or 0,
+        },
+        "payouts": _payout_stats(payout_qs),
+        "projects": _registry_registrations(start).count(),
+        "pots": pots,
+        "lists": lists,
+        "campaigns": new_campaigns,
+    }
+
+
 def _build_daily_stats():
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     seven_days_ago = now - timedelta(days=7)
 
-    donations_today = _aggregate_donations(Donation.objects.filter(donated_at__gte=today_start))
-    donations_7d = _aggregate_donations(Donation.objects.filter(donated_at__gte=seven_days_ago))
-    donations_all = _aggregate_donations(Donation.objects.all())
-
-    payouts_today = _payout_stats(PotPayout.objects.filter(paid_at__gte=today_start))
-    payouts_7d = _payout_stats(PotPayout.objects.filter(paid_at__gte=seven_days_ago))
-    payouts_all = _payout_stats(PotPayout.objects.all())
-
-    pots_today = Pot.objects.filter(deployed_at__gte=today_start).count()
-    pots_7d = Pot.objects.filter(deployed_at__gte=seven_days_ago).count()
-    pots_all = Pot.objects.count()
-
     campaign_stats = _fetch_campaign_stats_from_dev() or {}
-    campaigns_today = campaign_stats.get("today")
-    campaigns_7d = campaign_stats.get("last_7_days")
-    campaigns_all = campaign_stats.get("all_time")
 
     return {
         "date": now.strftime("%Y-%m-%d"),
-        "today": {
-            "donations": donations_today,
-            "payouts": payouts_today,
-            "new_pots": pots_today,
-            "campaigns": campaigns_today,
-        },
-        "last_7_days": {
-            "donations": donations_7d,
-            "payouts": payouts_7d,
-            "new_pots": pots_7d,
-            "campaigns": campaigns_7d,
-        },
-        "all_time": {
-            "donations": donations_all,
-            "payouts": payouts_all,
-            "pots": pots_all,
-            "campaigns": campaigns_all,
-        },
+        "today": _window_stats(today_start, campaign_stats.get("today")),
+        "last_7_days": _window_stats(seven_days_ago, campaign_stats.get("last_7_days")),
+        "all_time": _window_stats(None, campaign_stats.get("all_time")),
+        "signups_total": Account.objects.count(),
     }
 
 
-def _format_window(label: str, window: dict, *, include_new_label: bool, all_time: bool = False) -> str:
+def _format_window(label: str, window: dict, *, all_time: bool = False) -> str:
     d = window["donations"]
-    p = window["payouts"]
+    f = window["fees"]
+    fees_total = f["protocol"] + f["referrer"] + f["chef"]
+
     lines = [
         label,
-        f"Volume: {_money(d['volume'])} (direct {_money(d['direct_volume'])} + matching {_money(d['matching_pool_volume'])})",
-        f"Fees: {_money(d['protocol_fees'] + d['referrer_fees'] + d['chef_fees'])}"
-        f" (protocol {_money(d['protocol_fees'])} + referrer {_money(d['referrer_fees'])} + chef {_money(d['chef_fees'])})",
-        f"Donations: {d['count']}",
-        f"Unique donors: {d['donors']}",
-        f"Unique recipients: {d['recipients']}",
-        f"Payouts: {_money(p['paid_usd'])} ({p['paid_count']})",
-        f"Pending payouts: {p['pending_count']}",
+        f"Donations: {d['count']} ({_money(d['usd'])})",
+        f"  - direct: {d['direct_count']} ({_money(d['direct_usd'])})",
+        f"  - pots (matching): {d['pot_count']} ({_money(d['pot_usd'])})",
     ]
-    pot_label = "Pots" if all_time else ("New pots" if include_new_label else "Pots")
-    if all_time:
-        lines.append(f"{pot_label}: {window['pots']}")
-    else:
-        lines.append(f"{pot_label}: {window['new_pots']}")
+    if d["has_campaigns"]:
+        lines.append(f"  - campaigns: {d['campaign_count']} ({_money(d['campaign_usd'])})")
 
-    campaigns = window["campaigns"]
-    if campaigns is not None:
-        camp_label = "Campaigns" if all_time else ("New campaigns" if include_new_label else "Campaigns")
-        lines.append(f"{camp_label}: {campaigns['count']} (raised {_money(campaigns['raised_usd'])})")
+    lines.append(f"Donors: {window['donors']}")
+    lines.append(f"Recipients: {window['recipients']}")
+    lines.append(
+        f"Fees: {_money(fees_total)} (protocol {_money(f['protocol'])}"
+        f" + referrer {_money(f['referrer'])} + chef {_money(f['chef'])})"
+    )
+
+    p = window["payouts"]
+    lines.append(f"Payouts: {_money(p['paid_usd'])} ({p['paid_count']})")
+    lines.append(f"Pending payouts: {p['pending_count']}")
+
+    proj_label = "Projects" if all_time else "New projects"
+    pot_label = "Pots" if all_time else "New pots"
+    camp_label = "Campaigns" if all_time else "New campaigns"
+    list_label = "Lists" if all_time else "New lists"
+
+    lines.append(f"{proj_label}: {window['projects']}")
+    lines.append(f"{pot_label}: {window['pots']}")
+    if window["campaigns"] is not None:
+        lines.append(f"{camp_label}: {window['campaigns']}")
+    lines.append(f"{list_label}: {window['lists']}")
     return "\n".join(lines)
 
 
@@ -241,11 +273,12 @@ def format_daily_stats_text(stats: dict) -> str:
         "POTLOCK metrics - Global",
         f"Date: {stats['date']}",
         divider,
-        _format_window("TODAY", stats["today"], include_new_label=True),
+        _format_window("TODAY", stats["today"]),
         divider,
-        _format_window("LAST 7 DAYS", stats["last_7_days"], include_new_label=True),
+        _format_window("LAST 7 DAYS", stats["last_7_days"]),
         divider,
-        _format_window("ALL-TIME", stats["all_time"], include_new_label=False, all_time=True),
+        _format_window("ALL-TIME", stats["all_time"], all_time=True),
+        f"Signups (total accounts): {stats['signups_total']:,}",
     ]
     return "\n".join(parts)
 
