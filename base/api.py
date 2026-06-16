@@ -288,13 +288,16 @@ def _campaign_raised_usd(campaign):
 
 
 def _near_usd_price():
-    """Current NEAR/USD price via CoinGecko's live simple-price endpoint, the same
-    source the frontend uses. Returns 0.0 if unavailable."""
+    """Current NEAR/USD price via CoinGecko's public live simple-price endpoint,
+    the same source the frontend uses. No API key: the configured key is a pro key
+    that returns 401 here, and this is only called a few times a day. Returns 0.0
+    if unavailable."""
     try:
-        url = f"{settings.COINGECKO_URL}/simple/price?ids=near&vs_currencies=usd"
-        if settings.COINGECKO_API_KEY:
-            url += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "near", "vs_currencies": "usd"},
+            timeout=10,
+        )
         resp.raise_for_status()
         return float(resp.json().get("near", {}).get("usd") or 0.0)
     except Exception as e:
