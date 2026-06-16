@@ -22,9 +22,10 @@ from donations.models import Donation
 from pots.models import Pot, PotPayout
 
 try:
-    from campaigns.models import Campaign
+    from campaigns.models import Campaign, CampaignDonation
 except ImportError:
     Campaign = None
+    CampaignDonation = None
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -281,17 +282,31 @@ def _campaign_raised_usd(campaign):
         return 0
 
 
-def _campaign_window_stats(window_filter=None):
-    qs = Campaign.objects.all() if window_filter is None else Campaign.objects.filter(**window_filter)
-    qs = qs.select_related("token", "token__account")
+def _campaign_window_stats(start=None):
+    """Per-window campaign aggregates: new campaigns (count + raised USD) plus the
+    donations made into campaigns (count + USD, windowed by donated_at). `start`
+    is a datetime, or None for all-time."""
+    cqs = Campaign.objects.all() if start is None else Campaign.objects.filter(created_at__gte=start)
+    cqs = cqs.select_related("token", "token__account")
+
+    dqs = (
+        CampaignDonation.objects.all()
+        if start is None
+        else CampaignDonation.objects.filter(donated_at__gte=start)
+    )
+    donations = dqs.aggregate(usd=Sum("total_amount_usd"), count=Count("id"))
+
     return {
-        "count": qs.count(),
-        "raised_usd": float(sum(_campaign_raised_usd(c) for c in qs)),
+        "count": cqs.count(),
+        "raised_usd": float(sum(_campaign_raised_usd(c) for c in cqs)),
+        "donation_count": donations["count"] or 0,
+        "donation_usd": float(donations["usd"] or 0),
     }
 
 
 def _build_campaign_stats():
-    """Campaign aggregates (count + raised USD) for today / last 7 days / all-time.
+    """Campaign aggregates for today / last 7 days / all-time: new-campaign count +
+    raised USD, plus donation count + USD into campaigns.
 
     Consumed by the prod deployment's daily Signal message: prod has no campaigns
     app, so it pulls this over HTTP and merges it into the same message. USD is
@@ -300,8 +315,8 @@ def _build_campaign_stats():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     seven_days_ago = now - timedelta(days=7)
     return {
-        "today": _campaign_window_stats({"created_at__gte": today_start}),
-        "last_7_days": _campaign_window_stats({"created_at__gte": seven_days_ago}),
+        "today": _campaign_window_stats(today_start),
+        "last_7_days": _campaign_window_stats(seven_days_ago),
         "all_time": _campaign_window_stats(),
     }
 
