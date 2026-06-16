@@ -167,10 +167,14 @@ def _window_stats(start, campaign_window):
 
     if campaign_window is not None:
         camp_don_count = campaign_window.get("donation_count", 0)
-        camp_don_usd = campaign_window.get("donation_usd", 0) or 0
+        camp_near = campaign_window.get("donation_near", 0) or 0
+        # stored USD (priced/FT donations) + approx USD of the NEAR portion
+        camp_don_usd = (campaign_window.get("donation_usd", 0) or 0) + (
+            campaign_window.get("donation_near_usd", 0) or 0
+        )
         new_campaigns = campaign_window.get("count")
     else:
-        camp_don_count, camp_don_usd, new_campaigns = 0, 0, None
+        camp_don_count, camp_near, camp_don_usd, new_campaigns = 0, 0, 0, None
 
     people = dqs.aggregate(
         donors=Count("donor", distinct=True),
@@ -196,6 +200,7 @@ def _window_stats(start, campaign_window):
             "pot_usd": pot_usd,
             "campaign_count": camp_don_count,
             "campaign_usd": camp_don_usd,
+            "campaign_near": camp_near,
             "has_campaigns": campaign_window is not None,
         },
         "donors": people["donors"] or 0,
@@ -241,7 +246,9 @@ def _format_window(label: str, window: dict, *, all_time: bool = False) -> str:
         f"  - pots (matching): {d['pot_count']} ({_money(d['pot_usd'])})",
     ]
     if d["has_campaigns"]:
-        lines.append(f"  - campaigns: {d['campaign_count']} ({_money(d['campaign_usd'])})")
+        lines.append(
+            f"  - campaigns: {d['campaign_count']} ({d['campaign_near']:,.2f} NEAR / ~{_money(d['campaign_usd'])})"
+        )
 
     lines.append(f"Donors: {window['donors']}")
     lines.append(f"Recipients: {window['recipients']}")
