@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -309,23 +309,25 @@ def _campaign_window_stats(start=None):
         if start is None
         else CampaignDonation.objects.filter(donated_at__gte=start)
     )
-    donations = dqs.aggregate(usd=Sum("total_amount_usd"), count=Count("id"))
-
-    # Raw NEAR donated to campaigns. NEAR donations have a null token and no USD
-    # computed, so report the on-chain amount (yoctoNEAR, 24 decimals) as NEAR.
+    # NEAR donations use the native "near" Token (or null) and have no USD
+    # computed, so report the on-chain amount (yoctoNEAR, 24 decimals) as NEAR
+    # plus an approx USD using the current NEAR price (like the frontend).
+    near_filter = Q(token__isnull=True) | Q(token__account_id="near")
     near_yocto = sum(
-        int(a) for a in dqs.filter(token__isnull=True).values_list("total_amount", flat=True) if a
+        int(a) for a in dqs.filter(near_filter).values_list("total_amount", flat=True) if a
     )
     donation_near = float(Decimal(near_yocto) / Decimal(10**24))
-    # Approx USD for the NEAR amount using the current NEAR price (like the
-    # frontend's live CoinGecko conversion), since these donations have no stored USD.
     donation_near_usd = round(donation_near * _near_usd_price(), 2) if donation_near else 0.0
+
+    # Stored USD for non-NEAR (FT) donations only, so it doesn't double-count the
+    # NEAR amount already reported above as an approx USD.
+    ft_usd = dqs.exclude(near_filter).aggregate(s=Sum("total_amount_usd"))["s"] or 0
 
     return {
         "count": cqs.count(),
         "raised_usd": float(sum(_campaign_raised_usd(c) for c in cqs)),
-        "donation_count": donations["count"] or 0,
-        "donation_usd": float(donations["usd"] or 0),
+        "donation_count": dqs.count(),
+        "donation_usd": float(ft_usd),
         "donation_near": donation_near,
         "donation_near_usd": donation_near_usd,
     }
