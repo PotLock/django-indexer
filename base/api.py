@@ -1,6 +1,8 @@
+import logging
 from datetime import timedelta
 from decimal import Decimal
 
+import requests
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -21,13 +23,14 @@ from rest_framework.views import APIView
 from accounts.models import Account
 from donations.models import Donation
 from pots.models import Pot, PotPayout
-from tokens.models import Token
 
 try:
     from campaigns.models import Campaign, CampaignDonation
 except ImportError:
     Campaign = None
     CampaignDonation = None
+
+logger = logging.getLogger("jobs")
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -285,19 +288,21 @@ def _campaign_raised_usd(campaign):
 
 
 def _near_usd_price():
-    """Current NEAR/USD price (approx) via the 'near' Token, mirroring the
-    frontend's CoinGecko conversion. Returns 0.0 if unavailable."""
-    token = Token.objects.filter(account_id="near").first()
-    if not token:
-        return 0.0
+    """Current NEAR/USD price via CoinGecko's live simple-price endpoint, the same
+    source the frontend uses. Returns 0.0 if unavailable."""
     try:
-        price = token.fetch_usd_prices_common(timezone.now())
-        return float(price) if price else 0.0
-    except Exception:
+        url = f"{settings.COINGECKO_URL}/simple/price?ids=near&vs_currencies=usd"
+        if settings.COINGECKO_API_KEY:
+            url += f"&x_cg_pro_api_key={settings.COINGECKO_API_KEY}"
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return float(resp.json().get("near", {}).get("usd") or 0.0)
+    except Exception as e:
+        logger.warning("Failed to fetch NEAR price from CoinGecko: %s", e)
         return 0.0
 
 
-def _campaign_window_stats(start=None):
+def _campaign_window_stats(start=None, near_price=0.0):
     """Per-window campaign aggregates: new campaigns (count + raised USD) plus the
     donations made into campaigns (count + USD, windowed by donated_at). `start`
     is a datetime, or None for all-time."""
@@ -317,7 +322,7 @@ def _campaign_window_stats(start=None):
         int(a) for a in dqs.filter(near_filter).values_list("total_amount", flat=True) if a
     )
     donation_near = float(Decimal(near_yocto) / Decimal(10**24))
-    donation_near_usd = round(donation_near * _near_usd_price(), 2) if donation_near else 0.0
+    donation_near_usd = round(donation_near * near_price, 2) if donation_near else 0.0
 
     # Stored USD for non-NEAR (FT) donations only, so it doesn't double-count the
     # NEAR amount already reported above as an approx USD.
@@ -343,10 +348,11 @@ def _build_campaign_stats():
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     seven_days_ago = now - timedelta(days=7)
+    near_price = _near_usd_price()
     return {
-        "today": _campaign_window_stats(today_start),
-        "last_7_days": _campaign_window_stats(seven_days_ago),
-        "all_time": _campaign_window_stats(),
+        "today": _campaign_window_stats(today_start, near_price),
+        "last_7_days": _campaign_window_stats(seven_days_ago, near_price),
+        "all_time": _campaign_window_stats(None, near_price),
     }
 
 
