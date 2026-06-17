@@ -1158,6 +1158,48 @@ def post_daily_stats_to_signal():
     jobs_logger.info("Posted daily stats to Signal (%d chars).", len(message))
 
 
+@shared_task
+def post_ummah_stats_to_signal():
+    """Fetch ummah.build daily metrics (secret-gated HTTP endpoint) and POST them
+    to the Ummah build Daily Metrics Signal group. Runs on the same box/schedule as
+    post_daily_stats_to_signal and reuses the same signal-cli sender.
+
+    Required env vars:
+        SIGNAL_API_URL          base URL of signal-cli-rest-api
+        SIGNAL_SENDER_NUMBER    registered Signal sender (E.164)
+        UMMAH_STATS_URL         ummah.build stats endpoint (e.g. https://ummah.build/api/daily-stats)
+        UMMAH_STATS_SECRET      secret sent as the `x-stats-secret` header
+        UMMAH_SIGNAL_RECIPIENT  group id (or phone number) of the Ummah metrics group
+    """
+    import os
+
+    api_url = os.environ.get("SIGNAL_API_URL")
+    sender = os.environ.get("SIGNAL_SENDER_NUMBER")
+    recipient = os.environ.get("UMMAH_SIGNAL_RECIPIENT")
+    stats_url = os.environ.get("UMMAH_STATS_URL")
+    secret = os.environ.get("UMMAH_STATS_SECRET")
+
+    if not (api_url and sender and recipient and stats_url and secret):
+        jobs_logger.warning(
+            "post_ummah_stats_to_signal skipped: missing one of "
+            "SIGNAL_API_URL / SIGNAL_SENDER_NUMBER / UMMAH_SIGNAL_RECIPIENT / "
+            "UMMAH_STATS_URL / UMMAH_STATS_SECRET"
+        )
+        return
+
+    stats_resp = requests.get(stats_url, headers={"x-stats-secret": secret}, timeout=30)
+    stats_resp.raise_for_status()
+    message = stats_resp.text
+
+    resp = requests.post(
+        f"{api_url.rstrip('/')}/v2/send",
+        json={"number": sender, "recipients": [recipient], "message": message},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    jobs_logger.info("Posted Ummah stats to Signal (%d chars).", len(message))
+
+
 @task_revoked.connect
 def on_task_revoked(request, terminated, signum, expired, **kwargs):
     logger.info(
