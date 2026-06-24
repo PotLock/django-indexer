@@ -142,11 +142,14 @@ def _fetch_campaign_stats_from_dev():
 
     The prod deployment does not have the campaigns app, so campaign data is
     pulled over HTTP from `DEV_CAMPAIGN_STATS_URL` and merged into the same
-    daily-stats message. Returns a dict with `today`/`last_7_days`/`all_time`
-    keys (each `{"count", "raised_usd"}`), or `None` if the URL is unset or the
-    request fails — in which case the message simply omits campaign lines.
+    daily-stats message. The env var is optional: it falls back to the canonical
+    dev endpoint so a dropped/missing var can't silently strip campaign lines
+    from the message. Returns a dict with `today`/`last_7_days`/`all_time` keys,
+    or `None` if the request fails — in which case the message omits campaigns.
     """
-    url = os.environ.get("DEV_CAMPAIGN_STATS_URL")
+    url = os.environ.get(
+        "DEV_CAMPAIGN_STATS_URL", "https://dev.potlock.io/api/v1/stats/campaigns"
+    )
     if not url:
         return None
     try:
