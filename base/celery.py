@@ -70,6 +70,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour="7", minute="0"),  # Daily at 07:00 UTC (same as potlock)
         "options": {"queue": "beat_tasks"},
     },
+    "post_shariacheck_stats_to_signal": {
+        "task": "indexer_app.tasks.post_shariacheck_stats_to_signal",
+        "schedule": crontab(hour="7", minute="0"),  # Daily at 07:00 UTC
+        "options": {"queue": "beat_tasks"},
+    },
 }
 
 app.conf.task_routes = {
@@ -82,6 +87,7 @@ app.conf.task_routes = {
     "indexer_app.tasks.backfill_missing_data": {"queue": "beat_tasks"},
     "indexer_app.tasks.post_daily_stats_to_signal": {"queue": "beat_tasks"},
     "indexer_app.tasks.post_ummah_stats_to_signal": {"queue": "beat_tasks"},
+    "indexer_app.tasks.post_shariacheck_stats_to_signal": {"queue": "beat_tasks"},
 }
 
 SPOT_INDEXER_QUEUE_NAME = "spot_indexing"
