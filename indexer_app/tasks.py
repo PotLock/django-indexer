@@ -1201,6 +1201,49 @@ def post_ummah_stats_to_signal():
 
 
 @shared_task
+def post_healstroke_stats_to_signal():
+    """Fetch HealStroke daily metrics (secret-gated HTTP endpoint) and POST them
+    to the HealStroke Daily Metrics Signal group. Mirrors post_ummah_stats_to_signal;
+    the endpoint lives in the healstroke.com Next app (shared Supabase project) at
+    /api/healstroke-stats.
+
+    Required env vars:
+        SIGNAL_API_URL               base URL of signal-cli-rest-api
+        SIGNAL_SENDER_NUMBER         registered Signal sender (E.164)
+        HEALSTROKE_STATS_URL         stats endpoint (e.g. https://healstroke.com/api/healstroke-stats)
+        HEALSTROKE_STATS_SECRET      secret sent as the `x-stats-secret` header
+        HEALSTROKE_SIGNAL_RECIPIENT  group id (or phone number) of the HealStroke metrics group
+    """
+    import os
+
+    api_url = os.environ.get("SIGNAL_API_URL")
+    sender = os.environ.get("SIGNAL_SENDER_NUMBER")
+    recipient = os.environ.get("HEALSTROKE_SIGNAL_RECIPIENT")
+    stats_url = os.environ.get("HEALSTROKE_STATS_URL")
+    secret = os.environ.get("HEALSTROKE_STATS_SECRET")
+
+    if not (api_url and sender and recipient and stats_url and secret):
+        jobs_logger.warning(
+            "post_healstroke_stats_to_signal skipped: missing one of "
+            "SIGNAL_API_URL / SIGNAL_SENDER_NUMBER / HEALSTROKE_SIGNAL_RECIPIENT / "
+            "HEALSTROKE_STATS_URL / HEALSTROKE_STATS_SECRET"
+        )
+        return
+
+    stats_resp = requests.get(stats_url, headers={"x-stats-secret": secret}, timeout=30)
+    stats_resp.raise_for_status()
+    message = stats_resp.text
+
+    resp = requests.post(
+        f"{api_url.rstrip('/')}/v2/send",
+        json={"number": sender, "recipients": [recipient], "message": message},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    jobs_logger.info("Posted HealStroke stats to Signal (%d chars).", len(message))
+
+
+@shared_task
 def post_shariacheck_stats_to_signal():
     """Fetch ShariaCheck daily metrics (secret-gated HTTP endpoint) and POST them
     to the ShariaCheck Daily Metrics Signal group. Mirrors post_ummah_stats_to_signal;
